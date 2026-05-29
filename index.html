@@ -9,42 +9,193 @@
 </head>
 <body class="bg-gray-100">
 <style>
+body {
+  font-family: 'Comic Sans MS', serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+b,
+strong,
+th,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+}
+
+input,
+select,
+textarea,
+button,
+::placeholder {
+  font-family: 'Comic Sans MS', serif;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table,
+th,
+td {
+  border: 1px solid #ddd;
+}
+
+th,
+td {
+  padding: 8px;
+}
+
+thead {
+  background-color: #f8f8f8;
+}
+
+tbody tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.footer {
+  background: #111;
+  color: white;
+  padding: 40px;
+  margin-top: 40px;
+}
+
+.footer-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.footer-section {
+  flex: 1;
+  min-width: 180px;
+}
+
+.footer-section h3,
+.footer-section h4 {
+  margin-bottom: 10px;
+}
+
+.footer-section p {
+  font-size: 14px;
+  margin: 8px 0;
+}
+
+.footer-bottom {
+  text-align: center;
+  margin-top: 20px;
+  border-top: 1px solid #444;
+  padding-top: 10px;
+  font-size: 13px;
+}
+
+img,
+iframe,
+video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  content-visibility: auto;
+}
+
+iframe {
+  border: none;
+}
+
+.smooth {
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  will-change: transform;
+}
+
+.drag-item {
+  will-change: transform;
+  transform: translate3d(0,0,0);
+  backface-visibility: hidden;
+  user-select: none;
+  touch-action: none;
+}
+
+.fast-render {
+  contain: content;
+}
+
+.shadow,
+.shadow-md,
+.shadow-lg,
+.shadow-xl,
+.shadow-2xl,
+.heavy-shadow {
+  will-change: auto;
+}
+
+.transition,
+.hover\:shadow-xl,
+.hover\:-translate-y-2,
+.hover\:scale-105 {
+  transition-duration: 0.15s !important;
+}
+
+.card,
+.modal,
+.section-box {
+  transform: translateZ(0);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.lazy-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 500px;
+}
+
+@media (max-width: 768px) {
+  .heavy-shadow,
+  .shadow,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
+    box-shadow: none !important;
+  }
+
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+
+  .mobile-full {
+    width: 100% !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   * {
-    font-family: 'Cambria', serif !important;
-    font-style: normal !important;
-    font-weight: normal !important;
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
-
-  b, strong, th, h1, h2, h3, h4, h5, h6 {
-    font-weight: 700 !important;
-  }
-
-  input, select, textarea, button, ::placeholder {
-    font-family: 'Cambria', serif !important;
-  }
-  
-  body {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
- 
-  table, th, td {
-    border: 1px solid #ccc;
-    border-collapse: collapse;
-  }
-
-  th, td {
-    padding: 8px 8px;
-  }
-
-  thead {
-    background-color: #f8f8f8;
-  }
-
-  tbody tr:nth-child(even) {
-    background-color: #fafafa;
-  }
+}
 </style>
 <!-- LOGIN SCREEN -->
 <div id="loginScreen" class="min-h-screen flex items-center justify-center">
@@ -56,12 +207,7 @@
       <button onclick="adminLogin()" class="flex-1 bg-green-600 text-white py-2 rounded hover:bg-green-700">Login</button>
       <button onclick="clearStorageConfirm()" class="px-3 py-2 bg-gray-200 rounded">Reset Data</button>
     </div>
-    <p id="loginHint" class="text-xs text-gray-500 mt-3">
-      Admins: <b>admin1</b>, <b>admin2</b>, <b>admin3</b><br/>
-      Accounts: <b>account1</b>, <b>account2</b><br/>
-      Developers: <b>dev1</b>, <b>dev2</b><br/>
-      (password for all in this demo: <b>123</b>)
-    </p>
+    
     <p id="loginError" class="text-sm text-red-600 mt-2 hidden">Invalid credentials</p>
   </div>
 </div>
@@ -262,23 +408,19 @@ function previewImage(event) {
 <section id="support" class="hidden">
   <h1 class="text-2xl font-bold mb-4">🛠 Support</h1>
 
-  <!-- Live chat -->
   <div id="liveChatContainer" class="mb-6 border rounded p-4 bg-white shadow">
     <p class="text-gray-600 mb-3">Contact Options:</p>
 
-    <!-- Live Chat -->
     <button onclick="toggleTawkChat()" class="w-full bg-blue-600 text-white px-3 py-2 rounded mb-3 hover:bg-blue-700">
       💬 Live Chat
     </button>
 
-    <!-- WhatsApp -->
     <a href="https://wa.me/254717346231" target="_blank"
        class="flex items-center space-x-2 text-green-600 hover:underline mb-3">
       <i class="fab fa-whatsapp text-green-500"></i>
       <span>WhatsApp: 254717346231</span>
     </a>
 
-   <!-- Email -->
 <a href="mailto:info@acaciabooks.ke?subject=Support%20Request%20from%20User"
    class="flex items-center space-x-2 text-yellow-600 hover:underline">
   <i class="fas fa-envelope text-yellow-500"></i>
@@ -515,12 +657,10 @@ function previewImage(event) {
 </div>
 
 <script>
-/* ------------------------
-   Storage keys & accounts
-   ------------------------ */
+
 const ADMIN_KEY = 'loggedAdmin';
-const LS_USERS = 'users';            // stores array of user objects
-const LS_RENEW_PREFIX = 'renewals_'; // per-user renewal history
+const LS_USERS = 'users';            
+const LS_RENEW_PREFIX = 'renewals_'; 
 
 const ACCOUNTS = {
   admin1: { password: '123', role: 'Admin' },
@@ -532,16 +672,10 @@ const ACCOUNTS = {
   dev2: { password: '123', role: 'Developer' }
 };
 
-/* ------------------------
-   State & chart refs
-   ------------------------ */
 let chartUsersByPlanRef = null;
 let chartPaymentsOverTimeRef = null;
 let editingUsername = null;
 
-/* ------------------------
-   Auth
-   ------------------------ */
 function adminLogin(){
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value.trim();
@@ -562,7 +696,6 @@ function adminLogout(){
   location.reload();
 }
 
-/* Auto-login if admin session exists */
 window.addEventListener('load', () => {
   const admin = localStorage.getItem(ADMIN_KEY);
   if(admin){
@@ -575,34 +708,72 @@ window.addEventListener('load', () => {
   }
 });
 
-/* ------------------------
-   Users & Renewals helpers
-   ------------------------ */
+let users = JSON.parse(localStorage.getItem("users") || "[]");
+
 function getUsers(){
-  try { return JSON.parse(localStorage.getItem(LS_USERS) || '[]'); } catch(e){ return []; }
-}
-function setUsers(arr){ localStorage.setItem(LS_USERS, JSON.stringify(arr)); }
-
-function getRenewals(username){
-  try { return JSON.parse(localStorage.getItem(LS_RENEW_PREFIX + username) || '[]'); } catch(e){ return []; }
-}
-function setRenewals(username, arr){ localStorage.setItem(LS_RENEW_PREFIX + username, JSON.stringify(arr)); }
-
-/* ------------------------
-   UI Navigation
-   ------------------------ */
-function showSection(id){
-  document.querySelectorAll('main > section, main > div').forEach(s => s && s.classList && s.classList.add('hidden'));
-  document.getElementById(id).classList.remove('hidden');
-  if(id === 'dashboard') renderDashboard();
-  if(id === 'users') renderUsersTable();
-  if(id === 'payments') renderPaymentsTable();
-  if(id === 'developer') showPlanDefs();
+  try { return JSON.parse(localStorage.getItem("users") || "[]"); } catch(e){ return []; }
 }
 
-/* ------------------------
-   Add User
-   ------------------------ */
+function setUsers(arr){
+  localStorage.setItem("users", JSON.stringify(arr));
+}
+
+function getCompanies(){
+  const users = getUsers();
+  const companies = {};
+
+  users.forEach(u => {
+    const id = u.companyId || "unknown";
+
+    if (!companies[id]) {
+      companies[id] = {
+        companyId: id,
+        users: [],
+        plan: u.plan || "Free"
+      };
+    }
+
+    companies[id].users.push(u);
+  });
+
+  return companies;
+}
+
+function renderCompanies(){
+  const companies = getCompanies();
+  const container = document.getElementById("companiesList");
+
+  if (!container) return;
+
+  container.innerHTML = Object.values(companies).map(c => `
+    <div onclick="openCompany('${c.companyId}')" class="p-3 border rounded cursor-pointer">
+      <h3>${c.companyId}</h3>
+      <p>Users: ${c.users.length}</p>
+      <p>Plan: ${c.plan}</p>
+    </div>
+  `).join("");
+}
+
+function openCompany(companyId){
+  const users = getUsers().filter(u => u.companyId === companyId);
+
+  document.getElementById("companyTitle").innerText = companyId;
+
+  const table = document.getElementById("companyUsersTable");
+
+  table.innerHTML = users.map(u => `
+    <tr>
+      <td>${u.username}</td>
+      <td>${u.email || ""}</td>
+      <td>${u.role || ""}</td>
+      <td>${u.plan || ""}</td>
+      <td>${u.status || ""}</td>
+    </tr>
+  `).join("");
+
+  document.getElementById("companyView").classList.remove("hidden");
+}
+
 function addUser(){
   const username = document.getElementById('add_username').value.trim();
   const fullName = document.getElementById('add_fullname').value.trim() || username;
@@ -611,22 +782,17 @@ function addUser(){
   const signupMethod = document.getElementById('add_signupMethod')?.value || "manual";
   const status = document.getElementById('add_status')?.value || (plan === "Free" ? "active" : "pending");
 
-  if(!username){ 
-    alert('⚠️ Username required'); 
-    return; 
-  }
+  if(!username) return alert('Username required');
 
   const users = getUsers();
-  if(users.find(u => u.username === username)){ 
-    alert('🚫 User already exists'); 
-    return; 
-  }
+
+  if(users.find(u => u.username === username)) return alert('User exists');
 
   const planPrices = { Free: 0, Starter: 2000, Pro: 5000, Business: 8000, Enterprise: 12000 };
   const price = planPrices[plan] || 0;
 
   const paymentDate = new Date().toISOString();
-  const expiry = new Date(); 
+  const expiry = new Date();
   expiry.setDate(expiry.getDate() + 30);
 
   const userObj = {
@@ -638,53 +804,46 @@ function addUser(){
     signupMethod,
     status,
     paymentDate,
-    expiryDate: expiry.toISOString()
+    expiryDate: expiry.toISOString(),
+    companyId: document.getElementById("activeCompanyId")?.value || "demo_company"
   };
 
   users.push(userObj);
   setUsers(users);
 
-  const history = [{
-    date: paymentDate,
-    method,
-    newExpiry: expiry.toISOString(),
-    note: 'Initial subscription'
-  }];
-  setRenewals(username, history);
-
-  closeAddUserModal();
-  refreshAll();
-  alert(`✅ ${username} added on ${plan} plan (${userObj.status}).`);
+  renderCompanies();
+  alert("User added");
 }
 
-/* ------------------------
-   Edit user modal & renewals
-   ------------------------ */
+function showSection(id){
+  document.querySelectorAll('main > section, main > div').forEach(s => s && s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+  if(id === 'dashboard') renderDashboard();
+  if(id === 'users') renderUsersTable();
+  if(id === 'payments') renderPaymentsTable();
+  if(id === 'companies') renderCompanies();
+}
+
 function openEditUserModal(username){
-  editingUsername = username;
   const users = getUsers();
   const u = users.find(x => x.username === username);
-  if(!u) return alert('User not found');
+  if(!u) return;
 
   document.getElementById('edit_username').value = u.username;
-  document.getElementById('edit_fullname').value = u.fullName || '';
-  document.getElementById('edit_plan').value = u.plan;
-  document.getElementById('edit_method').value = u.method;
+  document.getElementById('edit_fullname').value = u.fullName || "";
+  document.getElementById('edit_plan').value = u.plan || "";
+  document.getElementById('edit_method').value = u.method || "";
 
-  if(document.getElementById('edit_status')) document.getElementById('edit_status').value = u.status || "pending";
-  if(document.getElementById('edit_signupMethod')) document.getElementById('edit_signupMethod').value = u.signupMethod || "manual";
-
-  const d = new Date(u.expiryDate);
-  document.getElementById('edit_expiry').value = isNaN(d) ? '' : d.toISOString().slice(0,10);
-
-  renderRenewalHistory(username);
   document.getElementById('editUserModal').classList.remove('hidden');
 }
 
 function closeEditUserModal(){
-  editingUsername = null;
   document.getElementById('editUserModal').classList.add('hidden');
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderCompanies();
+});
 
 function saveEditedUser(){
   if(!editingUsername) return;
@@ -713,7 +872,6 @@ function saveEditedUser(){
   closeEditUserModal();
 }
 
-/* Add renewal action */
 function addRenewal(){
   if(!editingUsername) return;
   const months = parseInt(document.getElementById('renew_months').value || '1', 10);
@@ -746,7 +904,6 @@ function addRenewal(){
   alert(`✅ Renewed ${editingUsername} by ${months} month(s). New expiry: ${newExpiry.toDateString()}`);
 }
 
-/* Render renewal history */
 function renderRenewalHistory(username){
   const history = getRenewals(username).slice().reverse();
   const container = document.getElementById('renewalList');
@@ -770,21 +927,22 @@ function renderRenewalHistory(username){
   });
 }
 
-/* ------------------------
-   Render tables & charts
-   ------------------------ */
 function renderUsersTable(){
   const tbody = document.getElementById('usersTable');
   tbody.innerHTML = '';
   const users = getUsers();
+
   if(users.length === 0){
     tbody.innerHTML = `<tr><td class="p-3 text-center text-gray-500" colspan="8">No users yet</td></tr>`;
     return;
   }
+
   users.forEach(u=>{
     const expired = (new Date(u.expiryDate) < new Date());
+
     const tr = document.createElement('tr');
     tr.className = 'border-t';
+
     tr.innerHTML = `
       <td class="p-2">${u.username}</td>
       <td class="p-2">${u.fullName || '-'}</td>
@@ -792,13 +950,171 @@ function renderUsersTable(){
       <td class="p-2">${(u.method||'').toUpperCase()}</td>
       <td class="p-2">${new Date(u.paymentDate).toLocaleDateString()}</td>
       <td class="p-2">${new Date(u.expiryDate).toLocaleDateString()}</td>
-      <td class="p-2 font-semibold ${expired ? 'text-red-600' : 'text-green-600'}">${expired ? 'Expired' : 'Active'}</td>
+      <td class="p-2 font-semibold ${expired ? 'text-red-600' : 'text-green-600'}">
+        ${expired ? 'Expired' : 'Active'}
+      </td>
+
       <td class="p-2">
-        <button onclick="openEditUserModal('${u.username}')" class="bg-blue-600 text-white px-2 py-1 rounded mr-2">Edit</button>
-        <button onclick="deleteUserConfirm('${u.username}')" class="bg-red-500 text-white px-2 py-1 rounded">Delete</button>
-      </td>`;
+
+        <div class="flex gap-2">
+
+          <button onclick="openEditUserModal('${u.username}')"
+            class="bg-blue-900 text-white px-2 py-1 rounded">
+            Edit
+          </button>
+
+          <button onclick="deleteUserConfirm('${u.username}')"
+            class="bg-blue-900 text-white px-2 py-1 rounded">
+            Delete
+          </button>
+
+          <div class="relative inline-block">
+
+            <button onclick="toggleUsersMenu('${u.username}')"
+               class="bg-blue-900 text-white px-2 py-1 rounded">
+              More ▾
+            </button>
+
+            <div id="users-menu-${u.username}"
+              class="hidden absolute right-0 mt-1 w-44 bg-white border rounded shadow z-50 flex flex-col">
+
+              <button onclick="previewUser('${u.username}')"
+                class="w-full text-left px-3 py-2 text-sm hover:bg-blue-900 hover:text-white">
+                Preview
+              </button>
+
+              <button onclick="cloneUser('${u.username}')"
+                class="w-full text-left px-3 py-2 text-sm hover:bg-blue-900 hover:text-white">
+                Clone
+              </button>
+
+              <button onclick="downloadUser('${u.username}')"
+                class="w-full text-left px-3 py-2 text-sm hover:bg-blue-900 hover:text-white">
+                Download PDF
+              </button>
+
+              <button onclick="emailUser('${u.username}')"
+                class="w-full text-left px-3 py-2 text-sm hover:bg-blue-900 hover:text-white">
+                Email
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </td>
+    `;
+
     tbody.appendChild(tr);
   });
+}
+
+function toggleUsersMenu(username){
+  document.querySelectorAll("[id^='users-menu-']").forEach(m=>{
+    if(m.id !== `users-menu-${username}`) m.classList.add("hidden");
+  });
+
+  document.getElementById(`users-menu-${username}`).classList.toggle("hidden");
+}
+
+document.addEventListener("click", (e)=>{
+  if(!e.target.closest(".relative")){
+    document.querySelectorAll("[id^='users-menu-']").forEach(m=>{
+      m.classList.add("hidden");
+    });
+  }
+});
+
+function previewUser(username){
+  const u = getUsers().find(x => x.username === username);
+  const win = window.open("", "_blank");
+
+  win.document.write(`
+    <html>
+    <head>
+      <title>User Preview</title>
+      <style>
+        body{font-family:Arial;padding:20px}
+        table{width:100%;border-collapse:collapse}
+        td,th{border:1px solid #ccc;padding:10px}
+        th{background:#1e3a8a;color:#fff;text-align:left}
+      </style>
+    </head>
+    <body>
+      <h2>User Profile</h2>
+      <table>
+        <tr><th>Username</th><td>${u.username}</td></tr>
+        <tr><th>Full Name</th><td>${u.fullName || '-'}</td></tr>
+        <tr><th>Plan</th><td>${u.plan}</td></tr>
+        <tr><th>Payment Method</th><td>${u.method || '-'}</td></tr>
+        <tr><th>Payment Date</th><td>${u.paymentDate}</td></tr>
+        <tr><th>Expiry Date</th><td>${u.expiryDate}</td></tr>
+      </table>
+    </body>
+    </html>
+  `);
+
+  win.document.close();
+}
+
+function cloneUser(username){
+  const users = getUsers();
+  const u = users.find(x => x.username === username);
+  if(!u) return;
+
+  const copy = {...u, username: u.username + "_copy_" + Date.now()};
+  users.push(copy);
+  localStorage.setItem("users", JSON.stringify(users));
+  renderUsersTable();
+}
+
+function downloadUser(username){
+  const u = getUsers().find(x => x.username === username);
+  const win = window.open("", "_blank");
+
+  win.document.write(`
+    <html>
+    <head>
+      <title>User PDF</title>
+      <style>
+        body{font-family:Arial;padding:20px}
+        table{width:100%;border-collapse:collapse}
+        td,th{border:1px solid #ccc;padding:10px}
+        th{background:#1e3a8a;color:#fff;text-align:left}
+      </style>
+    </head>
+    <body>
+      <h2>User Report</h2>
+      <table>
+        <tr><th>Username</th><td>${u.username}</td></tr>
+        <tr><th>Full Name</th><td>${u.fullName || '-'}</td></tr>
+        <tr><th>Plan</th><td>${u.plan}</td></tr>
+        <tr><th>Status</th><td>${u.status || 'Active'}</td></tr>
+        <tr><th>Expiry</th><td>${u.expiryDate}</td></tr>
+      </table>
+      <script>window.onload=()=>window.print()<\/script>
+    </body>
+    </html>
+  `);
+
+  win.document.close();
+}
+
+function emailUser(username){
+  const u = getUsers().find(x => x.username === username);
+
+  const subject = encodeURIComponent("User Details - " + u.username);
+  const body = encodeURIComponent(
+`Username: ${u.username}
+Full Name: ${u.fullName || '-'}
+Plan: ${u.plan}
+Status: ${u.status || 'Active'}
+Expiry: ${u.expiryDate}`
+  );
+
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }
 
 function renderPaymentsTable(){
@@ -850,7 +1166,6 @@ function renderPaymentsTable(){
   });
 }
 
-/* Delete user */
 function deleteUserConfirm(username){
   if(!confirm(`Delete user ${username}? This removes renewals too.`)) return;
   let users = getUsers();
@@ -860,9 +1175,6 @@ function deleteUserConfirm(username){
   refreshAll();
 }
 
-/* ------------------------
-   Charts
-   ------------------------ */
 function renderCharts(){
   const users = getUsers();
 
@@ -904,9 +1216,6 @@ function renderCharts(){
   });
 }
 
-/* ------------------------
-   Misc: exports & refresh
-   ------------------------ */
 function exportPaymentsCSV(){
   const users = getUsers();
   let rows = [['username','fullName','plan','method','date','newExpiry','ref','months','note']];
@@ -927,9 +1236,6 @@ function resetPaymentsFilters(){
   renderPaymentsTable();
 }
 
-/* ------------------------
-   Dashboard & refresh
-   ------------------------ */
 function renderDashboard(){
   const users = getUsers();
   const total = users.length;
@@ -958,9 +1264,6 @@ function refreshAll(){
   renderDashboard();
 }
 
-/* ------------------------
-   Developer: plan defs
-   ------------------------ */
 const PLAN_FEATURES = {
   Free: ["dashboard","inventory_basic","customers_basic"],
   Starter: ["dashboard","inventory_basic","funds","customers_full"],
@@ -970,9 +1273,6 @@ const PLAN_FEATURES = {
 };
 function showPlanDefs(){ document.getElementById('planDefs').innerText = JSON.stringify(PLAN_FEATURES, null, 2); }
 
-/* ------------------------
-   Utilities
-   ------------------------ */
 function closeAddUserModal(){ document.getElementById('addUserModal').classList.add('hidden'); }
 function closeEditUserModal(){ document.getElementById('editUserModal').classList.add('hidden'); editingUsername = null; }
 
@@ -986,97 +1286,78 @@ function clearStorageConfirm(){
     refreshAll();
   }
 }
-</script>
-<script>
-/* Toggle Tawk.to live chat */
-function toggleTawkChat(){
-  if(window.Tawk_API && typeof window.Tawk_API.toggle === 'function') {
+
+let unreadCount = 0;
+
+function toggleTawkChat() {
+  if (window.Tawk_API && typeof window.Tawk_API.toggle === 'function') {
     window.Tawk_API.toggle();
-    // ✅ Reset unread counter when chat opened
     resetUnreadCounter();
   } else {
     alert("💬 Chat loading, please wait...");
   }
 }
 
-/* Load Tawk.to chat widget */
-(function(){
-  var s1 = document.createElement("script"),
-      s0 = document.getElementsByTagName("script")[0];
+(function () {
+  var s1 = document.createElement("script");
+  var s0 = document.getElementsByTagName("script")[0];
+
   s1.async = true;
-  s1.src = 'https://embed.tawk.to/YOUR_WIDGET_ID_HERE/1xxxxxxxx'; // 🔁 same widget ID as POS 2025
+  s1.src = 'https://embed.tawk.to/YOUR_WIDGET_ID_HERE/1xxxxxxxx';
   s1.charset = 'UTF-8';
-  s1.setAttribute('crossorigin','*');
-  s0.parentNode.insertBefore(s1,s0);
+  s1.setAttribute('crossorigin', '*');
+
+  s1.onload = function () {
+    window.Tawk_API = window.Tawk_API || {};
+
+    window.Tawk_API.onMessageReceived = function (message) {
+      unreadCount++;
+      updateUnreadBadge();
+
+      if (Notification.permission === "granted") {
+        new Notification("💬 New Support Message", {
+          body: message?.text || "New message received",
+          icon: "https://cdn-icons-png.flaticon.com/512/684/684908.png"
+        });
+      }
+    };
+  };
+
+  s0.parentNode.insertBefore(s1, s0);
 })();
 
-/* --------------------
-   🔔 New Message Notification + Badge
-   -------------------- */
-let unreadCount = 0;
-
-window.Tawk_API = window.Tawk_API || {};
-
-/* When new message arrives */
-window.Tawk_API.onChatMessage = function(message){
-  unreadCount++;
-  updateUnreadBadge();
-
-  // show browser notification
-  if (Notification.permission === "granted") {
-    new Notification("💬 New Support Message", {
-      body: message.text || "You have a new chat message",
-      icon: "https://cdn-icons-png.flaticon.com/512/684/684908.png"
-    });
-  } else {
-    // fallback: highlight Support button
-    const supportBtn = document.querySelector("button[onclick*='support']");
-    if(supportBtn) supportBtn.classList.add("bg-yellow-600");
-  }
-};
-
-/* Badge updater */
-function updateUnreadBadge(){
+function updateUnreadBadge() {
   let badge = document.getElementById("supportBadge");
-  if(!badge){
+
+  if (!badge) {
     const btn = document.querySelector("button[onclick*='support']");
-    if(btn){
+    if (btn) {
       badge = document.createElement("span");
       badge.id = "supportBadge";
       badge.className = "ml-2 bg-red-600 text-white rounded-full px-2 py-0.5 text-xs";
       btn.appendChild(badge);
     }
   }
-  if(badge) badge.textContent = unreadCount;
+
+  if (badge) badge.textContent = unreadCount;
 }
 
-/* Reset counter when chat is opened */
-function resetUnreadCounter(){
+function resetUnreadCounter() {
   unreadCount = 0;
   const badge = document.getElementById("supportBadge");
-  if(badge) badge.remove();
+  if (badge) badge.remove();
 }
 
-/* Ask for notification permission once */
-if ("Notification" in window && Notification.permission !== "granted") {
+if ("Notification" in window && Notification.permission === "default") {
   Notification.requestPermission();
 }
-</script>
-<script>
-/* ------------------------
-   Section renderers & refresh
-   ------------------------ */
 
-/* Refresh functions called by each hub's button */
 function refreshAnalytics(){ renderAnalytics(); }
 function refreshReports(){ renderReports(); }
 function refreshNotifications(){ renderNotifications(); }
 function refreshSettings(){ renderSettings(); }
 function refreshLogs(){ renderLogs(); }
 
-/* ------------------------
-   Analytics Hub
-   ------------------------ */
 let chartTrafficOverviewRef = null;
 let chartUserEngagementRef = null;
 
@@ -1107,7 +1388,6 @@ function renderAnalytics(){
     </div>
   `;
 
-  // Traffic Overview Chart
   const trafficLabels = users.map(u => u.username);
   const trafficData = users.map(u => Math.floor(Math.random()*100)); // sample traffic metric
   const ctxTraffic = document.getElementById('chartTrafficOverview').getContext('2d');
@@ -1118,7 +1398,6 @@ function renderAnalytics(){
     options: { responsive: true, plugins: { legend: { display: false } } }
   });
 
-  // User Engagement Chart
   const engagementLabels = ['Low','Medium','High'];
   const engagementCounts = [
     Math.floor(users.length*0.2),
@@ -1134,9 +1413,6 @@ function renderAnalytics(){
   });
 }
 
-/* ------------------------
-   Reports Hub
-   ------------------------ */
 let chartMonthlyReportsRef = null;
 let chartTopMetricsRef = null;
 
@@ -1152,7 +1428,6 @@ function renderReports(){
        <div class="text-2xl font-bold">${counts[i]}</div>
      </div>`).join('');
 
-  // Monthly Reports Chart
   const monthlyMap = {};
   users.forEach(u => {
     const m = new Date(u.paymentDate).toLocaleString('default', { month: 'short', year: 'numeric' });
@@ -1180,9 +1455,6 @@ function renderReports(){
   });
 }
 
-/* ------------------------
-   Notifications Hub
-   ------------------------ */
 let chartRecentAlertsRef = null;
 let chartNotificationsByTypeRef = null;
 
@@ -1200,7 +1472,6 @@ function renderNotifications(){
     </div>
   `;
 
-  // Recent Alerts Chart
   const alertLabels = ['System','Payments','User','Other'];
   const alertData = alertLabels.map(()=>Math.floor(Math.random()*10));
   const ctxAlerts = document.getElementById('chartRecentAlerts').getContext('2d');
@@ -1211,7 +1482,6 @@ function renderNotifications(){
     options:{ responsive:true, plugins:{ legend:{ display:false } } }
   });
 
-  // Notifications by Type Chart
   const typesLabels = ['Email','SMS','Push'];
   const typesData = typesLabels.map(()=>Math.floor(Math.random()*20));
   const ctxTypes = document.getElementById('chartNotificationsByType').getContext('2d');
@@ -1223,9 +1493,6 @@ function renderNotifications(){
   });
 }
 
-/* ------------------------
-   Settings Hub
-   ------------------------ */
 let chartSystemPreferencesRef = null;
 let chartConfigChangesRef = null;
 
@@ -1241,7 +1508,6 @@ function renderSettings(){
     </div>
   `;
 
-  // Sample charts
   const ctxSystem = document.getElementById('chartSystemPreferences').getContext('2d');
   if(chartSystemPreferencesRef) chartSystemPreferencesRef.destroy();
   chartSystemPreferencesRef = new Chart(ctxSystem,{
@@ -1259,9 +1525,6 @@ function renderSettings(){
   });
 }
 
-/* ------------------------
-   Logs Hub
-   ------------------------ */
 let chartErrorLogsRef = null;
 let chartActivityLogsRef = null;
 
