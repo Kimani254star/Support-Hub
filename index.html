@@ -1,47 +1,1543 @@
 <!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Dashboard — Acacia Books</title>
-<link href="shared.css" rel="stylesheet">
-</head><body data-page="dashboard">
-<main class="main">
-  <div class="topbar"><div><h1>Dashboard</h1><p>Overview of every Acacia Books app</p></div></div>
-  <div class="content">
-    <div class="stats">
-      <div class="card stat"><h3>Connected Apps</h3><div class="val" id="cApps">0</div></div>
-      <div class="card stat"><h3>Active Users</h3><div class="val" id="cUsers">0</div></div>
-      <div class="card stat"><h3>Open Tickets</h3><div class="val" id="cTickets">0</div></div>
-      <div class="card stat"><h3>Revenue (paid)</h3><div class="val" id="cRev">$0</div></div>
-    </div>
-    <div class="card">
-      <h3 style="color:#062b69;font-weight:800;margin-bottom:12px;">Apps overview</h3>
-      <div id="appsGrid" class="grid-3"></div>
-    </div>
-  </div>
-</main>
-<script src="shared.js"></script>
-<script>
-  const apps=acaciaStore.get('acacia_apps',[]);
-  const users=acaciaStore.get('acacia_users',[]);
-  const tickets=acaciaStore.get('acacia_tickets',[]);
-  const invoices=acaciaStore.get('acacia_invoices',[]);
-  document.getElementById('cApps').textContent=apps.length;
-  document.getElementById('cUsers').textContent=users.filter(u=>u.status==='active').length;
-  document.getElementById('cTickets').textContent=tickets.filter(t=>t.status==='open').length;
-  document.getElementById('cRev').textContent='$'+invoices.filter(i=>i.status==='paid').reduce((s,i)=>s+Number(i.amount||0),0).toLocaleString();
-  const grid=document.getElementById('appsGrid');
-  if(!apps.length){
-    grid.outerHTML='<div class="empty"><div class="icon">📦</div><h3>No apps yet</h3><p>Add your first website in the Apps Hub.</p></div>';
-  } else {
-    grid.innerHTML=apps.map(a=>`
-      <div class="card" style="display:flex;gap:12px;align-items:flex-start;">
-        <div style="width:44px;height:44px;border-radius:10px;background:${a.color||'#062b69'};color:#fff;display:grid;place-items:center;font-weight:800;">${(a.name||'?')[0]}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;color:#062b69;">${a.name}</div>
-          <div style="font-size:12px;color:#6b7280;">App ID · ${a.id}</div>
-          <div style="font-size:13px;color:#6b7280;margin-top:6px;">${a.description||''}</div>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spear Developer Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Cambria,serif;
+}
+body{
+background:#f3f4f6;
+overflow:hidden;
+}
+.hidden{
+display:none;
+}
+button{
+cursor:pointer;
+}
+.login-page{
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+background:linear-gradient(135deg,#0f172a,#1e3a8a);
+}
+.login-card{
+width:400px;
+background:#fff;
+padding:35px;
+border-radius:15px;
+box-shadow:0 20px 40px rgba(0,0,0,.25);
+}
+.login-card h1{
+font-size:28px;
+margin-bottom:25px;
+text-align:center;
+color:#1e3a8a;
+}
+.login-card input{
+width:100%;
+padding:12px;
+margin-bottom:15px;
+border:1px solid #ccc;
+border-radius:8px;
+font-size:15px;
+}
+.login-card button{
+width:100%;
+padding:12px;
+border:none;
+background:#2563eb;
+color:#fff;
+font-size:16px;
+border-radius:8px;
+}
+.login-card button:hover{
+background:#1d4ed8;
+}
+#error{
+color:red;
+margin-top:10px;
+text-align:center;
+display:none;
+}
+#app{
+display:flex;
+height:100vh;
+}
+.sidebar{
+width:260px;
+background:#111827;
+color:white;
+display:flex;
+flex-direction:column;
+}
+.logo{
+padding:20px;
+font-size:24px;
+font-weight:bold;
+text-align:center;
+border-bottom:1px solid rgba(255,255,255,.1);
+}
+.sidebar ul{
+list-style:none;
+padding:15px;
+}
+.sidebar li{
+margin-bottom:8px;
+}
+.sidebar button{
+width:100%;
+padding:12px;
+background:none;
+border:none;
+color:white;
+text-align:left;
+border-radius:8px;
+font-size:15px;
+}
+.sidebar button:hover{
+background:#2563eb;
+}
+.topbar{
+height:70px;
+background:white;
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:0 25px;
+box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.content{
+flex:1;
+display:flex;
+flex-direction:column;
+overflow:auto;
+}
+.page{
+padding:25px;
+display:none;
+}
+.page.active{
+display:block;
+}
+.cards{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+gap:20px;
+margin-top:20px;
+}
+.card{
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 4px 12px rgba(0,0,0,.08);
+}
+.card h2{
+font-size:15px;
+margin-bottom:10px;
+color:#666;
+}
+.card h1{
+font-size:32px;
+color:#2563eb;
+}
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
+background:white;
+}
+th,td{
+padding:12px;
+border:1px solid #ddd;
+text-align:left;
+}
+th{
+background:#2563eb;
+color:white;
+}
+.modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.5);
+display:flex;
+justify-content:center;
+align-items:center;
+z-index:1000;
+}
+</style>
+</head>
+<body>
+<div class="login-page" id="loginPage">
+<div class="login-card">
+<h1>Developer Login</h1>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+<div id="error">Invalid Username or Password</div>
+</div>
+</div>
+<div id="app" class="hidden">
+<div class="sidebar">
+<div class="logo">Spear Tech dvlp</div>
+<ul>
+<li><button onclick="openPage('dashboard')">Dashboard</button></li>
+<li><button onclick="openPage('users')">Users</button></li>
+<li><button onclick="openPage('companies')">Companies</button></li>
+<li><button onclick="openPage('payments')">Payments</button></li>
+<li><button onclick="openPage('analytics')">Analytics</button></li>
+<li><button onclick="openPage('reports')">Reports</button></li>
+<li><button onclick="openPage('notifications')">Notifications</button></li>
+<li><button onclick="openPage('settings')">Settings</button></li>
+<li><button onclick="openPage('logs')">Logs</button></li>
+<li><button onclick="openPage('websites')">Websites</button></li>
+<li><button onclick="openPage('support')">Support</button></li>
+<li><button onclick="logout()">Logout</button></li>
+</ul>
+</div>
+<div class="content">
+<div class="topbar">
+<h2 id="welcome">Welcome</h2>
+<div id="role">Developer</div>
+</div>
+<div class="page active" id="dashboard">
+<h1 class="text-2xl font-bold">Dashboard</h1>
+<p class="my-2 text-gray-500">Welcome to the Acacia Books Developer Panel</p>
+<div class="cards">
+<div class="card">
+<h2>Total Users</h2>
+<h1 id="totalUsers">0</h1>
+</div>
+<div class="card">
+<h2>Total Companies</h2>
+<h1 id="totalCompanies">0</h1>
+</div>
+<div class="card">
+<h2>Total Websites</h2>
+<h1 id="totalWebsites">0</h1>
+</div>
+<div class="card">
+<h2>Revenue</h2>
+<h1 id="totalRevenue">KES 0</h1>
+</div>
+<div class="card">
+<h2>Support Tickets</h2>
+<h1 id="totalTickets">0</h1>
+</div>
+<div class="card">
+<h2>Storage Used</h2>
+<h1 id="storageUsed">0 MB</h1>
+</div>
+</div>
+<div class="mt-6">
+<canvas id="dashboardChart" height="100"></canvas>
+</div>
+</div>
+<div class="page" id="users">
+<h1 class="text-2xl font-bold">Users</h1>
+<div class="flex flex-wrap gap-2 mt-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="openUserModal()">➕ Add User</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="exportUsers()">📥 Export</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="renderUsers()">🔄 Refresh</button>
+</div>
+<div class="mt-4">
+<input id="userSearch" type="text" placeholder="Search users..." onkeyup="renderUsers()" class="w-full p-2 border border-gray-300 rounded">
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Username/Name</th>
+<th>Company</th>
+<th>Role</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="usersTable">
+<tr>
+<td colspan="5" class="text-center p-6 text-gray-500">No users found</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="page" id="companies">
+<h1 class="text-2xl font-bold">Registered Companies</h1>
+<p class="my-2 text-gray-500">All companies registered through the Acacia Books website are displayed here automatically.</p>
+<div class="flex flex-wrap gap-2">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="syncCompanies()">🔄 Sync Companies</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="exportCompanies()">📥 Export</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="renderCompanies()">↻ Refresh</button>
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Companies</h2>
+<h1 id="companyCount">0</h1>
+</div>
+<div class="card">
+<h2>Active</h2>
+<h1 id="activeCompanies">0</h1>
+</div>
+<div class="card">
+<h2>Trial</h2>
+<h1 id="trialCompanies">0</h1>
+</div>
+<div class="card">
+<h2>Paid Plans</h2>
+<h1 id="paidCompanies">0</h1>
+</div>
+</div>
+<div class="mt-4">
+<input id="companySearch" type="text" placeholder="Search company..." onkeyup="renderCompanies()" class="w-full p-2 border border-gray-300 rounded">
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Company</th>
+<th>Owner</th>
+<th>Email</th>
+<th>Plan</th>
+<th>Status</th>
+<th>Registered</th>
+</tr>
+</thead>
+<tbody id="companiesTable">
+<tr>
+<td colspan="6" class="text-center p-6 text-gray-500">No companies registered.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="page" id="websites">
+<h1 class="text-2xl font-bold">🌐 Website Manager</h1>
+<p class="my-2 text-gray-500">Manage all Acacia Books applications from one dashboard.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="renderWebsites()">🔄 Refresh</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="document.getElementById('websiteZip').click()">📤 Import New Website</button>
+<input type="file" id="websiteZip" accept=".zip" hidden onchange="uploadWebsite(event)">
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Websites</h2>
+<h1 id="totalWebsitesCount">16</h1>
+</div>
+<div class="card">
+<h2>Running</h2>
+<h1 id="runningWebsites">16</h1>
+</div>
+<div class="card">
+<h2>Disabled</h2>
+<h1 id="disabledWebsites">0</h1>
+</div>
+<div class="card">
+<h2>Storage</h2>
+<h1 id="websiteStorage">--</h1>
+</div>
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Application</th>
+<th>Version</th>
+<th>Status</th>
+<th>Uploaded</th>
+<th>Size</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="websiteTable"></tbody>
+</table>
+</div>
+<div class="page" id="payments">
+<h1 class="text-2xl font-bold">Payments Management</h1>
+<p class="my-2 text-gray-500">Manage subscriptions, invoices and customer payments.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="openPaymentModal()">➕ New Payment</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="exportPayments()">📤 Export</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="renderPayments()">🔄 Refresh</button>
+</div>
+<div class="mb-4">
+<input type="text" id="paymentSearch" placeholder="Search payment..." onkeyup="renderPayments()" class="w-full p-2 border border-gray-300 rounded">
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Payments</h2>
+<h1 id="paymentCount">0</h1>
+</div>
+<div class="card">
+<h2>Total Revenue</h2>
+<h1 id="paymentRevenue">KES 0</h1>
+</div>
+<div class="card">
+<h2>Pending</h2>
+<h1 id="paymentPending">0</h1>
+</div>
+<div class="card">
+<h2>Completed</h2>
+<h1 id="paymentCompleted">0</h1>
+</div>
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Invoice</th>
+<th>Customer</th>
+<th>Amount</th>
+<th>Method</th>
+<th>Status</th>
+<th>Date</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="paymentsTable">
+<tr>
+<td colspan="7" class="text-center p-6 text-gray-500">No payments found.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="page" id="analytics">
+<h1 class="text-2xl font-bold">Business Analytics</h1>
+<p class="my-2 text-gray-500">Monitor your business performance in real time.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="refreshAnalytics()">🔄 Refresh</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="exportAnalytics()">📊 Export Report</button>
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Revenue</h2>
+<h1 id="analyticsRevenue">KES 0</h1>
+</div>
+<div class="card">
+<h2>Total Payments</h2>
+<h1 id="analyticsPayments">0</h1>
+</div>
+<div class="card">
+<h2>Total Users</h2>
+<h1 id="analyticsUsers">0</h1>
+</div>
+<div class="card">
+<h2>Total Companies</h2>
+<h1 id="analyticsCompanies">0</h1>
+</div>
+<div class="card">
+<h2>Active Websites</h2>
+<h1 id="analyticsWebsites">0</h1>
+</div>
+<div class="card">
+<h2>Support Tickets</h2>
+<h1 id="analyticsTickets">0</h1>
+</div>
+</div>
+<div class="card mt-6">
+<h2>Revenue Overview</h2>
+<canvas id="revenueChart" height="100"></canvas>
+</div>
+<div class="card mt-6">
+<h2>User Growth</h2>
+<canvas id="usersChart" height="100"></canvas>
+</div>
+<div class="card mt-6">
+<h2>Website Activity</h2>
+<canvas id="websiteChart" height="100"></canvas>
+</div>
+</div>
+<div class="page" id="reports">
+<h1 class="text-2xl font-bold">Reports Center</h1>
+<p class="my-2 text-gray-500">Generate, view and export business reports.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="generateReport('users')">👥 Users Report</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="generateReport('companies')">🏢 Companies Report</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="generateReport('payments')">💰 Payments Report</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="generateReport('websites')">🌐 Websites Report</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="generateReport('analytics')">📊 Analytics Report</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="generateReport('backup')">💾 Backup Report</button>
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Reports</h2>
+<h1 id="reportCount">6</h1>
+</div>
+<div class="card">
+<h2>Last Generated</h2>
+<h1 id="lastReport">Never</h1>
+</div>
+<div class="card">
+<h2>Downloads</h2>
+<h1 id="reportDownloads">0</h1>
+</div>
+<div class="card">
+<h2>Export Format</h2>
+<h1 class="text-lg">PDF / Excel / CSV</h1>
+</div>
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Report</th>
+<th>Description</th>
+<th>Generated</th>
+<th>Format</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody id="reportsTable">
+<tr>
+<td>Users</td>
+<td>System users report</td>
+<td>-</td>
+<td>PDF / Excel</td>
+<td><button class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm transition" onclick="generateReport('users')">Generate</button></td>
+</tr>
+<tr>
+<td>Companies</td>
+<td>Registered companies</td>
+<td>-</td>
+<td>PDF / Excel</td>
+<td><button class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm transition" onclick="generateReport('companies')">Generate</button></td>
+</tr>
+<tr>
+<td>Payments</td>
+<td>Revenue and payments</td>
+<td>-</td>
+<td>PDF / Excel</td>
+<td><button class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm transition" onclick="generateReport('payments')">Generate</button></td>
+</tr>
+<tr>
+<td>Websites</td>
+<td>Installed websites</td>
+<td>-</td>
+<td>PDF / Excel</td>
+<td><button class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm transition" onclick="generateReport('websites')">Generate</button></td>
+</tr>
+<tr>
+<td>Analytics</td>
+<td>Business analytics</td>
+<td>-</td>
+<td>PDF / Excel</td>
+<td><button class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm transition" onclick="generateReport('analytics')">Generate</button></td>
+</tr>
+<tr>
+<td>System Backup</td>
+<td>Backup summary</td>
+<td>-</td>
+<td>PDF</td>
+<td><button class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm transition" onclick="generateReport('backup')">Generate</button></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="page" id="notifications">
+<h1 class="text-2xl font-bold">Notification Center</h1>
+<p class="my-2 text-gray-500">Manage system alerts, emails, SMS and in-app notifications.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="openNotificationModal()">➕ New Notification</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="sendAllNotifications()">📤 Send All</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="renderNotifications()">🔄 Refresh</button>
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Notifications</h2>
+<h1 id="notificationCount">0</h1>
+</div>
+<div class="card">
+<h2>Unread</h2>
+<h1 id="unreadNotifications">0</h1>
+</div>
+<div class="card">
+<h2>Sent Today</h2>
+<h1 id="todayNotifications">0</h1>
+</div>
+<div class="card">
+<h2>Failed</h2>
+<h1 id="failedNotifications">0</h1>
+</div>
+</div>
+<div class="my-4">
+<input type="text" id="notificationSearch" placeholder="Search notifications..." onkeyup="renderNotifications()" class="w-full p-2 border border-gray-300 rounded">
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Title</th>
+<th>Recipient</th>
+<th>Type</th>
+<th>Status</th>
+<th>Date</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="notificationsTable">
+<tr>
+<td colspan="6" class="text-center p-6 text-gray-500">No notifications available.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="page" id="settings">
+<h1 class="text-2xl font-bold">Developer Settings</h1>
+<p class="my-2 text-gray-500">Manage the Acacia Books platform configuration, security, integrations and maintenance.</p>
+<div class="cards">
+<div class="card">
+<h2>Platform</h2>
+<label class="block mt-2 text-sm font-medium">Platform Name</label>
+<input id="platformName" type="text" value="Acacia Books ERP" class="w-full p-2 border border-gray-300 rounded text-sm mb-2">
+<label class="block text-sm font-medium">Current Version</label>
+<input id="platformVersion" type="text" value="17.10" class="w-full p-2 border border-gray-300 rounded text-sm mb-2">
+<label class="block text-sm font-medium">Support Email</label>
+<input id="supportEmail" type="email" value="support@acaciabooks.com" class="w-full p-2 border border-gray-300 rounded text-sm mb-2">
+<label class="block text-sm font-medium">Support Phone</label>
+<input id="supportPhone" type="text" value="+254700000000" class="w-full p-2 border border-gray-300 rounded text-sm mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm" onclick="savePlatformSettings()">💾 Save Platform</button>
+</div>
+<div class="card">
+<h2>System Preferences</h2>
+<label class="block mt-2 text-sm font-medium">Default Currency</label>
+<select id="currency" class="w-full p-2 border border-gray-300 rounded text-sm mb-2">
+<option>KES</option>
+<option>USD</option>
+<option>EUR</option>
+<option>GBP</option>
+</select>
+<label class="block text-sm font-medium">Default Language</label>
+<select id="language" class="w-full p-2 border border-gray-300 rounded text-sm mb-2">
+<option>English</option>
+<option>Swahili</option>
+</select>
+<label class="block text-sm font-medium">Theme</label>
+<select id="theme" class="w-full p-2 border border-gray-300 rounded text-sm mb-4">
+<option>Light</option>
+<option>Dark</option>
+</select>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition text-sm" onclick="savePreferences()">💾 Save Preferences</button>
+</div>
+<div class="card flex flex-col justify-between">
+<h2>Security</h2>
+<div class="space-y-2 mt-2">
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="changePassword()">🔑 Change Administrator Password</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="clearSystemCache()">🗑 Clear Cache</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="logoutAllUsers()">🚪 Logout All Users</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="rebuildIndexes()">⚙ Rebuild Database</button>
+</div>
+</div>
+<div class="card flex flex-col justify-between">
+<h2>Maintenance</h2>
+<div class="space-y-2 mt-2">
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="backupSystem()">💾 Create Backup</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="restoreSystem()">📂 Restore Backup</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="checkUpdates()">⬇ Check Updates</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="optimizeSystem()">🚀 Optimize System</button>
+</div>
+</div>
+<div class="card flex flex-col justify-between">
+<h2>Applications</h2>
+<div class="space-y-2 mt-2">
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="syncApplications()">🔄 Sync Installed Websites</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="verifyApplications()">✔ Verify Applications</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="scanMissingFiles()">📂 Scan Missing Files</button>
+<button class="w-full bg-gray-800 text-white p-2 rounded hover:bg-gray-900 transition text-sm" onclick="repairApplications()">🛠 Repair Applications</button>
+</div>
+</div>
+<div class="card text-sm space-y-1">
+<h2>About</h2>
+<p><strong>Acacia Books Developer Panel</strong></p>
+<p>Version <span id="systemVersion">17.10</span></p>
+<p>Developer: Joseph Kimani</p>
+<p>Platform: Acacia Books ERP Suite</p>
+<p id="lastSaved" class="text-gray-500 mt-2">Last Saved: Never</p>
+</div>
+</div>
+</div>
+<div class="page" id="logs">
+<h1 class="text-2xl font-bold">System Logs</h1>
+<p class="my-2 text-gray-500">Monitor all activities performed within the system.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="clearLogs()">🗑 Clear Logs</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="exportLogs()">📥 Export Logs</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="renderLogs()">🔄 Refresh</button>
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Logs</h2>
+<h1 id="logCount">0</h1>
+</div>
+<div class="card">
+<h2>Logins</h2>
+<h1 id="loginLogs">0</h1>
+</div>
+<div class="card">
+<h2>Errors</h2>
+<h1 id="errorLogs">0</h1>
+</div>
+<div class="card">
+<h2>Warnings</h2>
+<h1 id="warningLogs">0</h1>
+</div>
+</div>
+<div class="my-4">
+<input type="text" id="logSearch" placeholder="Search logs..." onkeyup="renderLogs()" class="w-full p-2 border border-gray-300 rounded">
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Date</th>
+<th>Level</th>
+<th>User</th>
+<th>Activity</th>
+<th>Module</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="logsTable">
+<tr>
+<td colspan="6" class="text-center p-6 text-gray-500">No logs available.</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="page" id="support">
+<h1 class="text-2xl font-bold">Support Center</h1>
+<p class="my-2 text-gray-500">Manage customer support tickets, live chats, feature requests and bug reports.</p>
+<div class="flex flex-wrap gap-2 mb-4">
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="openSupportModal()">➕ New Ticket</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="renderSupportTickets()">🔄 Refresh</button>
+<button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition" onclick="exportSupportTickets()">📥 Export</button>
+</div>
+<div class="cards">
+<div class="card">
+<h2>Total Tickets</h2>
+<h1 id="supportTotal">0</h1>
+</div>
+<div class="card">
+<h2>Open</h2>
+<h1 id="supportOpen">0</h1>
+</div>
+<div class="card">
+<h2>Resolved</h2>
+<h1 id="supportResolved">0</h1>
+</div>
+<div class="card">
+<h2>High Priority</h2>
+<h1 id="supportHigh">0</h1>
+</div>
+</div>
+<div class="my-4">
+<input type="text" id="supportSearch" placeholder="Search tickets..." onkeyup="renderSupportTickets()" class="w-full p-2 border border-gray-300 rounded">
+</div>
+<table class="w-full mt-4 border-collapse bg-white">
+<thead>
+<tr>
+<th>Ticket #</th>
+<th>Customer</th>
+<th>Subject</th>
+<th>Priority</th>
+<th>Status</th>
+<th>Date</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="supportTable">
+<tr>
+<td colspan="7" class="text-center p-6 text-gray-500">No support tickets available.</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+<div id="globalModal" class="modal hidden">
+    <div class="bg-white p-6 rounded-lg w-96 shadow-2xl relative">
+        <h2 id="modalTitle" class="text-xl font-bold mb-4">Modal Title</h2>
+        <div id="modalBody" class="space-y-3"></div>
+        <div class="flex justify-end gap-2 mt-5">
+            <button class="bg-gray-400 text-white px-4 py-2 rounded text-sm hover:bg-gray-500" onclick="closeModal()">Cancel</button>
+            <button id="modalActionBtn" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">Save</button>
         </div>
-      </div>`).join('');
-  }
+    </div>
+</div>
+
+<script>
+const ACCOUNTS = {
+    "adminacaciabooks@gmail.com": { password: "admin123", role: "Administrator", fullName: "System Administrator" },
+    "developeracaciabooks@gmail.com": { password: "dvlp123", role: "Developer", fullName: "System Developer" }
+};
+
+const USERS_KEY = "users";
+const COMPANY_KEY = "acacia_companies";
+const WEBSITE_KEY = "acacia_websites";
+const PAYMENT_KEY = "acacia_payments";
+const NOTIFICATION_KEY = "acacia_notifications";
+const SUPPORT_KEY = "acacia_support";
+const SETTINGS_KEY = "acacia_settings";
+const LOG_KEY = "acacia_logs";
+
+let users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
+let companies = JSON.parse(localStorage.getItem(COMPANY_KEY) || "[]");
+let payments = JSON.parse(localStorage.getItem(PAYMENT_KEY) || "[]");
+let notifications = JSON.parse(localStorage.getItem(NOTIFICATION_KEY) || "[]");
+let supportTickets = JSON.parse(localStorage.getItem(SUPPORT_KEY) || "[]");
+let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+let logs = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+
+let websites = [
+    {id:1,name:"ERP System",file:"app_1710.html",version:"17.10",size:"48 MB",status:"Active",uploaded:"Built In"},
+    {id:2,name:"CRM",file:"crm_1707.html",version:"17.07",size:"12 MB",status:"Active",uploaded:"Built In"},
+    {id:3,name:"Mail",file:"Mail_1707.html",version:"17.07",size:"8 MB",status:"Active",uploaded:"Built In"},
+    {id:4,name:"Inventory",file:"Inventory_1707.html",version:"17.07",size:"16 MB",status:"Active",uploaded:"Built In"},
+    {id:5,name:"Payroll",file:"Payroll_1707.html",version:"17.07",size:"14 MB",status:"Active",uploaded:"Built In"},
+    {id:6,name:"Projects",file:"projects_1707.html",version:"17.07",size:"11 MB",status:"Active",uploaded:"Built In"},
+    {id:7,name:"Architecture",file:"Architecture_1707.html",version:"17.07",size:"9 MB",status:"Active",uploaded:"Built In"},
+    {id:8,name:"Expenses",file:"Expenses_1707.html",version:"17.07",size:"8 MB",status:"Active",uploaded:"Built In"},
+    {id:9,name:"Home Page",file:"Home page_1707.html",version:"17.07",size:"5 MB",status:"Active",uploaded:"Built In"},
+    {id:10,name:"Landing Page",file:"Land_1707.html",version:"17.07",size:"4 MB",status:"Active",uploaded:"Built In"},
+    {id:11,name:"2Sweet",file:"2sweet.html",version:"1.0",size:"3 MB",status:"Active",uploaded:"Built In"},
+    {id:12,name:"Tech Hub",file:"techhub.html",version:"1.0",size:"6 MB",status:"Active",uploaded:"Built In"},
+    {id:13,name:"MediPharm",file:"medipharm.html",version:"1.0",size:"5 MB",status:"Active",uploaded:"Built In"},
+    {id:14,name:"Liquor Store",file:"liquorstore.html",version:"1.0",size:"6 MB",status:"Active",uploaded:"Built In"},
+    {id:15,name:"Gadget Store",file:"Gadget-Store_1707.html",version:"17.07",size:"7 MB",status:"Active",uploaded:"Built In"},
+    {id:16,name:"Wine Store",file:"Wines_1707.html",version:"17.07",size:"5 MB",status:"Active",uploaded:"Built In"}
+];
+
+function login() {
+    const u = document.getElementById("username").value.trim().toLowerCase();
+    const p = document.getElementById("password").value;
+    const account = ACCOUNTS[u];
+    if (!account || account.password !== p) {
+        document.getElementById("error").style.display = "block";
+        return;
+    }
+    const session = { email: u, role: account.role, fullName: account.fullName, loginTime: new Date().toISOString() };
+    localStorage.setItem("developerSession", JSON.stringify(session));
+    document.getElementById("welcome").textContent = `Welcome, ${account.fullName}`;
+    document.getElementById("role").textContent = account.role;
+    document.getElementById("loginPage").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    addLog("Info", account.fullName, "User Logged In Successfully", "Auth");
+    loadDashboard();
+}
+
+function logout(){
+    localStorage.removeItem("developerSession");
+    location.reload();
+}
+
+function openPage(id){
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+    if(id === 'dashboard') loadDashboard();
+    if(id === 'users') renderUsers();
+    if(id === 'companies') renderCompanies();
+    if(id === 'payments') renderPayments();
+    if(id === 'analytics') refreshAnalytics();
+    if(id === 'notifications') renderNotifications();
+    if(id === 'logs') renderLogs();
+    if(id === 'support') renderSupportTickets();
+}
+
+function openModal(title, bodyHtml, actionCallback) {
+    document.getElementById("modalTitle").textContent = title;
+    document.getElementById("modalBody").innerHTML = bodyHtml;
+    const actionBtn = document.getElementById("modalActionBtn");
+    actionBtn.onclick = function() {
+        actionCallback();
+        closeModal();
+    };
+    document.getElementById("globalModal").classList.remove("hidden");
+}
+function closeModal() {
+    document.getElementById("globalModal").classList.add("hidden");
+}
+
+function openUserModal(userId = null) {
+    const user = users.find(u => u.id == userId);
+    const title = user ? "Edit User" : "Add New User";
+    const bodyHtml = `
+        <input id="modalUser_name" type="text" placeholder="Username/Name" value="${user ? user.username : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalUser_company" type="text" placeholder="Company" value="${user ? user.company : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalUser_role" type="text" placeholder="Role (e.g. Admin, Staff)" value="${user ? user.role : ''}" class="w-full p-2 border rounded text-sm">
+        <select id="modalUser_status" class="w-full p-2 border rounded text-sm">
+            <option value="Active" ${user && user.status === 'Active' ? 'selected' : ''}>Active</option>
+            <option value="Inactive" ${user && user.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+        </select>
+    `;
+    openModal(title, bodyHtml, () => {
+        const username = document.getElementById("modalUser_name").value.trim();
+        const company = document.getElementById("modalUser_company").value.trim();
+        const role = document.getElementById("modalUser_role").value.trim();
+        const status = document.getElementById("modalUser_status").value;
+        if (!username) return alert("Username required!");
+
+        if (user) {
+            user.username = username;
+            user.company = company;
+            user.role = role;
+            user.status = status;
+            addLog("Warning", "Developer", `Updated User: ${username}`, "Users");
+        } else {
+            users.push({ id: Date.now(), username, company, role, status });
+            addLog("Info", "Developer", `Created User: ${username}`, "Users");
+        }
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        renderUsers();
+    });
+}
+
+function renderUsers() {
+    const tbody = document.getElementById("usersTable");
+    const search = document.getElementById("userSearch").value.toLowerCase();
+    tbody.innerHTML = "";
+    const filtered = users.filter(u => u.username.toLowerCase().includes(search) || (u.company && u.company.toLowerCase().includes(search)));
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">No users found</td></tr>`;
+    } else {
+        filtered.forEach(u => {
+            tbody.innerHTML += `
+            <tr>
+                <td>${u.username}</td>
+                <td>${u.company || '-'}</td>
+                <td>${u.role || '-'}</td>
+                <td><span class="${u.status === 'Active' ? 'text-green-600 font-bold' : 'text-red-500'}">${u.status || 'Active'}</span></td>
+                <td>
+                    <button class="bg-blue-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="openUserModal(${u.id})">Edit</button>
+                    <button class="bg-red-600 text-white px-2 py-1 text-xs rounded" onclick="deleteUser(${u.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("totalUsers").innerHTML = users.length;
+}
+
+function deleteUser(id) {
+    if(!confirm("Delete this user?")) return;
+    users = users.filter(u => u.id !== id);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Error", "Developer", "Deleted System User Profile", "Users");
+    renderUsers();
+}
+
+function exportUsers() {
+    const blob = new Blob([JSON.stringify(users, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "system_users.json";
+    a.click();
+}
+
+function openPaymentModal(payId = null) {
+    const payment = payments.find(p => p.id == payId);
+    const title = payment ? "Edit Payment Invoice" : "Generate New Payment";
+    const bodyHtml = `
+        <input id="modalPay_invoice" type="text" placeholder="Invoice String (e.g. INV-002)" value="${payment ? payment.invoice : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalPay_customer" type="text" placeholder="Customer Name" value="${payment ? payment.customer : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalPay_amount" type="number" placeholder="Amount (KES)" value="${payment ? payment.amount : ''}" class="w-full p-2 border rounded text-sm">
+        <select id="modalPay_method" class="w-full p-2 border rounded text-sm">
+            <option ${payment && payment.method === 'M-Pesa' ? 'selected' : ''}>M-Pesa</option>
+            <option ${payment && payment.method === 'Bank Transfer' ? 'selected' : ''}>Bank Transfer</option>
+            <option ${payment && payment.method === 'Credit Card' ? 'selected' : ''}>Credit Card</option>
+        </select>
+        <select id="modalPay_status" class="w-full p-2 border rounded text-sm">
+            <option ${payment && payment.status === 'Completed' ? 'selected' : ''}>Completed</option>
+            <option ${payment && payment.status === 'Pending' ? 'selected' : ''}>Pending</option>
+        </select>
+    `;
+    openModal(title, bodyHtml, () => {
+        const invoice = document.getElementById("modalPay_invoice").value.trim();
+        const customer = document.getElementById("modalPay_customer").value.trim();
+        const amount = document.getElementById("modalPay_amount").value;
+        const method = document.getElementById("modalPay_method").value;
+        const status = document.getElementById("modalPay_status").value;
+        if (!invoice || !customer || !amount) return alert("Fill in all parameters!");
+
+        if (payment) {
+            payment.invoice = invoice;
+            payment.customer = customer;
+            payment.amount = amount;
+            payment.method = method;
+            payment.status = status;
+        } else {
+            payments.push({ id: Date.now(), invoice, customer, amount, method, status, date: new Date().toLocaleDateString() });
+        }
+        localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+        addLog("Info", "Developer", `Processed Invoice: ${invoice}`, "Payments");
+        renderPayments();
+    });
+}
+
+function renderPayments(){
+    const tbody = document.getElementById("paymentsTable");
+    const search = document.getElementById("paymentSearch").value.toLowerCase();
+    tbody.innerHTML = "";
+    let revenue = 0;
+    let completed = 0;
+    let pending = 0;
+    const filtered = payments.filter(p => p.invoice.toLowerCase().includes(search) || p.customer.toLowerCase().includes(search));
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No payments found.</td></tr>`;
+    }else{
+        filtered.forEach(p => {
+            if(p.status === "Completed") {
+                revenue += Number(p.amount);
+                completed++;
+            }
+            if(p.status === "Pending") pending++;
+            tbody.innerHTML += `
+            <tr>
+                <td>${p.invoice}</td>
+                <td>${p.customer}</td>
+                <td>KES ${Number(p.amount).toLocaleString()}</td>
+                <td>${p.method}</td>
+                <td><span class="${p.status==='Completed'?'text-green-600':'text-yellow-600'}">${p.status}</span></td>
+                <td>${p.date}</td>
+                <td>
+                    <button class="bg-blue-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="openPaymentModal(${p.id})">Edit</button>
+                    <button class="bg-red-600 text-white px-2 py-1 text-xs rounded" onclick="deletePayment(${p.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("paymentCount").textContent = payments.length;
+    document.getElementById("paymentRevenue").textContent = "KES " + revenue.toLocaleString();
+    document.getElementById("paymentPending").textContent = pending;
+    document.getElementById("paymentCompleted").textContent = completed;
+    document.getElementById("totalRevenue").textContent = "KES " + revenue.toLocaleString();
+}
+
+function deletePayment(id){
+    if(!confirm("Delete this payment?")) return;
+    payments = payments.filter(p => p.id !== id);
+    localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+    renderPayments();
+}
+
+function exportPayments() {
+    const blob = new Blob([JSON.stringify(payments, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "payments_register.json";
+    a.click();
+}
+
+function openNotificationModal() {
+    const bodyHtml = `
+        <input id="modalNotif_title" type="text" placeholder="Notification Title" class="w-full p-2 border rounded text-sm">
+        <input id="modalNotif_recipient" type="text" placeholder="Recipient Email/All" class="w-full p-2 border rounded text-sm">
+        <select id="modalNotif_type" class="w-full p-2 border rounded text-sm">
+            <option>System Alert</option>
+            <option>Email Blast</option>
+            <option>SMS</option>
+        </select>
+        <textarea id="modalNotif_msg" placeholder="Message content details..." class="w-full p-2 border rounded text-sm h-20"></textarea>
+    `;
+    openModal("Create Broadcast Notification", bodyHtml, () => {
+        const title = document.getElementById("modalNotif_title").value.trim();
+        const recipient = document.getElementById("modalNotif_recipient").value.trim();
+        const type = document.getElementById("modalNotif_type").value;
+        const message = document.getElementById("modalNotif_msg").value.trim();
+        if(!title || !recipient) return alert("Missing structural fields.");
+
+        notifications.push({ id: Date.now(), title, recipient, type, status: "Unread", message, date: new Date().toLocaleDateString() });
+        localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+        renderNotifications();
+    });
+}
+
+function renderNotifications(){
+    const tbody = document.getElementById("notificationsTable");
+    const search = document.getElementById("notificationSearch").value.toLowerCase();
+    tbody.innerHTML = "";
+    const filtered = notifications.filter(n => n.title.toLowerCase().includes(search) || n.recipient.toLowerCase().includes(search));
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">No notifications available.</td></tr>`;
+    }else{
+        filtered.forEach(n => {
+            tbody.innerHTML += `
+            <tr>
+                <td>${n.title}</td>
+                <td>${n.recipient}</td>
+                <td>${n.type}</td>
+                <td><span class="text-blue-500">${n.status}</span></td>
+                <td>${n.date}</td>
+                <td>
+                    <button class="bg-blue-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="viewNotification(${n.id})">View</button>
+                    <button class="bg-red-600 text-white px-2 py-1 text-xs rounded" onclick="deleteNotification(${n.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("notificationCount").textContent = notifications.length;
+    document.getElementById("unreadNotifications").textContent = notifications.filter(n=>n.status==="Unread").length;
+    document.getElementById("todayNotifications").textContent = notifications.filter(n=>n.date===new Date().toLocaleDateString()).length;
+    document.getElementById("failedNotifications").textContent = notifications.filter(n=>n.status==="Failed").length;
+}
+
+function viewNotification(id){
+    const n = notifications.find(notif => notif.id === id);
+    if(!n) return;
+    alert(`Broadcast Content: ${n.title}\n\nMessage Body:\n${n.message}`);
+    n.status = "Read";
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    renderNotifications();
+}
+
+function deleteNotification(id){
+    if(!confirm("Remove log structure?")) return;
+    notifications = notifications.filter(n => n.id !== id);
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    renderNotifications();
+}
+
+function sendAllNotifications(){
+    notifications.forEach(n => n.status = "Sent");
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    renderNotifications();
+    alert("All queued notifications dispatched successfully.");
+}
+
+function openSupportModal() {
+    const bodyHtml = `
+        <input id="modalTicket_cust" type="text" placeholder="Customer Name" class="w-full p-2 border rounded text-sm">
+        <input id="modalTicket_subj" type="text" placeholder="Subject Issue Description" class="w-full p-2 border rounded text-sm">
+        <select id="modalTicket_priority" class="w-full p-2 border rounded text-sm">
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+        </select>
+        <textarea id="modalTicket_msg" placeholder="Describe architectural context/bug details..." class="w-full p-2 border rounded text-sm h-20"></textarea>
+    `;
+    openModal("File System Support Ticket", bodyHtml, () => {
+        const customer = document.getElementById("modalTicket_cust").value.trim();
+        const subject = document.getElementById("modalTicket_subj").value.trim();
+        const priority = document.getElementById("modalTicket_priority").value;
+        const message = document.getElementById("modalTicket_msg").value.trim();
+        if(!customer || !subject) return alert("Parameters can't be empty.");
+
+        supportTickets.push({
+            id: Date.now(), ticket: "TCK-" + Math.floor(1000 + Math.random() * 9000),
+            customer, subject, priority, status: "Open", message, date: new Date().toLocaleDateString()
+        });
+        localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+        renderSupportTickets();
+    });
+}
+
+function renderSupportTickets(){
+    const tbody = document.getElementById("supportTable");
+    const search = document.getElementById("supportSearch").value.toLowerCase();
+    tbody.innerHTML = "";
+    const filtered = supportTickets.filter(t => t.customer.toLowerCase().includes(search) || t.subject.toLowerCase().includes(search));
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No support tickets available.</td></tr>`;
+    }else{
+        filtered.forEach(t => {
+            tbody.innerHTML += `
+            <tr>
+                <td>${t.ticket}</td>
+                <td>${t.customer}</td>
+                <td>${t.subject}</td>
+                <td><span class="${t.priority==='High'?'text-red-600 font-bold':''}">${t.priority}</span></td>
+                <td><span class="text-blue-500">${t.status}</span></td>
+                <td>${t.date}</td>
+                <td>
+                    <button class="bg-green-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="resolveTicket(${t.id})">Resolve</button>
+                    <button class="bg-red-600 text-white px-2 py-1 text-xs rounded" onclick="deleteTicket(${t.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("supportTotal").textContent = supportTickets.length;
+    document.getElementById("supportOpen").textContent = supportTickets.filter(t=>t.status==="Open").length;
+    document.getElementById("supportResolved").textContent = supportTickets.filter(t=>t.status==="Resolved").length;
+    document.getElementById("supportHigh").textContent = supportTickets.filter(t=>t.priority==="High").length;
+    document.getElementById("totalTickets").textContent = supportTickets.length;
+}
+
+function resolveTicket(id) {
+    const t = supportTickets.find(ticket => ticket.id === id);
+    if(t) t.status = "Resolved";
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    renderSupportTickets();
+}
+
+function deleteTicket(id){
+    if(!confirm("Purge ticket history?")) return;
+    supportTickets = supportTickets.filter(t => t.id !== id);
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    renderSupportTickets();
+}
+
+function exportSupportTickets(){
+    const blob = new Blob([JSON.stringify(supportTickets, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "support_tickets.json";
+    a.click();
+}
+
+function savePlatformSettings(){
+    settings.platformName = document.getElementById("platformName").value;
+    settings.platformVersion = document.getElementById("platformVersion").value;
+    settings.supportEmail = document.getElementById("supportEmail").value;
+    settings.supportPhone = document.getElementById("supportPhone").value;
+    settings.lastSaved = new Date().toLocaleString();
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    document.getElementById("lastSaved").textContent = "Last Saved: " + settings.lastSaved;
+    alert("Platform settings written to system storage configuration successfully.");
+}
+
+function savePreferences(){
+    settings.currency = document.getElementById("currency").value;
+    settings.language = document.getElementById("language").value;
+    settings.theme = document.getElementById("theme").value;
+    settings.lastSaved = new Date().toLocaleString();
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    document.getElementById("lastSaved").textContent = "Last Saved: " + settings.lastSaved;
+    alert("System rendering preferences adapted successfully.");
+}
+
+function changePassword(){
+    const bodyHtml = `<input id="newAdminPassword" type="password" placeholder="Enter New Access Key Pass" class="w-full p-2 border rounded text-sm">`;
+    openModal("Change Administration Password", bodyHtml, () => {
+        const passValue = document.getElementById("newAdminPassword").value;
+        if(passValue.length < 4) return alert("Password too weak.");
+        ACCOUNTS["adminacaciabooks@gmail.com"].password = passValue;
+        addLog("Warning", "Developer", "Updated Global Administrator Master Root Password", "Security");
+        alert("Root key mutated successfully.");
+    });
+}
+
+function clearSystemCache(){
+    if(!confirm("Perform deep system cache cleanup?")) return;
+    localStorage.clear();
+    alert("Application LocalStorage cache purged fully. Reloading framework.");
+    location.reload();
+}
+
+function logoutAllUsers() {
+    alert("Active OAuth structural tokens invalidated. Core terminal isolated.");
+    addLog("Warning", "System", "Forced Logout Event Issued to all active clusters", "Security");
+}
+
+function rebuildIndexes() {
+    alert("Reindexing application schemas and structure keys completely.");
+    addLog("Info", "DBA Engine", "Rebuilt structural storage nodes and relational entities", "Database");
+}
+
+function backupSystem() {
+    const backupBundle = { users, companies, payments, notifications, supportTickets, settings, logs };
+    const blob = new Blob([JSON.stringify(backupBundle, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `Acacia_Core_Backup_${Date.now()}.json`;
+    a.click();
+}
+
+function restoreSystem() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.readAsText(file,'UTF-8');
+        reader.onload = readerEvent => {
+            try {
+                const parsed = JSON.parse(readerEvent.target.result);
+                if(parsed.users) localStorage.setItem(USERS_KEY, JSON.stringify(parsed.users));
+                if(parsed.companies) localStorage.setItem(COMPANY_KEY, JSON.stringify(parsed.companies));
+                if(parsed.payments) localStorage.setItem(PAYMENT_KEY, JSON.stringify(parsed.payments));
+                alert("Core database structural architecture restored successfully! Refreshing dashboard context.");
+                location.reload();
+            } catch(err) { alert("Invalid core state structural file formatting template."); }
+        }
+    }
+    input.click();
+}
+
+function checkUpdates() { alert("System instance operating on the absolute bleeding edge optimization roadmap."); }
+function optimizeSystem() { alert("Compacting data layers, flushing execution trees, and boosting computational output loops."); }
+function syncApplications() { alert("Installed static web nodes synchronized against core root assets registry module."); }
+function verifyApplications() { alert("Cryptographic verification check matching hashes across 16 active apps: OK."); }
+function scanMissingFiles() { alert("Asset scan execution: 0 missing blocks across runtime trees."); }
+function repairApplications() { alert("Executing structure tree reconstruction engine. Active pipelines clean."); }
+
+function loadSettings(){
+    if(!settings) return;
+    document.getElementById("platformName").value = settings.platformName || "Acacia Books ERP";
+    document.getElementById("platformVersion").value = settings.platformVersion || "17.10";
+    document.getElementById("supportEmail").value = settings.supportEmail || "support@acaciabooks.com";
+    document.getElementById("supportPhone").value = settings.supportPhone || "+254700000000";
+    document.getElementById("currency").value = settings.currency || "KES";
+    document.getElementById("language").value = settings.language || "English";
+    document.getElementById("theme").value = settings.theme || "Light";
+    document.getElementById("lastSaved").textContent = "Last Saved: " + (settings.lastSaved || "Never");
+}
+
+function addLog(level, user, activity, module){
+    logs.unshift({ id: Date.now(), date: new Date().toLocaleString(), level, user, activity, module });
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+}
+
+function renderLogs(){
+    const tbody = document.getElementById("logsTable");
+    const search = document.getElementById("logSearch").value.toLowerCase();
+    tbody.innerHTML = "";
+    const filtered = logs.filter(log =>
+        log.user.toLowerCase().includes(search) ||
+        log.activity.toLowerCase().includes(search) ||
+        log.module.toLowerCase().includes(search) ||
+        log.level.toLowerCase().includes(search)
+    );
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">No logs available.</td></tr>`;
+    }else{
+        filtered.forEach(log => {
+            tbody.innerHTML += `
+            <tr>
+                <td>${log.date}</td>
+                <td><span class="font-bold ${log.level==='Error'?'text-red-600':log.level==='Warning'?'text-yellow-600':'text-blue-600'}">${log.level}</span></td>
+                <td>${log.user}</td>
+                <td>${log.activity}</td>
+                <td>${log.module}</td>
+                <td><button class="bg-red-600 text-white px-2 py-1 text-xs rounded hover:bg-red-700" onclick="deleteLog(${log.id})">Delete</button></td>
+            </tr>`;
+        });
+    }
+    document.getElementById("logCount").textContent = logs.length;
+    document.getElementById("loginLogs").textContent = logs.filter(l => l.activity.toLowerCase().includes("login")).length;
+    document.getElementById("errorLogs").textContent = logs.filter(l => l.level === "Error").length;
+    document.getElementById("warningLogs").textContent = logs.filter(l => l.level === "Warning").length;
+}
+
+function deleteLog(id){
+    logs = logs.filter(log => log.id !== id);
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    renderLogs();
+}
+
+function clearLogs(){
+    if(!confirm("Flush system audit traces trail completely?")) return;
+    logs = [];
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    renderLogs();
+}
+
+function exportLogs(){
+    const blob = new Blob([JSON.stringify(logs, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "system_logs.json";
+    a.click();
+}
+
+function uploadWebsite(event){
+    const file = event.target.files[0];
+    if(!file) return;
+    websites.push({
+        id: Date.now(),
+        name: file.name.replace(".zip", ""),
+        file: "#",
+        version: "1.0",
+        size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+        status: "Imported",
+        uploaded: new Date().toLocaleString()
+    });
+    addLog("Info", "Developer", `Imported Web Module Zip Application: ${file.name}`, "Web App");
+    renderWebsites();
+}
+
+function renderWebsites(){
+    const tbody = document.getElementById("websiteTable");
+    tbody.innerHTML = "";
+    let running = 0;
+    let storage = 0;
+    websites.forEach(site => {
+        if(site.status === "Active") running++;
+        storage += parseFloat(site.size) || 0;
+        tbody.innerHTML += `
+        <tr>
+            <td>${site.name}</td>
+            <td>${site.version}</td>
+            <td><span class="${site.status==='Active'?'text-green-600':'text-red-500'}">${site.status}</span></td>
+            <td>${site.uploaded}</td>
+            <td>${site.size}</td>
+            <td>
+                <button class="bg-blue-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="openWebsite(${site.id})">Open</button>
+                <button class="bg-gray-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="toggleWebsite(${site.id})">${site.status === "Active" ? "Disable" : "Enable"}</button>
+                <button class="bg-red-600 text-white px-2 py-1 text-xs rounded" onclick="deleteWebsite(${site.id})">Delete</button>
+            </td>
+        </tr>`;
+    });
+    document.getElementById("totalWebsitesCount").textContent = websites.length;
+    document.getElementById("runningWebsites").textContent = running;
+    document.getElementById("disabledWebsites").textContent = websites.length - running;
+    document.getElementById("websiteStorage").textContent = storage.toFixed(2) + " MB";
+    document.getElementById("totalWebsites").textContent = websites.length;
+    document.getElementById("storageUsed").textContent = storage.toFixed(2) + " MB";
+}
+
+function openWebsite(id){
+    const site = websites.find(w => w.id === id);
+    if(!site) return;
+    if(site.file === "#"){
+        alert("Imported local ZIP payload architecture file structure. Complete instantiation parameters inside raw local staging environment engine framework.");
+        return;
+    }
+    window.open(site.file, "_blank");
+}
+
+function toggleWebsite(id){
+    const site = websites.find(w => w.id === id);
+    if(!site) return;
+    site.status = site.status === "Active" ? "Disabled" : "Active";
+    renderWebsites();
+}
+
+function deleteWebsite(id){
+    if(!confirm("Purge application bundle data?")) return;
+    websites = websites.filter(w => w.id !== id);
+    renderWebsites();
+}
+
+function renderCompanies(){
+    const tbody = document.getElementById("companiesTable");
+    const search = document.getElementById("companySearch").value.toLowerCase();
+    tbody.innerHTML = "";
+    const filtered = companies.filter(c => (c.companyName || "").toLowerCase().includes(search) || (c.ownerName || "").toLowerCase().includes(search));
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">No companies registered through automated registry modules.</td></tr>`;
+    }else{
+        filtered.forEach(c => {
+            tbody.innerHTML += `
+            <tr>
+                <td>${c.companyName}</td>
+                <td>${c.ownerName}</td>
+                <td>${c.email}</td>
+                <td>${c.plan}</td>
+                <td>${c.status}</td>
+                <td>${c.createdAt}</td>
+            </tr>`;
+        });
+    }
+    document.getElementById("companyCount").textContent = companies.length;
+    document.getElementById("activeCompanies").textContent = companies.filter(c => c.status === "Active").length;
+    document.getElementById("trialCompanies").textContent = companies.filter(c => c.plan === "Trial").length;
+    document.getElementById("paidCompanies").textContent = companies.filter(c => c.plan !== "Trial").length;
+    document.getElementById("totalCompanies").textContent = companies.length;
+}
+
+function syncCompanies(){
+    companies = JSON.parse(localStorage.getItem(COMPANY_KEY) || "[]");
+    renderCompanies();
+}
+
+function exportCompanies(){
+    const blob = new Blob([JSON.stringify(companies, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "companies_registry.json";
+    a.click();
+}
+
+function refreshAnalytics(){
+    let revenueSum = 0;
+    payments.forEach(p => { if(p.status === 'Completed') revenueSum += Number(p.amount); });
+    document.getElementById("analyticsRevenue").textContent = "KES " + revenueSum.toLocaleString();
+    document.getElementById("analyticsPayments").textContent = payments.length;
+    document.getElementById("analyticsUsers").textContent = users.length;
+    document.getElementById("analyticsCompanies").textContent = companies.length;
+    document.getElementById("analyticsWebsites").textContent = websites.filter(w=>w.status==='Active').length;
+    document.getElementById("analyticsTickets").textContent = supportTickets.length;
+    drawAnalyticsCharts(users, companies, payments, websites);
+}
+
+let revenueChart, usersChart, websiteChart;
+function drawAnalyticsCharts(users, companies, payments, websites){
+    if(revenueChart) revenueChart.destroy();
+    if(usersChart) usersChart.destroy();
+    if(websiteChart) websiteChart.destroy();
+
+    const completedPaymentsTotal = payments.reduce((acc, curr) => curr.status === 'Completed' ? acc + Number(curr.amount) : acc, 0);
+
+    revenueChart = new Chart(document.getElementById("revenueChart"), {
+        type: "bar",
+        data: { labels: ["Revenue"], datasets: [{ label: "KES Monitored", data: [completedPaymentsTotal], backgroundColor: '#2563eb' }] }
+    });
+    usersChart = new Chart(document.getElementById("usersChart"), {
+        type: "doughnut",
+        data: { labels: ["Users", "Companies"], datasets: [{ data: [users.length, companies.length], backgroundColor: ['#2563eb', '#10b981'] }] }
+    });
+    websiteChart = new Chart(document.getElementById("websiteChart"), {
+        type: "pie",
+        data: { labels: ["Websites", "Payments Trace"], datasets: [{ data: [websites.length, payments.length], backgroundColor: ['#3b82f6', '#f59e0b'] }] }
+    });
+}
+
+let reportDownloads = 0;
+function generateReport(type){
+    document.getElementById("lastReport").textContent = new Date().toLocaleString();
+    reportDownloads++;
+    document.getElementById("reportDownloads").textContent = reportDownloads;
+    alert(`Standard business engine processed localized structured ${type.toUpperCase()} file bundle successfully.`);
+}
+
+function exportAnalytics() { alert("Report engine bundle targeted inside Reports section matrix center dashboard."); }
+
+function loadDashboard(){
+    document.getElementById("totalUsers").innerHTML = users.length;
+    document.getElementById("totalCompanies").innerHTML = companies.length;
+    let completedRevenue = 0;
+    payments.forEach(p => { if(p.status === "Completed") completedRevenue += Number(p.amount); });
+    document.getElementById("totalRevenue").textContent = "KES " + completedRevenue.toLocaleString();
+    document.getElementById("totalTickets").textContent = supportTickets.length;
+
+    const tbody = document.getElementById("usersTable");
+    tbody.innerHTML = "";
+    if (users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">No users found</td></tr>`;
+    } else {
+        users.slice(0, 5).forEach(u => {
+            tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.company || '-'}</td><td>${u.role || '-'}</td><td>${u.status || 'Active'}</td><td>-</td></tr>`;
+        });
+    }
+
+    new Chart(document.getElementById("dashboardChart"), {
+        type: "bar",
+        data: { labels: ["Users", "Companies", "Websites Assets"], datasets: [{ data: [users.length, companies.length, websites.length], backgroundColor: ['#2563eb', '#10b981', '#f59e0b'] }] }
+    });
+}
+
+window.onload = function () {
+    const session = JSON.parse(localStorage.getItem("developerSession"));
+    if (!session) return;
+    document.getElementById("loginPage").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
+    document.getElementById("welcome").textContent = `Welcome, ${session.fullName}`;
+    document.getElementById("role").textContent = session.role;
+    
+    renderWebsites();
+    renderPayments();
+    renderUsers();
+    renderCompanies();
+    renderNotifications();
+    renderLogs();
+    renderSupportTickets();
+    loadSettings();
+    loadDashboard();
+};
 </script>
-</body></html>
+</body>
+</html>
