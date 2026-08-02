@@ -179,6 +179,31 @@ justify-content:center;
 align-items:center;
 z-index:1000;
 }
+
+/* ==== Dark mode ==================================================== */
+body.dark-mode{background:#0b1220;color:#e5e7eb;}
+body.dark-mode .topbar{background:#111827;color:#e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,.5);}
+body.dark-mode .card{background:#111827;color:#e5e7eb;box-shadow:0 4px 12px rgba(0,0,0,.5);}
+body.dark-mode .card h2{color:#9ca3af;}
+body.dark-mode .card h1{color:#60a5fa;}
+body.dark-mode table{background:#111827;}
+body.dark-mode th{background:#1d4ed8;color:#fff;}
+body.dark-mode td{border-color:#1f2937;color:#e5e7eb;}
+body.dark-mode th{border-color:#1f2937;}
+body.dark-mode .modal>div{background:#111827!important;color:#e5e7eb;}
+body.dark-mode .bg-white,body.dark-mode .bg-gray-50,body.dark-mode .bg-gray-100{background-color:#111827!important;}
+body.dark-mode .bg-gray-200{background-color:#1f2937!important;}
+body.dark-mode .page.bg-gray-50{background-color:#0b1220!important;}
+body.dark-mode .text-gray-900,body.dark-mode .text-gray-800,body.dark-mode .text-gray-700{color:#e5e7eb!important;}
+body.dark-mode .text-gray-600,body.dark-mode .text-gray-500,body.dark-mode .text-gray-400{color:#9ca3af!important;}
+body.dark-mode .border,body.dark-mode .border-b,body.dark-mode .border-t,
+body.dark-mode .border-gray-100,body.dark-mode .border-gray-200,body.dark-mode .border-gray-300{border-color:#1f2937!important;}
+body.dark-mode input,body.dark-mode select,body.dark-mode textarea{background-color:#0b1220!important;color:#e5e7eb!important;border-color:#1f2937!important;}
+body.dark-mode input::placeholder,body.dark-mode textarea::placeholder{color:#6b7280;}
+body.dark-mode .divide-gray-100>*+*{border-color:#1f2937!important;}
+body.dark-mode .hover\:bg-gray-50:hover,body.dark-mode .hover\:bg-gray-100:hover{background-color:#1f2937!important;}
+body.dark-mode pre.code-view{background:#020617;color:#93c5fd;}
+.code-view{background:#0b1220;color:#93c5fd;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;padding:16px;overflow:auto;white-space:pre;height:100%;}
 </style>
 </head>
 <body>
@@ -215,7 +240,9 @@ z-index:1000;
 <div class="content">
 <div class="topbar">
 <h2 id="welcome">Welcome</h2>
-<main id="contentArea" class="ml-40 p-1">
+<span id="role" class="text-xs text-gray-400 ml-2"></span>
+<button id="themeToggleBtn" onclick="toggleDarkMode()" title="Toggle dark mode" class="ml-auto mr-3 px-3 py-1.5 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-100 transition">🌙 Dark</button>
+<main id="contentArea" class="p-1">
   <h2 class="text-xl font-italic mb-1 text-left flex items-center gap-2">
     <img id="userAvatar" src="https://via.placeholder.com/32" alt="User Avatar" class="w-8 h-8 rounded-full" onclick="triggerFileInput()">
     Developer
@@ -687,6 +714,10 @@ z-index:1000;
       <span>🔄</span> Refresh
     </button>
 
+    <button class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-1.5 font-medium shadow-sm" onclick="attachWebsiteModal()">
+      <span>🔗</span> Attach Website
+    </button>
+
     <button class="bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-800 transition flex items-center gap-1.5 font-medium shadow-sm" onclick="openVSCodeEditor()">
       <svg class="w-4 h-4 fill-current text-blue-400" viewBox="0 0 24 24"><path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.12a.999.999 0 0 0-1.276.057L.331 7.282a1 1 0 0 0-.05 1.47l3.656 3.561L.28 15.873a1 1 0 0 0 .05 1.47l1.318 1.216a.998.998 0 0 0 1.276.057l4.12-3.12 9.46 8.63a1.494 1.494 0 0 0 1.705.29l4.94-2.377A1.5 1.5 0 0 0 24 20.686V3.314a1.5 1.5 0 0 0-.85-1.327zM18 16.24l-5.69-4.24L18 7.76v8.48z"/></svg>
       VS Code Editor
@@ -748,6 +779,39 @@ z-index:1000;
     </thead>
     <tbody id="websiteTable"></tbody>
   </table>
+</div>
+
+<div id="sitePreviewModal" class="fixed inset-0 bg-black/80 hidden z-50 flex-col">
+  <div class="bg-gray-900 text-white px-4 py-3 flex justify-between items-center border-b border-gray-800">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="font-semibold text-sm">🚀 Live Preview</span>
+      <span id="previewSiteName" class="text-xs bg-gray-800 px-2 py-0.5 rounded text-gray-300 truncate"></span>
+      <span id="previewSiteUrl" class="text-xs text-blue-400 truncate hidden sm:inline"></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="reloadPreview()" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded">Reload</button>
+      <button onclick="viewWebsiteCode(previewSiteId)" class="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded">&lt;/&gt; View Code</button>
+      <button onclick="openPreviewInNewTab()" class="text-xs bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded">Open in Tab</button>
+      <button onclick="closeSitePreview()" class="text-gray-400 hover:text-white text-xl font-bold px-2">&times;</button>
+    </div>
+  </div>
+  <iframe id="sitePreviewFrame" class="w-full flex-grow border-none bg-white" src="about:blank"></iframe>
+</div>
+
+<div id="sourceModal" class="fixed inset-0 bg-black/80 hidden z-50 flex-col">
+  <div class="bg-gray-900 text-white px-4 py-3 flex justify-between items-center border-b border-gray-800">
+    <div class="flex items-center gap-3 min-w-0">
+      <span class="font-semibold text-sm">&lt;/&gt; Source Code</span>
+      <span id="sourceSiteName" class="text-xs bg-gray-800 px-2 py-0.5 rounded text-gray-300 truncate"></span>
+      <span id="sourceLineCount" class="text-xs text-gray-500"></span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="copySourceCode()" class="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded">Copy</button>
+      <button onclick="downloadSourceCode()" class="text-xs bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded">Download</button>
+      <button onclick="closeSourceModal()" class="text-gray-400 hover:text-white text-xl font-bold px-2">&times;</button>
+    </div>
+  </div>
+  <pre id="sourceCodeBox" class="code-view flex-grow"></pre>
 </div>
 
 <div id="codeEditorModal" class="fixed inset-0 bg-black/70 hidden z-50 flex-col">
@@ -969,16 +1033,25 @@ z-index:1000;
 </div>
 </div>
 <div class="card mt-6">
-<h2>Revenue Overview</h2>
-<canvas id="revenueChart" height="100"></canvas>
+<div class="flex items-center justify-between flex-wrap gap-2">
+<h2>Revenue Trend Graph (12 Months)</h2>
+<select id="analyticsRange" onchange="refreshAnalytics()" class="px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium">
+<option value="12">Last 12 Months</option>
+<option value="6">Last 6 Months</option>
+<option value="3">Last 3 Months</option>
+</select>
 </div>
-<div class="card mt-6">
-<h2>User Growth</h2>
-<canvas id="usersChart" height="100"></canvas>
+<div style="height:320px"><canvas id="revenueChart"></canvas></div>
 </div>
-<div class="card mt-6">
-<h2>Website Activity</h2>
-<canvas id="websiteChart" height="100"></canvas>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-6">
+<div class="card">
+<h2>Users &amp; Companies Growth Graph</h2>
+<div style="height:300px"><canvas id="usersChart"></canvas></div>
+</div>
+<div class="card">
+<h2>Platform Activity Graph</h2>
+<div style="height:300px"><canvas id="websiteChart"></canvas></div>
+</div>
 </div>
 </div>
 <div class="page" id="reports">
@@ -1471,7 +1544,7 @@ z-index:1000;
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Interface Theme</label>
-                        <select id="theme" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all">
+                        <select id="theme" onchange="applyTheme(this.value, true)" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all">
                             <option value="Light" selected>Light Mode</option>
                             <option value="Dark">Dark Mode</option>
                             <option value="System">System Sync</option>
@@ -1785,176 +1858,6 @@ z-index:1000;
         </div>
     </div>
 </div>
-<div class="page p-4 sm:p-6 w-full bg-gray-50 min-h-screen" id="logs">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-5 mb-6">
-        <div>
-            <div class="flex items-center gap-3">
-                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">System Logs</h1>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
-                    <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Audit Stream Active
-                </span>
-            </div>
-            <p class="mt-2 text-sm text-gray-500">Monitor system activity, user authentication streams, error traces, and operational audits in real time.</p>
-        </div>
-        <div class="flex flex-wrap gap-2.5 mt-4 md:mt-0">
-            <button class="inline-flex items-center justify-center bg-rose-600 text-white font-medium text-sm px-4 py-2.5 rounded-lg shadow-sm hover:bg-rose-700 focus:ring-4 focus:ring-rose-100 transition-all cursor-pointer" onclick="clearLogs()">
-                <span class="mr-2">🗑</span> Clear Logs
-            </button>
-            <button class="inline-flex items-center justify-center bg-white text-gray-700 font-medium text-sm px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transition-all cursor-pointer" onclick="exportLogs()">
-                <span class="mr-2">📥</span> Export CSV/JSON
-            </button>
-            <button class="inline-flex items-center justify-center bg-white text-gray-700 font-medium text-sm px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:ring-4 focus:ring-gray-100 transition-all cursor-pointer" onclick="renderLogs()">
-                <span class="mr-2">🔄</span> Refresh
-            </button>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-            <div class="flex justify-between items-start">
-                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Logs</div>
-                <span class="text-blue-600 bg-blue-50 text-xs font-medium px-2.5 py-0.5 rounded-full">All Streams</span>
-            </div>
-            <div class="mt-2 flex items-baseline justify-between">
-                <span class="text-3xl font-bold text-gray-900" id="logCount">0</span>
-                <span class="text-gray-400 text-xs">Events</span>
-            </div>
-            <div class="w-full bg-gray-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                <div class="bg-blue-500 h-full rounded-full" style="width: 100%"></div>
-            </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-            <div class="flex justify-between items-start">
-                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Logins & Auth</div>
-                <span class="text-emerald-700 bg-emerald-50 text-xs font-medium px-2 py-0.5 rounded">Security</span>
-            </div>
-            <div class="mt-2 flex items-baseline justify-between">
-                <span class="text-3xl font-bold text-emerald-600" id="loginLogs">0</span>
-                <span class="text-gray-400 text-xs">Sessions</span>
-            </div>
-            <div class="w-full bg-gray-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                <div class="bg-emerald-500 h-full rounded-full" style="width: 60%"></div>
-            </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-            <div class="flex justify-between items-start">
-                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider">System Errors</div>
-                <span class="text-rose-700 bg-rose-50 text-xs font-medium px-2 py-0.5 rounded">Critical</span>
-            </div>
-            <div class="mt-2 flex items-baseline justify-between">
-                <span class="text-3xl font-bold text-rose-600" id="errorLogs">0</span>
-                <span class="text-gray-400 text-xs">Exceptions</span>
-            </div>
-            <div class="w-full bg-gray-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                <div class="bg-rose-500 h-full rounded-full" style="width: 10%"></div>
-            </div>
-        </div>
-
-        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md">
-            <div class="flex justify-between items-start">
-                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Warnings</div>
-                <span class="text-amber-700 bg-amber-50 text-xs font-medium px-2 py-0.5 rounded">Attention</span>
-            </div>
-            <div class="mt-2 flex items-baseline justify-between">
-                <span class="text-3xl font-bold text-amber-600" id="warningLogs">0</span>
-                <span class="text-gray-400 text-xs">Alerts</span>
-            </div>
-            <div class="w-full bg-gray-100 h-1.5 rounded-full mt-4 overflow-hidden">
-                <div class="bg-amber-500 h-full rounded-full" style="width: 25%"></div>
-            </div>
-        </div>
-    </div>
-
-    <div id="logBulkBar" class="hidden mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-blue-900">
-            <span class="font-bold" id="selectedLogCount">0</span> logs selected
-        </div>
-        <div class="flex gap-2">
-            <button onclick="bulkExportSelectedLogs()" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700 transition">Export Selected</button>
-            <button onclick="bulkDeleteSelectedLogs()" class="px-3 py-1.5 bg-rose-600 text-white rounded text-xs font-medium hover:bg-rose-700 transition">Delete Selected</button>
-        </div>
-    </div>
-
-    <div class="mb-6 bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col xl:flex-row gap-3 items-center justify-between">
-        <div class="relative w-full xl:w-1/3">
-            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 pointer-events-none">🔍</span>
-            <input type="text" id="logSearch" placeholder="Search activity, user, module, IP address..." onkeyup="renderLogs()" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-            <select id="logLevelFilter" onchange="renderLogs()" class="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
-                <option value="">All Severity Levels</option>
-                <option value="Info">Info</option>
-                <option value="Warning">Warning</option>
-                <option value="Error">Error</option>
-                <option value="Critical">Critical</option>
-            </select>
-
-            <select id="logModuleFilter" onchange="renderLogs()" class="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
-                <option value="">All Modules</option>
-                <option value="Auth">Auth & Security</option>
-                <option value="Database">Database</option>
-                <option value="Payments">Payments API</option>
-                <option value="System">System Kernel</option>
-            </select>
-
-            <div class="flex items-center gap-1 bg-gray-50 border border-gray-300 rounded-lg px-2 py-1">
-                <input type="date" id="logStartDate" onchange="renderLogs()" class="bg-transparent text-sm text-gray-700 focus:outline-none">
-                <span class="text-gray-400 text-xs">to</span>
-                <input type="date" id="logEndDate" onchange="renderLogs()" class="bg-transparent text-sm text-gray-700 focus:outline-none">
-            </div>
-
-            <button onclick="resetLogFilters()" class="px-3 py-2 border border-gray-300 text-gray-600 rounded-lg bg-gray-100 text-sm hover:bg-gray-200 transition">
-                Reset
-            </button>
-        </div>
-    </div>
-
-    <div class="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm w-full">
-        <table class="w-full text-left border-collapse min-w-[1000px]">
-            <thead>
-                <tr class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                    <th class="p-4 pl-6 w-10">
-                        <input type="checkbox" id="selectAllLogs" onclick="toggleSelectAllLogs(this)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    </th>
-                    <th class="p-4 cursor-pointer hover:bg-gray-100" onclick="sortLogs('date')">Timestamp ↕</th>
-                    <th class="p-4">Level</th>
-                    <th class="p-4 cursor-pointer hover:bg-gray-100" onclick="sortLogs('user')">User ↕</th>
-                    <th class="p-4">Activity Description</th>
-                    <th class="p-4 cursor-pointer hover:bg-gray-100" onclick="sortLogs('module')">Module ↕</th>
-                    <th class="p-4 pr-6 text-right">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="logsTable" class="divide-y divide-gray-100 text-sm text-gray-700 font-normal">
-                <tr>
-                    <td colspan="7" class="text-center p-8 text-gray-500">No logs available.</td>
-                </tr>
-            </tbody>
-        </table>
-
-        <div class="flex flex-col sm:flex-row items-center justify-between p-4 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 gap-3">
-            <div class="flex items-center gap-4">
-                <span>Showing <span id="logShowingCount" class="font-semibold text-gray-700">0</span> entries</span>
-                <div class="flex items-center gap-1">
-                    <span>Rows per page:</span>
-                    <select id="logPageSize" onchange="changeLogPageSize()" class="bg-white border border-gray-300 rounded px-1.5 py-0.5 text-xs">
-                        <option value="10">10</option>
-                        <option value="25" selected>25</option>
-                        <option value="50">50</option>
-                        <option value="100">100</option>
-                    </select>
-                </div>
-            </div>
-            <div class="flex gap-1">
-                <button class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50" onclick="prevLogPage()">Previous</button>
-                <div id="logPageNumbers" class="flex gap-1"></div>
-                <button class="px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50" onclick="nextLogPage()">Next</button>
-            </div>
-        </div>
-    </div>
-
 
 <div id="globalModal" class="modal hidden">
     <div class="bg-white p-6 rounded-lg w-96 shadow-2xl relative">
@@ -1982,32 +1885,228 @@ const SUPPORT_KEY = "acacia_support";
 const SETTINGS_KEY = "acacia_settings";
 const LOG_KEY = "acacia_logs";
 
-let users = JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-let companies = JSON.parse(localStorage.getItem(COMPANY_KEY) || "[]");
-let payments = JSON.parse(localStorage.getItem(PAYMENT_KEY) || "[]");
+/* ==== Cross-app data adapter =========================================
+   The customer app (index.html) writes:
+     users     -> "users"      (may be company-namespaced: "users::comp_x")
+     companies -> "companies"  (fields: companyId, companyName, ownerName,
+                                email, plan, price, status, registered)
+     plan      -> "selectedPlan"
+   This panel previously only read "acacia_companies", so companies and the
+   chosen plan never rendered. We now read every matching store (including
+   company-namespaced copies) and normalise the records. =============== */
+const NS_SEP = "::";
+const COMPANY_STORE_KEYS = ["companies", "acacia_companies"];
+const USER_STORE_KEYS = ["users", "acacia_users"];
+
+function devReadArray(key){
+    try { const parsed = JSON.parse(localStorage.getItem(key) || "null"); return Array.isArray(parsed) ? parsed : []; }
+    catch(e){ return []; }
+}
+function devCollect(baseKeys){
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if (!k) continue;
+        const base = k.split(NS_SEP)[0];
+        if (baseKeys.indexOf(base) !== -1) out.push(...devReadArray(k));
+    }
+    return out;
+}
+function devTitle(v, fallback){
+    const str = String(v == null ? "" : v).trim();
+    if (!str) return fallback;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+function devDate(v){
+    if (!v) return "-";
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+}
+function devHashId(str){
+    let h = 0;
+    str = String(str || "");
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return Math.abs(h) || 1;
+}
+function normalizeCompanies(list){
+    const map = new Map();
+    (list || []).forEach(c => {
+        if (!c || typeof c !== "object") return;
+        const key = String(c.companyId || c.id || c.companyName || c.name || "").toLowerCase();
+        if (!key) return;
+        const rec = Object.assign({}, map.get(key) || {}, c, {
+            id: c.companyId || c.id || c.companyName,
+            companyId: c.companyId || c.id || c.companyName,
+            companyName: c.companyName || c.name || c.company || c.companyId || "-",
+            ownerName: c.ownerName || c.fullName || c.owner || "-",
+            email: c.email || "-",
+            plan: devTitle(c.plan, "Free"),
+            price: Number(c.price || 0),
+            status: devTitle(c.status, "Active"),
+            registered: devDate(c.registered || c.createdAt || c.date),
+            createdAt: devDate(c.registered || c.createdAt || c.date),
+            expiry: c.expiry ? devDate(c.expiry) : "-"
+        });
+        map.set(key, rec);
+    });
+    return Array.from(map.values());
+}
+function normalizeUsers(list){
+    const map = new Map();
+    (list || []).forEach(u => {
+        if (!u || typeof u !== "object" || !(u.username || u.email)) return;
+        const key = String(u.email || u.username).toLowerCase();
+        const rec = Object.assign({}, map.get(key) || {}, u, {
+            id: u.id || devHashId(key),
+            username: u.username || String(u.email).split("@")[0],
+            email: u.email || "",
+            company: u.company || u.companyName || u.companyId || "",
+            plan: devTitle(u.plan, "Free"),
+            role: devTitle(u.role, "Viewer"),
+            status: devTitle(u.status, "Active")
+        });
+        map.set(key, rec);
+    });
+    return Array.from(map.values());
+}
+/* Users registered by the app always carry their company + chosen plan, so
+   they double as a company source if the "companies" store is missing one. */
+function companiesFromUsers(userList){
+    return (userList || []).filter(u => u.companyName || u.companyId).map(u => ({
+        companyId: u.companyId || u.companyName,
+        companyName: u.companyName || u.companyId,
+        ownerName: u.fullName || u.username,
+        email: u.email,
+        plan: u.plan,
+        price: u.price,
+        status: u.status,
+        registered: u.registered,
+        expiry: u.expiry
+    }));
+}
+function loadUsersFromStores(){ return normalizeUsers(devCollect(USER_STORE_KEYS)); }
+
+/* The customer app records money in "payments" / "customerPayments" /
+   "invoices" (optionally company-namespaced). The panel used to read only
+   "acacia_payments", so nothing rendered. Collect + normalise them all. */
+/* Billing is driven by the SUBSCRIPTION PLAN the customer picked when the
+   account/company was created - not by whatever activity happens inside the
+   website. So each company registration produces one subscription invoice
+   priced from the chosen plan. Only invoices created here in the panel are
+   read back from storage; app-side activity stores are ignored. */
+const PAYMENT_STORE_KEYS = ["acacia_payments"];
+const SIGNUP_PLAN_PRICES = { free:0, starter:2000, pro:5000, business:8000, enterprise:12000, allaccess:20000 };
+function planKeyOf(plan){ return String(plan || "free").toLowerCase().replace(/[^a-z]/g, ""); }
+function signupPlanPrice(plan){
+    const k = planKeyOf(plan);
+    return SIGNUP_PLAN_PRICES[k] != null ? SIGNUP_PLAN_PRICES[k] : 0;
+}
+function normalizePayments(list){
+    const map = new Map();
+    (list || []).forEach(p => {
+        if (!p || typeof p !== "object") return;
+        const invoice = String(p.invoice || p.invoiceNo || p.invoiceNumber || p.reference || p.ref || p.id || "").trim();
+        const customer = String(p.customer || p.customerName || p.companyName || p.company || p.name || p.email || "").trim();
+        if (!invoice && !customer) return;
+        const key = (invoice || customer).toLowerCase();
+        const plan = devTitle(p.plan || p.package || p.subscription, "Free");
+        const billing = p.billing || p.cycle || "Monthly";
+        const addons = Number(p.addonsCount || 0);
+        let amount = Number(p.amount || p.total || 0);
+        if (!amount) {
+            amount = signupPlanPrice(plan) + addons * 1500;
+            if (billing === "Yearly") amount = amount * 0.9;
+        }
+        const rec = Object.assign({}, map.get(key) || {}, p, {
+            id: p.id || devHashId(key),
+            invoice: invoice || "INV-" + devHashId(key),
+            customer: customer || "-",
+            email: p.email || p.customerEmail || "",
+            plan: plan,
+            billing: billing,
+            addonsCount: addons,
+            amount: amount,
+            method: p.method || p.paymentMethod || p.mode || "M-Pesa",
+            status: devTitle(p.status || p.state, "Pending"),
+            date: p.date || p.registered || p.createdAt || "",
+            source: p.source || "panel"
+        });
+        map.set(key, rec);
+    });
+    return Array.from(map.values());
+}
+/* One subscription invoice per registered company, priced from the plan that
+   was picked at sign-up (company.price wins when the app stored one). */
+function buildSignupPayments(companyList){
+    return (companyList || []).map(c => {
+        const plan = devTitle(c.plan, "Free");
+        const billing = c.billing || c.cycle || "Monthly";
+        let amount = Number(c.price || 0);
+        if (!amount) {
+            amount = signupPlanPrice(plan);
+            if (billing === "Yearly") amount = amount * 0.9;
+        }
+        const paid = /paid|active|completed/i.test(String(c.paymentStatus || c.status || ""));
+        const isFree = signupPlanPrice(plan) === 0 && !amount;
+        return {
+            id: "sub-" + devHashId(String(c.companyId || c.companyName)),
+            invoice: "SUB-" + String(devHashId(String(c.companyId || c.companyName))).slice(0, 6),
+            customer: c.companyName || c.ownerName || "-",
+            email: c.email || "",
+            company: c.companyName || "",
+            plan: plan,
+            billing: billing,
+            addonsCount: 0,
+            amount: amount,
+            method: c.paymentMethod || (isFree ? "N/A" : "M-Pesa"),
+            status: isFree ? "Completed" : (paid ? "Completed" : "Pending"),
+            date: c.registered && c.registered !== "-" ? c.registered : (c.createdAt || ""),
+            source: "signup",
+            locked: true
+        };
+    });
+}
+function loadPaymentsFromStores(){
+    const manual = normalizePayments(devCollect(PAYMENT_STORE_KEYS)).filter(p => p.source !== "signup");
+    const signup = buildSignupPayments(typeof companies !== "undefined" ? companies : []);
+    const seen = new Set(signup.map(p => String(p.invoice).toLowerCase()));
+    return signup.concat(manual.filter(p => !seen.has(String(p.invoice).toLowerCase())));
+}
+function persistPayments(){
+    try {
+        /* signup subscription invoices are derived from companies, never stored */
+        localStorage.setItem(PAYMENT_KEY, JSON.stringify((payments || []).filter(p => p.source !== "signup")));
+    } catch(e){ console.warn("persistPayments", e); }
+}
+function loadCompaniesFromStores(usersList){
+    return normalizeCompanies(companiesFromUsers(usersList).concat(devCollect(COMPANY_STORE_KEYS)));
+}
+function persistCompanies(){
+    const payload = JSON.stringify(companies);
+    localStorage.setItem("companies", payload);
+    localStorage.setItem(COMPANY_KEY, payload);
+}
+function populateFilterOptionsLabeled(selectId, values, allLabel){
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const current = select.value;
+    const unique = Array.from(new Set(values.filter(Boolean))).sort();
+    select.innerHTML = `<option value="">${allLabel}</option>` + unique.map(v => `<option value="${v}">${v}</option>`).join("");
+    select.value = unique.includes(current) ? current : "";
+}
+
+let users = loadUsersFromStores();
+let companies = loadCompaniesFromStores(users);
+let payments = loadPaymentsFromStores();
 let notifications = JSON.parse(localStorage.getItem(NOTIFICATION_KEY) || "[]");
 let supportTickets = JSON.parse(localStorage.getItem(SUPPORT_KEY) || "[]");
 let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
 let logs = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
 
-let websites = [
-    {id:1,name:"ERP System",file:"app_1710.html",version:"17.10",size:"48 MB",status:"Active",uploaded:"Built In"},
-    {id:2,name:"CRM",file:"crm_1707.html",version:"17.07",size:"12 MB",status:"Active",uploaded:"Built In"},
-    {id:3,name:"Mail",file:"Mail_1707.html",version:"17.07",size:"8 MB",status:"Active",uploaded:"Built In"},
-    {id:4,name:"Inventory",file:"Inventory_1707.html",version:"17.07",size:"16 MB",status:"Active",uploaded:"Built In"},
-    {id:5,name:"Payroll",file:"Payroll_1707.html",version:"17.07",size:"14 MB",status:"Active",uploaded:"Built In"},
-    {id:6,name:"Projects",file:"projects_1707.html",version:"17.07",size:"11 MB",status:"Active",uploaded:"Built In"},
-    {id:7,name:"Architecture",file:"Architecture_1707.html",version:"17.07",size:"9 MB",status:"Active",uploaded:"Built In"},
-    {id:8,name:"Expenses",file:"Expenses_1707.html",version:"17.07",size:"8 MB",status:"Active",uploaded:"Built In"},
-    {id:9,name:"Home Page",file:"Home page_1707.html",version:"17.07",size:"5 MB",status:"Active",uploaded:"Built In"},
-    {id:10,name:"Landing Page",file:"Land_1707.html",version:"17.07",size:"4 MB",status:"Active",uploaded:"Built In"},
-    {id:11,name:"2Sweet",file:"2sweet.html",version:"1.0",size:"3 MB",status:"Active",uploaded:"Built In"},
-    {id:12,name:"Tech Hub",file:"techhub.html",version:"1.0",size:"6 MB",status:"Active",uploaded:"Built In"},
-    {id:13,name:"MediPharm",file:"medipharm.html",version:"1.0",size:"5 MB",status:"Active",uploaded:"Built In"},
-    {id:14,name:"Liquor Store",file:"liquorstore.html",version:"1.0",size:"6 MB",status:"Active",uploaded:"Built In"},
-    {id:15,name:"Gadget Store",file:"Gadget-Store_1707.html",version:"17.07",size:"7 MB",status:"Active",uploaded:"Built In"},
-    {id:16,name:"Wine Store",file:"Wines_1707.html",version:"17.07",size:"5 MB",status:"Active",uploaded:"Built In"}
-];
+/* No demo data: websites are only what you attach/upload. */
+const DEFAULT_WEBSITES = [];
+let websites = JSON.parse(localStorage.getItem(WEBSITE_KEY) || "null") || [];
+function saveWebsites(){ localStorage.setItem(WEBSITE_KEY, JSON.stringify(websites)); }
 
 function login() {
     const u = document.getElementById("username").value.trim().toLowerCase();
@@ -2066,6 +2165,7 @@ function openUserModal(userId = null) {
     const title = user ? "Edit User" : "Add New User";
     const bodyHtml = `
         <input id="modalUser_name" type="text" placeholder="Username/Name" value="${user ? user.username : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalUser_email" type="email" placeholder="Email" value="${user ? (user.email || '') : ''}" class="w-full p-2 border rounded text-sm">
         <input id="modalUser_company" type="text" placeholder="Company" value="${user ? user.company : ''}" class="w-full p-2 border rounded text-sm">
         <input id="modalUser_role" type="text" placeholder="Role (e.g. Admin, Staff)" value="${user ? user.role : ''}" class="w-full p-2 border rounded text-sm">
         <select id="modalUser_status" class="w-full p-2 border rounded text-sm">
@@ -2075,6 +2175,7 @@ function openUserModal(userId = null) {
     `;
     openModal(title, bodyHtml, () => {
         const username = document.getElementById("modalUser_name").value.trim();
+        const email = document.getElementById("modalUser_email").value.trim();
         const company = document.getElementById("modalUser_company").value.trim();
         const role = document.getElementById("modalUser_role").value.trim();
         const status = document.getElementById("modalUser_status").value;
@@ -2082,12 +2183,13 @@ function openUserModal(userId = null) {
 
         if (user) {
             user.username = username;
+            user.email = email;
             user.company = company;
             user.role = role;
             user.status = status;
             addLog("Warning", "Developer", `Updated User: ${username}`, "Users");
         } else {
-            users.push({ id: Date.now(), username, company, role, status });
+            users.push({ id: Date.now(), username, email, company, role, status });
             addLog("Info", "Developer", `Created User: ${username}`, "Users");
         }
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
@@ -2098,20 +2200,36 @@ function openUserModal(userId = null) {
 function renderUsers() {
     const tbody = document.getElementById("usersTable");
     const search = document.getElementById("userSearch").value.toLowerCase();
+    const roleFilter = document.getElementById("userRoleFilter")?.value || "";
+    const statusFilter = document.getElementById("userStatusFilter")?.value || "";
+    const companyFilter = document.getElementById("userCompanyFilter")?.value || "";
     tbody.innerHTML = "";
-    
-    const filtered = users.filter(u => 
-        u.username.toLowerCase().includes(search) || 
+
+    populateFilterOptions("userCompanyFilter", users.map(u => u.company).filter(Boolean));
+
+    let filtered = users.filter(u =>
+        u.username.toLowerCase().includes(search) ||
         (u.company && u.company.toLowerCase().includes(search)) ||
         (u.email && u.email.toLowerCase().includes(search))
     );
+    if (roleFilter) filtered = filtered.filter(u => u.role === roleFilter);
+    if (statusFilter) filtered = filtered.filter(u => (u.status || 'Active') === statusFilter);
+    if (companyFilter) filtered = filtered.filter(u => u.company === companyFilter);
+
+    document.getElementById("totalUserCount").textContent = users.length;
+    document.getElementById("activeUserCount").textContent = users.filter(u => (u.status||'Active') === 'Active').length;
+    document.getElementById("adminUserCount").textContent = users.filter(u => u.role === 'Administrator').length;
+    document.getElementById("suspendedUserCount").textContent = users.filter(u => u.status === 'Suspended' || u.status === 'Inactive').length;
+
+    const { pageItems, totalPages } = paginate(filtered, 'users');
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">No users found</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No users found</td></tr>`;
     } else {
-        filtered.forEach(u => {
+        pageItems.forEach(u => {
             tbody.innerHTML += `
             <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="user-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${u.id}" onclick="onRowCheckToggle('users')"></td>
                 <td>${u.username}</td>
                 <td>${u.email || '-'}</td>
                 <td>${u.company || '-'}</td>
@@ -2126,19 +2244,28 @@ function renderUsers() {
         });
     }
     document.getElementById("totalUsers").innerHTML = users.length;
+    document.getElementById("userShowingCount").textContent = pageItems.length;
+    renderPageNumbers("userPageNumbers", "users", totalPages, gotoUserPage);
+    updateBulkBar('users');
 }
 
 function previewUser(id) {
     const user = users.find(u => u.id === id);
     if (!user) return;
 
-    document.getElementById("previewUsername").innerText = user.username;
-    document.getElementById("previewEmail").innerText = user.email || '-';
-    document.getElementById("previewCompany").innerText = user.company || '-';
-    document.getElementById("previewRole").innerText = user.role || '-';
-    document.getElementById("previewStatus").innerText = user.status || 'Active';
-
-    document.getElementById("previewModal").classList.remove("hidden");
+    const bodyHtml = `
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Username</span><span class="font-medium">${user.username}</span></div>
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Email</span><span class="font-medium">${user.email || '-'}</span></div>
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Company</span><span class="font-medium">${user.company || '-'}</span></div>
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Role</span><span class="font-medium">${user.role || '-'}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Status</span><span class="font-medium">${user.status || 'Active'}</span></div>
+        </div>
+    `;
+    openModal("User Details", bodyHtml, () => {});
+    document.getElementById("modalActionBtn").classList.add("hidden");
+    const restoreBtn = () => document.getElementById("modalActionBtn").classList.remove("hidden");
+    document.querySelector('#globalModal button[onclick="closeModal()"]').addEventListener("click", restoreBtn, { once: true });
 }
 
 function deleteUser(id) {
@@ -2167,8 +2294,10 @@ const PRICING_PLANS = {
 };
 
 function calculateInvoiceAmount(p) {
-    const planKey = (p.plan || 'pro').toLowerCase().replace(/\s+/g, '');
-    const planConfig = PRICING_PLANS[planKey] || { base: 0 };
+    /* Amount always comes from the plan picked at account creation. */
+    if (p && p.source === "signup") return Number(p.amount) || 0;
+    const planKey = planKeyOf(p.plan || 'free');
+    const planConfig = PRICING_PLANS[planKey] || { base: signupPlanPrice(planKey) };
     let cost = planConfig.base + ((Number(p.addonsCount) || 0) * 1500);
     if (p.billing === "Yearly") {
         cost = cost * 0.9;
@@ -2267,39 +2396,49 @@ function openPaymentModal(payId = null) {
 function renderPayments() {
     const tbody = document.getElementById("paymentsTable");
     const search = document.getElementById("paymentSearch").value.toLowerCase();
+    const statusFilter = document.getElementById("paymentStatusFilter")?.value || "";
+    const methodFilter = document.getElementById("paymentMethodFilter")?.value || "";
+    const startDate = document.getElementById("startDateFilter")?.value || "";
+    const endDate = document.getElementById("endDateFilter")?.value || "";
     tbody.innerHTML = "";
     
     let revenue = 0;
     let completed = 0;
     let pending = 0;
 
-    const filtered = payments.filter(p => {
+    let filtered = payments.filter(p => {
         const planKey = (p.plan || 'pro').toLowerCase().replace(/\s+/g, '');
         const planMeta = PRICING_PLANS[planKey]?.label || p.plan || '';
-        return p.invoice.toLowerCase().includes(search) || 
-               p.customer.toLowerCase().includes(search) ||
+        return String(p.invoice || '').toLowerCase().includes(search) ||
+               String(p.customer || '').toLowerCase().includes(search) ||
                (p.email && p.email.toLowerCase().includes(search)) ||
                planMeta.toLowerCase().includes(search)
     });
+    if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
+    if (methodFilter) filtered = filtered.filter(p => p.method === methodFilter);
+    if (startDate) filtered = filtered.filter(p => !p.date || new Date(p.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(p => !p.date || new Date(p.date) <= new Date(endDate));
+
+    // Totals reflect the full (unfiltered by pagination) filtered set
+    filtered.forEach(p => {
+        const amt = calculateInvoiceAmount(p);
+        if (p.status === "Completed") { revenue += amt; completed++; }
+        if (p.status === "Pending") pending++;
+    });
+
+    const { pageItems, totalPages } = paginate(filtered, 'payments');
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-500">No payments found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center p-6 text-gray-500">No payments found.</td></tr>`;
     } else {
-        filtered.forEach(p => {
+        pageItems.forEach(p => {
             const calculatedAmount = calculateInvoiceAmount(p);
             const planKey = (p.plan || 'pro').toLowerCase().replace(/\s+/g, '');
             const planMeta = PRICING_PLANS[planKey]?.label || p.plan;
 
-            if (p.status === "Completed") {
-                revenue += calculatedAmount;
-                completed++;
-            }
-            if (p.status === "Pending") {
-                pending++;
-            }
-
             tbody.innerHTML += `
             <tr class="hover:bg-gray-50/70 transition-colors">
+                <td class="p-4 pl-6"><input type="checkbox" class="payments-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${p.id}" onclick="onRowCheckToggle('payments')"></td>
                 <td class="p-4 font-semibold text-blue-600 select-all">${p.invoice}</td>
                 <td class="p-4">
                     <div class="font-medium text-gray-900">${p.customer}</div>
@@ -2315,9 +2454,10 @@ function renderPayments() {
                 </td>
                 <td class="p-4 text-gray-500">${p.date}</td>
                 <td class="p-4 pr-6 text-right">
-                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="previewPayment(${p.id})">Preview</button>
-                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="openPaymentModal(${p.id})">Edit</button>
-                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded hover:bg-red-700 transition" onclick="deletePayment(${p.id})">Delete</button>
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="previewPayment('${p.id}')">Preview</button>
+                    <button class="bg-emerald-700 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-emerald-600 transition" onclick="renewPayment('${p.id}')">Renew</button>
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="openPaymentModal('${p.id}')">Edit</button>
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-red-700 transition" onclick="deletePayment('${p.id}')">Delete</button>
                 </td>
             </tr>`;
         });
@@ -2326,30 +2466,178 @@ function renderPayments() {
     document.getElementById("paymentCount").textContent = payments.length;
     document.getElementById("paymentRevenue").textContent = "KES " + revenue.toLocaleString();
     document.getElementById("paymentPending").textContent = pending;
-    document.getElementById("paymentCompleted").textContent = completed;
-    
+    document.getElementById("paymentCompleted").textContent = completed + " Succeeded";
+    document.getElementById("paymentShowingCount").textContent = pageItems.length;
+    renderPageNumbers("pageNumbers", "payments", totalPages, gotoPaymentPage);
+    updateBulkBar('payments');
+
     const totalRevEl = document.getElementById("totalRevenue");
     if (totalRevEl) {
         totalRevEl.textContent = "KES " + revenue.toLocaleString();
     }
 }
 
+function filterPaymentsTable(){ paginationState.payments.page = 1; renderPayments(); }
+function refreshPaymentsData(){ renderPayments(); addLog("Info", "Developer", "Refreshed Payments Gateway Data", "Payments"); }
+function resetPaymentFilters(){
+    document.getElementById("paymentSearch").value = "";
+    document.getElementById("paymentStatusFilter").value = "";
+    document.getElementById("paymentMethodFilter").value = "";
+    document.getElementById("startDateFilter").value = "";
+    document.getElementById("endDateFilter").value = "";
+    paginationState.payments.page = 1;
+    renderPayments();
+}
+function openBulkImportModal(){
+    const bodyHtml = `
+        <p class="text-xs text-gray-500 mb-2">Paste a JSON array of payment objects (invoice, customer, email, amount, method, status, date).</p>
+        <textarea id="bulkPayments_json" placeholder='[{"invoice":"INV-101","customer":"Jane Doe","email":"jane@example.com","amount":5000,"method":"M-Pesa","status":"Completed","date":"1/1/2026"}]' class="w-full p-2 border rounded text-sm h-32 font-mono"></textarea>
+    `;
+    openModal("Bulk Import Payments", bodyHtml, () => {
+        try {
+            const parsed = JSON.parse(document.getElementById("bulkPayments_json").value.trim() || "[]");
+            if (!Array.isArray(parsed)) throw new Error("Not an array");
+            parsed.forEach(p => {
+                payments.push({
+                    id: Date.now() + Math.floor(Math.random()*1000),
+                    invoice: p.invoice || ("INV-" + Math.floor(1000+Math.random()*9000)),
+                    customer: p.customer || "Unknown",
+                    email: p.email || "",
+                    plan: p.plan || "pro",
+                    addonsCount: p.addonsCount || 0,
+                    billing: p.billing || "Monthly",
+                    amount: p.amount || 0,
+                    method: p.method || "M-Pesa",
+                    status: p.status || "Pending",
+                    date: p.date || new Date().toLocaleDateString()
+                });
+            });
+            localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+            addLog("Info", "Developer", `Bulk Imported ${parsed.length} Payment Records`, "Payments");
+            renderPayments();
+        } catch(err) {
+            alert("Invalid JSON format for bulk import.");
+        }
+    });
+}
+
 function deletePayment(id) {
+    const target = payments.find(p => String(p.id) === String(id));
+    if (target && target.source === "signup") return alert("This is a subscription invoice generated from the plan picked at sign-up. Remove or change the company account instead.");
     if (!confirm("Delete this payment?")) return;
-    payments = payments.filter(p => p.id !== id);
+    payments = payments.filter(p => String(p.id) !== String(id));
     localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
     renderPayments();
 }
 
-function previewPayment(id) {
-    const payment = payments.find(p => p.id === id);
-    if (!payment) return;
-    
-    const finalAmount = calculateInvoiceAmount(payment);
-    const planKey = (payment.plan || 'pro').toLowerCase().replace(/\s+/g, '');
-    const planMeta = PRICING_PLANS[planKey]?.label || payment.plan;
+function planLabelOf(plan){
+    const key = planKeyOf(plan);
+    return (PRICING_PLANS[key] && PRICING_PLANS[key].label) || devTitle(plan, "Free");
+}
+function nextPeriodDate(from, billing){
+    const d = new Date(from && from !== "-" ? from : Date.now());
+    const base = isNaN(d.getTime()) ? new Date() : d;
+    const out = new Date(base.getTime());
+    if (String(billing) === "Yearly") out.setFullYear(out.getFullYear() + 1);
+    else out.setMonth(out.getMonth() + 1);
+    return out;
+}
 
-    alert(`Payment Details:\n\nInvoice: ${payment.invoice}\nCustomer: ${payment.customer}\nEmail: ${payment.email || 'N/A'}\nLicensing Tier: ${planMeta} (${payment.billing || 'Monthly'})\nPremium Add-ons: ${payment.addonsCount || 0}\nAmount: KES ${finalAmount.toLocaleString()}\nMethod: ${payment.method}\nStatus: ${payment.status}\nDate: ${payment.date}`);
+/* Proper invoice preview (was a plain alert that also crashed on
+   subscription rows because their ids are strings). */
+function previewPayment(id) {
+    const p = payments.find(x => String(x.id) === String(id));
+    if (!p) return alert("Payment not found.");
+    const amount = calculateInvoiceAmount(p);
+    const planMeta = planLabelOf(p.plan);
+    const addons = Number(p.addonsCount) || 0;
+    const addonTotal = addons * 1500;
+    const paid = p.status === "Completed";
+    const html = `
+    <div id="invoicePreviewSheet" class="text-sm">
+        <div class="flex items-start justify-between border-b pb-3 mb-3">
+            <div>
+                <div class="text-lg font-bold text-blue-900">INVOICE ${p.invoice}</div>
+                <div class="text-xs text-gray-500">Issued ${p.date || "-"}</div>
+                <div class="text-xs text-gray-500">${p.source === "signup" ? "Subscription - plan picked at sign-up" : "Manual invoice"}</div>
+            </div>
+            <span class="text-xs font-semibold px-3 py-1 rounded-full ${paid ? "bg-green-50 text-green-700 border border-green-200" : "bg-amber-50 text-amber-700 border border-amber-200"}">${p.status}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <div class="text-xs uppercase text-gray-400 mb-1">Billed To</div>
+                <div class="font-semibold text-gray-900">${p.customer}</div>
+                <div class="text-gray-500">${p.email || "-"}</div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400 mb-1">Payment</div>
+                <div class="text-gray-700">Method: ${p.method || "-"}</div>
+                <div class="text-gray-700">Cycle: ${p.billing || "Monthly"}</div>
+                <div class="text-gray-700">Renews: ${nextPeriodDate(p.date, p.billing).toLocaleDateString()}</div>
+            </div>
+        </div>
+        <table class="w-full text-left border-t">
+            <thead><tr class="text-xs uppercase text-gray-400"><th class="py-2">Description</th><th class="py-2 text-right">Amount</th></tr></thead>
+            <tbody>
+                <tr class="border-t"><td class="py-2">${planMeta} plan (${p.billing || "Monthly"})</td><td class="py-2 text-right">KES ${(amount - addonTotal).toLocaleString()}</td></tr>
+                ${addons ? `<tr class="border-t"><td class="py-2">${addons} premium add-on(s)</td><td class="py-2 text-right">KES ${addonTotal.toLocaleString()}</td></tr>` : ""}
+                <tr class="border-t font-bold"><td class="py-3">Total</td><td class="py-3 text-right">KES ${amount.toLocaleString()}</td></tr>
+            </tbody>
+        </table>
+        <div class="mt-4 flex gap-2">
+            <button onclick="printInvoice('${p.id}')" class="bg-blue-900 text-white px-3 py-1.5 text-xs rounded hover:bg-blue-700">Print / PDF</button>
+            <button onclick="renewPayment('${p.id}')" class="bg-emerald-700 text-white px-3 py-1.5 text-xs rounded hover:bg-emerald-600">Renew Subscription</button>
+        </div>
+    </div>`;
+    openModal("Invoice Preview", html, () => {});
+}
+
+function printInvoice(id) {
+    const sheet = document.getElementById("invoicePreviewSheet");
+    if (!sheet) return;
+    const w = window.open("", "_blank", "width=820,height=900");
+    if (!w) return alert("Allow pop-ups to print the invoice.");
+    w.document.write(`<html><head><title>Invoice</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">${sheet.innerHTML}</body></html>`);
+    w.document.close();
+    setTimeout(() => { try { w.print(); } catch(e){} }, 600);
+}
+
+/* Renew = charge the SAME plan chosen at sign-up for the next period. */
+function renewPayment(id) {
+    const p = payments.find(x => String(x.id) === String(id));
+    if (!p) return alert("Payment not found.");
+    const amount = calculateInvoiceAmount(p);
+    const nextDate = nextPeriodDate(p.date, p.billing);
+    if (!confirm(`Renew ${p.customer} on the ${planLabelOf(p.plan)} plan (${p.billing || "Monthly"}) for KES ${amount.toLocaleString()}?\nNew period starts ${nextDate.toLocaleDateString()}.`)) return;
+
+    payments.push({
+        id: "rnw-" + Date.now(),
+        invoice: "RNW-" + String(Date.now()).slice(-6),
+        customer: p.customer,
+        email: p.email || "",
+        company: p.company || p.customer,
+        plan: p.plan,
+        billing: p.billing || "Monthly",
+        addonsCount: Number(p.addonsCount) || 0,
+        amount: amount,
+        method: p.method && p.method !== "N/A" ? p.method : "M-Pesa",
+        status: "Pending",
+        date: nextDate.toLocaleDateString(),
+        source: "renewal"
+    });
+    persistPayments();
+
+    // Push the new expiry back onto the company record so the app sees it too.
+    const company = companies.find(c => String(c.companyName) === String(p.company || p.customer) || String(c.email) === String(p.email));
+    if (company) {
+        company.expiry = nextPeriodDate(nextDate, p.billing).toLocaleDateString();
+        company.status = "Active";
+        persistCompanies();
+    }
+    addLog("Info", "Developer", `Renewed ${p.customer} on ${planLabelOf(p.plan)} (${p.billing || "Monthly"})`, "Payments");
+    closeModal();
+    renderPayments();
+    alert("Renewal invoice created: KES " + amount.toLocaleString());
 }
 
 function exportPayments() {
@@ -2387,14 +2675,26 @@ function openNotificationModal() {
 function renderNotifications(){
     const tbody = document.getElementById("notificationsTable");
     const search = document.getElementById("notificationSearch").value.toLowerCase();
+    const channelFilter = document.getElementById("notificationChannelFilter")?.value || "";
+    const statusFilter = document.getElementById("notificationStatusFilter")?.value || "";
+    const startDate = document.getElementById("notificationStartDate")?.value || "";
+    const endDate = document.getElementById("notificationEndDate")?.value || "";
     tbody.innerHTML = "";
-    const filtered = notifications.filter(n => n.title.toLowerCase().includes(search) || n.recipient.toLowerCase().includes(search));
+    let filtered = notifications.filter(n => n.title.toLowerCase().includes(search) || n.recipient.toLowerCase().includes(search));
+    if (channelFilter) filtered = filtered.filter(n => n.type === channelFilter);
+    if (statusFilter) filtered = filtered.filter(n => n.status === statusFilter);
+    if (startDate) filtered = filtered.filter(n => !n.date || new Date(n.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(n => !n.date || new Date(n.date) <= new Date(endDate));
+
+    const { pageItems, totalPages } = paginate(filtered, 'notifications');
+
     if(filtered.length === 0){
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">No notifications available.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No notifications available.</td></tr>`;
     }else{
-        filtered.forEach(n => {
+        pageItems.forEach(n => {
             tbody.innerHTML += `
             <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="notifications-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${n.id}" onclick="onRowCheckToggle('notifications')"></td>
                 <td>${n.title}</td>
                 <td>${n.recipient}</td>
                 <td>${n.type}</td>
@@ -2411,6 +2711,44 @@ function renderNotifications(){
     document.getElementById("unreadNotifications").textContent = notifications.filter(n=>n.status==="Unread").length;
     document.getElementById("todayNotifications").textContent = notifications.filter(n=>n.date===new Date().toLocaleDateString()).length;
     document.getElementById("failedNotifications").textContent = notifications.filter(n=>n.status==="Failed").length;
+    document.getElementById("notificationShowingCount").textContent = pageItems.length;
+    renderPageNumbers("notificationPageNumbers", "notifications", totalPages, gotoNotificationPage);
+    updateBulkBar('notifications');
+}
+
+function resetNotificationFilters(){
+    document.getElementById("notificationSearch").value = "";
+    document.getElementById("notificationChannelFilter").value = "";
+    document.getElementById("notificationStatusFilter").value = "";
+    document.getElementById("notificationStartDate").value = "";
+    document.getElementById("notificationEndDate").value = "";
+    paginationState.notifications.page = 1;
+    renderNotifications();
+}
+
+function openNotificationTemplates(){
+    const templates = [
+        { title: "Welcome Aboard", type: "Email Blast", message: "Welcome to Acacia Books! Your account is now active." },
+        { title: "Payment Reminder", type: "SMS", message: "Your subscription payment is due soon. Please renew to avoid interruption." },
+        { title: "Scheduled Maintenance", type: "System Alert", message: "The platform will undergo scheduled maintenance tonight from 11 PM - 1 AM." }
+    ];
+    const bodyHtml = `
+        <p class="text-xs text-gray-500 mb-2">Select a template to queue as a new notification.</p>
+        <div class="space-y-2">
+            ${templates.map((t,i) => `
+                <label class="flex items-start gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="tplChoice" value="${i}" ${i===0?'checked':''}>
+                    <span><strong class="block text-sm">${t.title}</strong><span class="text-xs text-gray-500">${t.message}</span></span>
+                </label>`).join('')}
+        </div>
+    `;
+    openModal("Notification Templates", bodyHtml, () => {
+        const idx = parseInt(document.querySelector('input[name="tplChoice"]:checked')?.value || 0);
+        const t = templates[idx];
+        notifications.push({ id: Date.now(), title: t.title, recipient: "All", type: t.type, status: "Unread", message: t.message, date: new Date().toLocaleDateString() });
+        localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+        renderNotifications();
+    });
 }
 
 function viewNotification(id){
@@ -2436,6 +2774,7 @@ function sendAllNotifications(){
     alert("All queued notifications dispatched successfully.");
 }
 
+function openCreateTicketModal() { openSupportModal(); }
 function openSupportModal() {
     const bodyHtml = `
         <input id="modalTicket_cust" type="text" placeholder="Customer Name" class="w-full p-2 border rounded text-sm">
@@ -2464,38 +2803,146 @@ function openSupportModal() {
 }
 
 function renderSupportTickets(){
+    syncChatWidgetTickets();
     const tbody = document.getElementById("supportTable");
     const search = document.getElementById("supportSearch").value.toLowerCase();
+    const priorityFilter = document.getElementById("supportPriorityFilter")?.value || "";
+    const statusFilter = document.getElementById("supportStatusFilter")?.value || "";
+    const startDate = document.getElementById("supportStartDate")?.value || "";
+    const endDate = document.getElementById("supportEndDate")?.value || "";
     tbody.innerHTML = "";
-    const filtered = supportTickets.filter(t => t.customer.toLowerCase().includes(search) || t.subject.toLowerCase().includes(search));
+    let filtered = supportTickets.filter(t => t.customer.toLowerCase().includes(search) || t.subject.toLowerCase().includes(search));
+    if (priorityFilter) filtered = filtered.filter(t => t.priority === priorityFilter);
+    if (statusFilter) filtered = filtered.filter(t => t.status === statusFilter);
+    if (startDate) filtered = filtered.filter(t => !t.date || new Date(t.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(t => !t.date || new Date(t.date) <= new Date(endDate));
+
+    const { pageItems, totalPages } = paginate(filtered, 'support');
+
     if(filtered.length === 0){
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No support tickets available.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-500">No support tickets available.</td></tr>`;
     }else{
-        filtered.forEach(t => {
+        pageItems.forEach(t => {
             tbody.innerHTML += `
             <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="support-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${t.id}" onclick="onRowCheckToggle('support')"></td>
                 <td>${t.ticket}</td>
+                <td>${t.subject}${t.source === 'chat' ? ' <span class="ml-1 text-[10px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full align-middle">💬 AI Chat</span>' : ''}</td>
                 <td>${t.customer}</td>
-                <td>${t.subject}</td>
                 <td><span class="${t.priority==='High'?'text-red-600 font-bold':''}">${t.priority}</span></td>
                 <td><span class="text-blue-500">${t.status}</span></td>
                 <td>${t.date}</td>
                 <td>
-                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="resolveTicket(${t.id})">Resolve</button>
-                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteTicket(${t.id})">Delete</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="resolveTicket('${t.id}')">Resolve</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteTicket('${t.id}')">Delete</button>
                 </td>
             </tr>`;
         });
     }
-    document.getElementById("supportTotal").textContent = supportTickets.length;
-    document.getElementById("supportOpen").textContent = supportTickets.filter(t=>t.status==="Open").length;
-    document.getElementById("supportResolved").textContent = supportTickets.filter(t=>t.status==="Resolved").length;
-    document.getElementById("supportHigh").textContent = supportTickets.filter(t=>t.priority==="High").length;
+    document.getElementById("statTotalTickets").textContent = supportTickets.length;
+    document.getElementById("statOpenTickets").textContent = supportTickets.filter(t=>t.status==="Open").length;
+    document.getElementById("statResolvedTickets").textContent = supportTickets.filter(t=>t.status==="Resolved").length;
+    document.getElementById("statUrgentTickets").textContent = supportTickets.filter(t=>t.priority==="High").length;
     document.getElementById("totalTickets").textContent = supportTickets.length;
+    document.getElementById("supportShowingCount").textContent = pageItems.length;
+    renderPageNumbers("supportPageNumbers", "support", totalPages, gotoSupportPage);
+    updateBulkBar('support');
+}
+
+// Pulls in tickets created via the customer-facing "Acacia AI Support" chat
+// widget (stored per-user under axSupport_tickets_<userKey>) and merges any
+// new ones into this admin's supportTickets list. Existing entries (and any
+// status changes already made here) are left alone — this only adds tickets
+// that haven't been seen before, matched by their original chat ticket id.
+function syncChatWidgetTickets(){
+    try {
+        const seen = new Set(supportTickets.map(t => String(t.id)));
+        let added = 0;
+        for (let i = 0; i < localStorage.length; i++){
+            const key = localStorage.key(i);
+            if (!key || key.split(NS_SEP)[0].indexOf('axSupport_tickets_') !== 0) continue;
+            let chatTickets;
+            try { chatTickets = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ continue; }
+            if (!Array.isArray(chatTickets)) continue;
+            chatTickets.forEach(ct => {
+                const id = 'chat:' + ct.id;
+                if (seen.has(id)) return;
+                seen.add(id);
+                added++;
+                supportTickets.push({
+                    id: id,
+                    ticket: ct.id,
+                    customer: ct.userName || ct.userEmail || 'Guest (AI Chat)',
+                    subject: ct.subject || 'Support request',
+                    priority: ct.priority === 'Urgent' ? 'High' : (ct.priority === 'High' ? 'High' : (ct.priority === 'Low' ? 'Low' : 'Medium')),
+                    status: (ct.status === 'Resolved' || ct.status === 'Closed') ? 'Resolved' : 'Open',
+                    message: ct.description || '',
+                    date: ct.createdAt ? new Date(ct.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+                    source: 'chat'
+                });
+            });
+        }
+        added += syncChatConversations(seen);
+        if (added) localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    } catch(e) { console.error('syncChatWidgetTickets failed', e); }
+}
+
+// Every AI Chat conversation (axSupport_history_<user>) shows up here as a
+// live chat entry, even when the customer never formally raised a ticket.
+function syncChatConversations(seen){
+    let changed = 0;
+    for (let i = 0; i < localStorage.length; i++){
+        const key = localStorage.key(i);
+        if (!key || key.split(NS_SEP)[0].indexOf('axSupport_history_') !== 0) continue;
+        let msgs;
+        try { msgs = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ continue; }
+        if (!Array.isArray(msgs) || !msgs.length) continue;
+        const who = key.split(NS_SEP)[0].replace('axSupport_history_', '') || 'Guest';
+        const id = 'chat-session:' + who;
+        const firstUserMsg = msgs.find(m => m && (m.role === 'user' || m.from === 'user' || m.sender === 'user')) || msgs[0];
+        const text = String((firstUserMsg && (firstUserMsg.text || firstUserMsg.message || firstUserMsg.content)) || 'Chat started');
+        const last = msgs[msgs.length - 1] || {};
+        const when = last.at || last.time || last.createdAt || Date.now();
+        const existing = supportTickets.find(t => String(t.id) === id);
+        if (existing){
+            const summary = text.slice(0, 120) + ' (' + msgs.length + ' messages)';
+            if (existing.message !== summary){
+                existing.message = summary;
+                existing.date = new Date(when).toLocaleDateString();
+                changed++;
+            }
+            continue;
+        }
+        if (seen) seen.add(id);
+        supportTickets.push({
+            id: id,
+            ticket: 'CHAT-' + who.toUpperCase().slice(0, 10),
+            customer: who,
+            subject: 'AI Chat conversation',
+            priority: 'Medium',
+            status: 'Open',
+            message: text.slice(0, 120) + ' (' + msgs.length + ' messages)',
+            date: new Date(when).toLocaleDateString(),
+            source: 'chat'
+        });
+        changed++;
+    }
+    return changed;
+}
+
+function resetSupportFilters(){
+    document.getElementById("supportSearch").value = "";
+    document.getElementById("supportPriorityFilter").value = "";
+    document.getElementById("supportStatusFilter").value = "";
+    document.getElementById("supportCategoryFilter").value = "";
+    document.getElementById("supportStartDate").value = "";
+    document.getElementById("supportEndDate").value = "";
+    paginationState.support.page = 1;
+    renderSupportTickets();
 }
 
 function resolveTicket(id) {
-    const t = supportTickets.find(ticket => ticket.id === id);
+    const t = supportTickets.find(ticket => String(ticket.id) === String(id));
     if(t) t.status = "Resolved";
     localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
     renderSupportTickets();
@@ -2503,7 +2950,7 @@ function resolveTicket(id) {
 
 function deleteTicket(id){
     if(!confirm("Purge ticket history?")) return;
-    supportTickets = supportTickets.filter(t => t.id !== id);
+    supportTickets = supportTickets.filter(t => String(t.id) !== String(id));
     localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
     renderSupportTickets();
 }
@@ -2527,10 +2974,35 @@ function savePlatformSettings(){
     alert("Platform settings written to system storage configuration successfully.");
 }
 
+function applyTheme(mode, persist){
+    let resolved = mode || "Light";
+    if (resolved === "System") {
+        resolved = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
+    }
+    const dark = resolved === "Dark";
+    document.body.classList.toggle("dark-mode", dark);
+    document.documentElement.classList.toggle("dark", dark);
+    const btn = document.getElementById("themeToggleBtn");
+    if (btn) btn.textContent = dark ? "☀️ Light" : "🌙 Dark";
+    const select = document.getElementById("theme");
+    if (select && mode) select.value = mode;
+    if (persist) {
+        settings.theme = mode;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    }
+    // repaint graphs so their gradients match the new surface
+    if (document.querySelector(".page.active")?.id === "analytics") refreshAnalytics();
+}
+function toggleDarkMode(){
+    const isDark = document.body.classList.contains("dark-mode");
+    applyTheme(isDark ? "Light" : "Dark", true);
+}
+
 function savePreferences(){
     settings.currency = document.getElementById("currency").value;
     settings.language = document.getElementById("language").value;
     settings.theme = document.getElementById("theme").value;
+    applyTheme(settings.theme, false);
     settings.lastSaved = new Date().toLocaleString();
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     document.getElementById("lastSaved").textContent = "Last Saved: " + settings.lastSaved;
@@ -2612,6 +3084,7 @@ function loadSettings(){
     document.getElementById("currency").value = settings.currency || "KES";
     document.getElementById("language").value = settings.language || "English";
     document.getElementById("theme").value = settings.theme || "Light";
+    applyTheme(settings.theme || "Light", false);
     document.getElementById("lastSaved").textContent = "Last Saved: " + (settings.lastSaved || "Never");
 }
 
@@ -2623,19 +3096,31 @@ function addLog(level, user, activity, module){
 function renderLogs(){
     const tbody = document.getElementById("logsTable");
     const search = document.getElementById("logSearch").value.toLowerCase();
+    const levelFilter = document.getElementById("logLevelFilter")?.value || "";
+    const moduleFilter = document.getElementById("logModuleFilter")?.value || "";
+    const startDate = document.getElementById("logStartDate")?.value || "";
+    const endDate = document.getElementById("logEndDate")?.value || "";
     tbody.innerHTML = "";
-    const filtered = logs.filter(log =>
+    let filtered = logs.filter(log =>
         log.user.toLowerCase().includes(search) ||
         log.activity.toLowerCase().includes(search) ||
         log.module.toLowerCase().includes(search) ||
         log.level.toLowerCase().includes(search)
     );
+    if (levelFilter) filtered = filtered.filter(l => l.level === levelFilter);
+    if (moduleFilter) filtered = filtered.filter(l => l.module === moduleFilter);
+    if (startDate) filtered = filtered.filter(l => !l.date || new Date(l.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(l => !l.date || new Date(l.date) <= new Date(endDate));
+
+    const { pageItems, totalPages } = paginate(filtered, 'logs');
+
     if(filtered.length === 0){
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">No logs available.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No logs available.</td></tr>`;
     }else{
-        filtered.forEach(log => {
+        pageItems.forEach(log => {
             tbody.innerHTML += `
             <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="logs-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${log.id}" onclick="onRowCheckToggle('logs')"></td>
                 <td>${log.date}</td>
                 <td><span class="font-bold ${log.level==='Error'?'text-red-600':log.level==='Warning'?'text-yellow-600':'text-blue-600'}">${log.level}</span></td>
                 <td>${log.user}</td>
@@ -2649,6 +3134,19 @@ function renderLogs(){
     document.getElementById("loginLogs").textContent = logs.filter(l => l.activity.toLowerCase().includes("login")).length;
     document.getElementById("errorLogs").textContent = logs.filter(l => l.level === "Error").length;
     document.getElementById("warningLogs").textContent = logs.filter(l => l.level === "Warning").length;
+    document.getElementById("logShowingCount").textContent = pageItems.length;
+    renderPageNumbers("logPageNumbers", "logs", totalPages, gotoLogPage);
+    updateBulkBar('logs');
+}
+
+function resetLogFilters(){
+    document.getElementById("logSearch").value = "";
+    document.getElementById("logLevelFilter").value = "";
+    document.getElementById("logModuleFilter").value = "";
+    document.getElementById("logStartDate").value = "";
+    document.getElementById("logEndDate").value = "";
+    paginationState.logs.page = 1;
+    renderLogs();
 }
 
 function deleteLog(id){
@@ -2714,22 +3212,27 @@ function uploadWebsite(event) {
         uploaded: new Date().toLocaleString()
     });
     addLog("Info", "Developer", `Imported Web Module: ${file.name}`, "Web App");
+    saveWebsites();
     renderWebsites();
 }
 
 function processHtmlImport(file) {
     const reader = new FileReader();
     reader.onload = function(e) {
+        const newId = Date.now();
+        saveSiteSource(newId, String(e.target.result || ""));
         websites.push({
-            id: Date.now(),
+            id: newId,
             name: file.name.replace(".html", "").replace(".htm", ""),
             file: "#",
+            hasSource: true,
             version: "1.0",
             size: (file.size / 1024 / 1024).toFixed(2) + " MB",
             status: "Imported",
             uploaded: new Date().toLocaleString()
         });
         addLog("Info", "Developer", `Imported HTML File: ${file.name}`, "Web App");
+        saveWebsites();
         renderWebsites();
     };
     reader.readAsText(file);
@@ -2746,6 +3249,7 @@ function processExcelImport(file) {
         uploaded: new Date().toLocaleString()
     });
     addLog("Info", "Developer", `Imported Excel/CSV Data: ${file.name}`, "Web App");
+    saveWebsites();
     renderWebsites();
 }
 
@@ -2766,6 +3270,135 @@ function closeCodeEditor() {
     }
 }
 
+/* ---- Attach / preview / source viewing --------------------------- */
+const SITE_SRC_PREFIX = "acacia_site_src_";
+let previewSiteId = null;
+
+function siteUrl(site){
+    if (!site) return "";
+    return site.url || (site.file && site.file !== "#" ? site.file : "");
+}
+function saveSiteSource(id, content){
+    try { localStorage.setItem(SITE_SRC_PREFIX + id, content); }
+    catch(e){ console.warn("Source too large to cache locally", e); }
+}
+function getSiteSource(id){ return localStorage.getItem(SITE_SRC_PREFIX + id); }
+
+function attachWebsiteModal(){
+    const bodyHtml = `
+        <input id="attachName" type="text" placeholder="Website name (e.g. Acacia Storefront)" class="w-full p-2 border rounded text-sm">
+        <input id="attachUrl" type="url" placeholder="https://your-site.com  or  app_1710.html" class="w-full p-2 border rounded text-sm">
+        <input id="attachVersion" type="text" placeholder="Version (optional)" class="w-full p-2 border rounded text-sm">
+        <p class="text-xs text-gray-500">Attached sites can be launched in the live preview, inspected with View Code, enabled or disabled.</p>`;
+    openModal("Attach Website", bodyHtml, () => {
+        const name = document.getElementById("attachName").value.trim();
+        let url = document.getElementById("attachUrl").value.trim();
+        if (!name || !url) return alert("Provide both a name and a URL.");
+        if (!/^(https?:)?\/\//i.test(url) && !/^[\w .\-\/]+\.html?$/i.test(url)) url = "https://" + url;
+        websites.push({
+            id: Date.now(),
+            name,
+            file: url,
+            url,
+            version: document.getElementById("attachVersion").value.trim() || "1.0",
+            size: "Remote",
+            status: "Active",
+            uploaded: new Date().toLocaleString(),
+            attached: true
+        });
+        saveWebsites();
+        renderWebsites();
+        addLog("Info", "Developer", `Attached external website: ${name} (${url})`, "Web App");
+        closeModal();
+    });
+}
+
+function launchWebsite(id){
+    const site = websites.find(w => String(w.id) === String(id));
+    if (!site) return;
+    if (site.status !== "Active" && !confirm("This app is disabled. Launch anyway?")) return;
+    const url = siteUrl(site);
+    const source = getSiteSource(site.id);
+    previewSiteId = site.id;
+    const modal = document.getElementById("sitePreviewModal");
+    const frame = document.getElementById("sitePreviewFrame");
+    document.getElementById("previewSiteName").textContent = site.name;
+    document.getElementById("previewSiteUrl").textContent = url || "local import";
+    modal.classList.remove("hidden"); modal.classList.add("flex");
+    if (url) frame.src = url;
+    else if (source) frame.srcdoc = source;
+    else frame.srcdoc = "<body style='font-family:sans-serif;padding:40px;color:#475569'><h2>No preview source</h2><p>Attach a URL or re-import this project as a single HTML file to preview it here.</p></body>";
+    addLog("Info", "Developer", `Launched preview: ${site.name}`, "Web App");
+}
+function reloadPreview(){ launchWebsite(previewSiteId); }
+function openPreviewInNewTab(){
+    const site = websites.find(w => String(w.id) === String(previewSiteId));
+    const url = siteUrl(site);
+    if (url) window.open(url, "_blank");
+    else if (getSiteSource(previewSiteId)) {
+        const blob = new Blob([getSiteSource(previewSiteId)], { type: "text/html" });
+        window.open(URL.createObjectURL(blob), "_blank");
+    } else alert("No launchable target for this application.");
+}
+function closeSitePreview(){
+    const modal = document.getElementById("sitePreviewModal");
+    modal.classList.add("hidden"); modal.classList.remove("flex");
+    document.getElementById("sitePreviewFrame").src = "about:blank";
+}
+
+let currentSourceName = "source.html";
+async function viewWebsiteCode(id){
+    const site = websites.find(w => String(w.id) === String(id));
+    if (!site) return;
+    const modal = document.getElementById("sourceModal");
+    const box = document.getElementById("sourceCodeBox");
+    currentSourceName = (site.name || "source").replace(/\s+/g, "_") + ".html";
+    document.getElementById("sourceSiteName").textContent = site.name;
+    document.getElementById("sourceLineCount").textContent = "loading…";
+    modal.classList.remove("hidden"); modal.classList.add("flex");
+    box.textContent = "Fetching source…";
+
+    let code = getSiteSource(site.id);
+    if (!code) {
+        const url = siteUrl(site);
+        if (url) {
+            try {
+                const res = await fetch(url);
+                code = await res.text();
+                saveSiteSource(site.id, code);
+            } catch(e) {
+                code = null;
+                box.textContent = "Source could not be read from " + url + "\n\nThe host blocks cross-origin reads (CORS). Use “Open in Tab” and view source there, or import the file with Import Project → Single HTML.";
+            }
+        }
+    }
+    if (code) {
+        box.textContent = code;
+        document.getElementById("sourceLineCount").textContent = code.split("\n").length + " lines";
+    } else if (!siteUrl(site)) {
+        box.textContent = "No cached source for this application. Re-import it as a single HTML file to inspect the code here.";
+        document.getElementById("sourceLineCount").textContent = "";
+    } else {
+        document.getElementById("sourceLineCount").textContent = "";
+    }
+    addLog("Info", "Developer", `Viewed source code: ${site.name}`, "Web App");
+}
+function closeSourceModal(){
+    const modal = document.getElementById("sourceModal");
+    modal.classList.add("hidden"); modal.classList.remove("flex");
+}
+function copySourceCode(){
+    const text = document.getElementById("sourceCodeBox").textContent;
+    navigator.clipboard?.writeText(text).then(() => alert("Source copied to clipboard."), () => alert("Clipboard blocked by browser."));
+}
+function downloadSourceCode(){
+    const text = document.getElementById("sourceCodeBox").textContent;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/html" }));
+    a.download = currentSourceName;
+    a.click();
+}
+
 function renderWebsites(){
     const tbody = document.getElementById("websiteTable");
     tbody.innerHTML = "";
@@ -2782,8 +3415,10 @@ function renderWebsites(){
             <td>${site.uploaded}</td>
             <td>${site.size}</td>
             <td>
-                <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="openWebsite(${site.id})">Open</button>
-                <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="openInVSCode('${site.path || site.name}')">VS Code</button>
+                <button class="bg-emerald-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="launchWebsite(${site.id})">🚀 Launch</button>
+                <button class="bg-slate-700 text-white px-2 py-1 text-xs rounded mr-1" onclick="viewWebsiteCode(${site.id})">&lt;/&gt; Code</button>
+                <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openWebsite(${site.id})">Open</button>
+                <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openInVSCode('${site.path || site.name}')">VS Code</button>
                 <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="toggleWebsite(${site.id})">${site.status === "Active" ? "Disable" : "Enable"}</button>
                 <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteWebsite(${site.id})">Delete</button>
             </td>
@@ -2804,55 +3439,81 @@ function openInVSCode(path) {
 function openWebsite(id){
     const site = websites.find(w => w.id === id);
     if(!site) return;
-    if(site.file === "#"){
-        alert("Imported local ZIP payload architecture file structure. Complete instantiation parameters inside raw local staging environment engine framework.");
-        return;
-    }
-    window.open(site.file, "_blank");
+    const url = siteUrl(site);
+    if(!url){ previewSiteId = site.id; return openPreviewInNewTab(); }
+    window.open(url, "_blank");
 }
 
 function toggleWebsite(id){
     const site = websites.find(w => w.id === id);
     if(!site) return;
     site.status = site.status === "Active" ? "Disabled" : "Active";
+    saveWebsites();
     renderWebsites();
 }
 
 function deleteWebsite(id){
     if(!confirm("Purge application bundle data?")) return;
     websites = websites.filter(w => w.id !== id);
+    saveWebsites();
     renderWebsites();
 }
 
 function renderCompanies(){
     const tbody = document.getElementById("companiesTable");
     const search = document.getElementById("companySearch").value.toLowerCase();
+    const planFilter = document.getElementById("companyPlanFilter")?.value || "";
+    const statusFilter = document.getElementById("companyStatusFilter")?.value || "";
     tbody.innerHTML = "";
-    const filtered = companies.filter(c => (c.companyName || "").toLowerCase().includes(search) || (c.ownerName || "").toLowerCase().includes(search));
+    populateFilterOptionsLabeled("companyPlanFilter", companies.map(c => c.plan), "All Plans");
+    populateFilterOptionsLabeled("companyStatusFilter", companies.map(c => c.status), "All Statuses");
+    let filtered = companies.filter(c => (c.companyName || "").toLowerCase().includes(search) || (c.ownerName || "").toLowerCase().includes(search) || (c.email || "").toLowerCase().includes(search));
+    if (planFilter) filtered = filtered.filter(c => c.plan === planFilter);
+    if (statusFilter) filtered = filtered.filter(c => c.status === statusFilter);
+
+    const { pageItems, totalPages } = paginate(filtered, 'companies');
+
     if(filtered.length === 0){
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-gray-500">No companies registered through automated registry modules.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies registered through automated registry modules.</td></tr>`;
     }else{
-        filtered.forEach(c => {
+        pageItems.forEach(c => {
             tbody.innerHTML += `
             <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${c.id || c.companyName}" onclick="onRowCheckToggle('companies')"></td>
                 <td>${c.companyName}</td>
                 <td>${c.ownerName}</td>
                 <td>${c.email}</td>
                 <td>${c.plan}</td>
                 <td>${c.status}</td>
-                <td>${c.createdAt}</td>
+                <td>${c.registered || c.createdAt || '-'}</td>
+                <td class="pr-6 text-right">
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick='alert(${JSON.stringify(JSON.stringify(c))})'>View</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteCompany('${c.id || c.companyName}')">Delete</button>
+                </td>
             </tr>`;
         });
     }
     document.getElementById("companyCount").textContent = companies.length;
     document.getElementById("activeCompanies").textContent = companies.filter(c => c.status === "Active").length;
-    document.getElementById("trialCompanies").textContent = companies.filter(c => c.plan === "Trial").length;
-    document.getElementById("paidCompanies").textContent = companies.filter(c => c.plan !== "Trial").length;
+    document.getElementById("trialCompanies").textContent = companies.filter(c => c.status === "Trial" || c.plan === "Trial" || c.plan === "Free").length;
+    document.getElementById("paidCompanies").textContent = companies.filter(c => Number(c.price || 0) > 0 || ["Trial", "Free"].indexOf(c.plan) === -1).length;
     document.getElementById("totalCompanies").textContent = companies.length;
+    document.getElementById("companyShowingCount").textContent = pageItems.length;
+    renderPageNumbers("companyPageNumbers", "companies", totalPages, gotoCompanyPage);
+    updateBulkBar('companies');
+}
+
+function deleteCompany(idOrName){
+    if(!confirm("Remove this company from the registry?")) return;
+    companies = companies.filter(c => (c.id || c.companyName) != idOrName);
+    persistCompanies();
+    addLog("Warning", "Developer", "Removed Company Registry Entry", "Companies");
+    renderCompanies();
 }
 
 function syncCompanies(){
-    companies = JSON.parse(localStorage.getItem(COMPANY_KEY) || "[]");
+    users = loadUsersFromStores();
+    companies = loadCompaniesFromStores(users);
     renderCompanies();
 }
 
@@ -2876,25 +3537,132 @@ function refreshAnalytics(){
     drawAnalyticsCharts(users, companies, payments, websites);
 }
 
-let revenueChart, usersChart, websiteChart;
+let revenueChart, usersChart, websiteChart, dashboardChartRef;
+
+/* Monthly buckets so every panel renders a real time-series graph
+   (line / area / smooth curves) instead of single-value bar+pie charts. */
+function devMonthBuckets(months){
+    const out = [];
+    const now = new Date();
+    for (let i = months - 1; i >= 0; i--){
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        out.push({
+            key: d.getFullYear() + "-" + d.getMonth(),
+            label: d.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+            value: 0, count: 0
+        });
+    }
+    return out;
+}
+function devBucketKey(dateLike){
+    const d = new Date(dateLike);
+    if (isNaN(d.getTime())) return null;
+    return d.getFullYear() + "-" + d.getMonth();
+}
+function devSeries(records, months, dateField, valueFn){
+    const buckets = devMonthBuckets(months);
+    const index = new Map(buckets.map(b => [b.key, b]));
+    (records || []).forEach(r => {
+        const k = devBucketKey(r && (r[dateField] || r.date || r.registered || r.createdAt));
+        const b = k ? index.get(k) : null;
+        if (!b) return;
+        b.count++;
+        b.value += valueFn ? Number(valueFn(r) || 0) : 1;
+    });
+    return buckets;
+}
+function devCumulative(buckets, startingTotal){
+    let run = 0;
+    return buckets.map(b => { run += b.count; return run; });
+}
+function devGradient(canvas, hex){
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height || 300);
+    g.addColorStop(0, hex + "66");
+    g.addColorStop(1, hex + "05");
+    return g;
+}
+const DEV_GRAPH_OPTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8 } } },
+    elements: { line: { tension: 0.4, borderWidth: 2 }, point: { radius: 3, hoverRadius: 6 } },
+    scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: "rgba(148,163,184,0.2)" } }
+    }
+};
+
 function drawAnalyticsCharts(users, companies, payments, websites){
+    if (typeof Chart === "undefined") return;
     if(revenueChart) revenueChart.destroy();
     if(usersChart) usersChart.destroy();
     if(websiteChart) websiteChart.destroy();
 
-    const completedPaymentsTotal = payments.reduce((acc, curr) => curr.status === 'Completed' ? acc + Number(curr.amount) : acc, 0);
+    const months = parseInt(document.getElementById("analyticsRange")?.value || "12", 10);
 
-    revenueChart = new Chart(document.getElementById("revenueChart"), {
-        type: "bar",
-        data: { labels: ["Revenue"], datasets: [{ label: "KES Monitored", data: [completedPaymentsTotal], backgroundColor: '#2563eb' }] }
+    const completed = (payments || []).filter(p => p.status === "Completed");
+    const revSeries = devSeries(completed, months, "date", p => calculateInvoiceAmount(p));
+    const pendSeries = devSeries((payments || []).filter(p => p.status !== "Completed"), months, "date", p => calculateInvoiceAmount(p));
+    const labels = revSeries.map(b => b.label);
+
+    // Fall back to spreading current totals so the graph is never a flat blank
+    const revTotal = revSeries.reduce((a, b) => a + b.value, 0);
+    if (revTotal === 0 && completed.length){
+        const each = completed.reduce((a, p) => a + calculateInvoiceAmount(p), 0);
+        revSeries[revSeries.length - 1].value = each;
+    }
+
+    const revCanvas = document.getElementById("revenueChart");
+    revenueChart = new Chart(revCanvas, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                { label: "Collected Revenue (KES)", data: revSeries.map(b => b.value),
+                  borderColor: "#2563eb", backgroundColor: devGradient(revCanvas, "#2563eb"), fill: true },
+                { label: "Outstanding (KES)", data: pendSeries.map(b => b.value),
+                  borderColor: "#f59e0b", backgroundColor: "transparent", borderDash: [5, 4], fill: false }
+            ]
+        },
+        options: DEV_GRAPH_OPTS
     });
-    usersChart = new Chart(document.getElementById("usersChart"), {
-        type: "doughnut",
-        data: { labels: ["Users", "Companies"], datasets: [{ data: [users.length, companies.length], backgroundColor: ['#2563eb', '#10b981'] }] }
+
+    const userSeries = devSeries(users, months, "registered");
+    const compSeries = devSeries(companies, months, "registered");
+    const uCanvas = document.getElementById("usersChart");
+    usersChart = new Chart(uCanvas, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                { label: "Users (cumulative)", data: devCumulative(userSeries),
+                  borderColor: "#10b981", backgroundColor: devGradient(uCanvas, "#10b981"), fill: true },
+                { label: "Companies (cumulative)", data: devCumulative(compSeries),
+                  borderColor: "#6366f1", backgroundColor: "transparent", fill: false }
+            ]
+        },
+        options: DEV_GRAPH_OPTS
     });
-    websiteChart = new Chart(document.getElementById("websiteChart"), {
-        type: "pie",
-        data: { labels: ["Websites", "Payments Trace"], datasets: [{ data: [websites.length, payments.length], backgroundColor: ['#3b82f6', '#f59e0b'] }] }
+
+    const txSeries = devSeries(payments, months, "date");
+    const ticketSeries = devSeries(supportTickets, months, "date");
+    const wCanvas = document.getElementById("websiteChart");
+    websiteChart = new Chart(wCanvas, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                { label: "Transactions", data: txSeries.map(b => b.count),
+                  borderColor: "#3b82f6", backgroundColor: devGradient(wCanvas, "#3b82f6"), fill: true },
+                { label: "Support Requests", data: ticketSeries.map(b => b.count),
+                  borderColor: "#ef4444", backgroundColor: "transparent", fill: false },
+                { label: "Active Apps", data: labels.map(() => (websites || []).filter(w => w.status === "Active").length),
+                  borderColor: "#94a3b8", borderDash: [4, 4], backgroundColor: "transparent", fill: false }
+            ]
+        },
+        options: DEV_GRAPH_OPTS
     });
 }
 
@@ -3016,10 +3784,39 @@ function loadDashboard(){
         });
     }
 
-    new Chart(document.getElementById("dashboardChart"), {
-        type: "bar",
-        data: { labels: ["Users", "Companies", "Websites Assets"], datasets: [{ data: [users.length, companies.length, websites.length], backgroundColor: ['#2563eb', '#10b981', '#f59e0b'] }] }
-    });
+    // Trend graph (destroy first: re-rendering the same canvas otherwise throws)
+    if (typeof Chart !== "undefined") {
+        if (dashboardChartRef) { dashboardChartRef.destroy(); dashboardChartRef = null; }
+        const rangeVal = document.getElementById("dashboardChartRange")?.value || "";
+        const months = /3/.test(rangeVal) ? 3 : /6/.test(rangeVal) ? 6 : 12;
+        const canvas = document.getElementById("dashboardChart");
+        if (canvas) {
+            const rev = devSeries(payments.filter(p => p.status === "Completed"), months, "date", p => calculateInvoiceAmount(p));
+            const usr = devSeries(users, months, "registered");
+            const cmp = devSeries(companies, months, "registered");
+            dashboardChartRef = new Chart(canvas, {
+                type: "line",
+                data: {
+                    labels: rev.map(b => b.label),
+                    datasets: [
+                        { label: "Revenue (KES)", data: rev.map(b => b.value), borderColor: "#2563eb",
+                          backgroundColor: devGradient(canvas, "#2563eb"), fill: true, yAxisID: "y" },
+                        { label: "New Users", data: usr.map(b => b.count), borderColor: "#10b981",
+                          backgroundColor: "transparent", yAxisID: "y1" },
+                        { label: "New Companies", data: cmp.map(b => b.count), borderColor: "#f59e0b",
+                          backgroundColor: "transparent", borderDash: [5, 4], yAxisID: "y1" }
+                    ]
+                },
+                options: Object.assign({}, DEV_GRAPH_OPTS, {
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, position: "left", grid: { color: "rgba(148,163,184,0.2)" } },
+                        y1: { beginAtZero: true, position: "right", grid: { display: false } }
+                    }
+                })
+            });
+        }
+    }
 }
 
 document.addEventListener('click', function(e) {
@@ -3029,6 +3826,423 @@ document.addEventListener('click', function(e) {
     }
 });
 
+/* ===================== Pagination Framework ===================== */
+const paginationState = {
+    users: { page: 1, size: 25 },
+    companies: { page: 1, size: 25 },
+    payments: { page: 1, size: 25 },
+    notifications: { page: 1, size: 25 },
+    support: { page: 1, size: 25 },
+    logs: { page: 1, size: 25 }
+};
+
+function paginate(list, key) {
+    const st = paginationState[key];
+    const totalPages = Math.max(1, Math.ceil(list.length / st.size));
+    if (st.page > totalPages) st.page = totalPages;
+    if (st.page < 1) st.page = 1;
+    const start = (st.page - 1) * st.size;
+    return { pageItems: list.slice(start, start + st.size), totalPages, start };
+}
+
+function renderPageNumbers(containerId, key, totalPages, gotoFn) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = "";
+    const st = paginationState[key];
+    const maxButtons = 7;
+    let startPage = Math.max(1, st.page - 3);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+    startPage = Math.max(1, endPage - maxButtons + 1);
+    for (let i = startPage; i <= endPage; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.className = 'px-2.5 py-1 rounded text-xs border ' + (i === st.page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-100');
+        btn.onclick = () => gotoFn(i);
+        el.appendChild(btn);
+    }
+}
+
+function gotoUserPage(p){ paginationState.users.page = p; renderUsers(); }
+function prevUserPage(){ if(paginationState.users.page>1){ paginationState.users.page--; renderUsers(); } }
+function nextUserPage(){ paginationState.users.page++; renderUsers(); }
+function changeUserPageSize(){ paginationState.users.size = parseInt(document.getElementById('userPageSize').value); paginationState.users.page = 1; renderUsers(); }
+
+function gotoCompanyPage(p){ paginationState.companies.page = p; renderCompanies(); }
+function prevCompanyPage(){ if(paginationState.companies.page>1){ paginationState.companies.page--; renderCompanies(); } }
+function nextCompanyPage(){ paginationState.companies.page++; renderCompanies(); }
+function changeCompanyPageSize(){ paginationState.companies.size = parseInt(document.getElementById('companyPageSize').value); paginationState.companies.page = 1; renderCompanies(); }
+
+function gotoPaymentPage(p){ paginationState.payments.page = p; renderPayments(); }
+function prevPage(){ if(paginationState.payments.page>1){ paginationState.payments.page--; renderPayments(); } }
+function nextPage(){ paginationState.payments.page++; renderPayments(); }
+function changePageSize(){ paginationState.payments.size = parseInt(document.getElementById('pageSize').value); paginationState.payments.page = 1; renderPayments(); }
+
+function gotoNotificationPage(p){ paginationState.notifications.page = p; renderNotifications(); }
+function prevNotificationPage(){ if(paginationState.notifications.page>1){ paginationState.notifications.page--; renderNotifications(); } }
+function nextNotificationPage(){ paginationState.notifications.page++; renderNotifications(); }
+function changeNotificationPageSize(){ paginationState.notifications.size = parseInt(document.getElementById('notificationPageSize').value); paginationState.notifications.page = 1; renderNotifications(); }
+
+function gotoSupportPage(p){ paginationState.support.page = p; renderSupportTickets(); }
+function prevSupportPage(){ if(paginationState.support.page>1){ paginationState.support.page--; renderSupportTickets(); } }
+function nextSupportPage(){ paginationState.support.page++; renderSupportTickets(); }
+function changeSupportPageSize(){ paginationState.support.size = parseInt(document.getElementById('supportPageSize').value); paginationState.support.page = 1; renderSupportTickets(); }
+
+function gotoLogPage(p){ paginationState.logs.page = p; renderLogs(); }
+function prevLogPage(){ if(paginationState.logs.page>1){ paginationState.logs.page--; renderLogs(); } }
+function nextLogPage(){ paginationState.logs.page++; renderLogs(); }
+function changeLogPageSize(){ paginationState.logs.size = parseInt(document.getElementById('logPageSize').value); paginationState.logs.page = 1; renderLogs(); }
+
+/* ===================== Sorting Framework ===================== */
+const sortState = {};
+function genericSort(arr, key, stateKey, valueFn) {
+    if (!sortState[stateKey]) sortState[stateKey] = {};
+    const st = sortState[stateKey];
+    if (st.key === key) st.asc = !st.asc; else { st.key = key; st.asc = true; }
+    arr.sort((a, b) => {
+        let av = valueFn ? valueFn(a, key) : a[key];
+        let bv = valueFn ? valueFn(b, key) : b[key];
+        if (typeof av === 'string') av = av.toLowerCase();
+        if (typeof bv === 'string') bv = bv.toLowerCase();
+        if (av == null) av = '';
+        if (bv == null) bv = '';
+        if (av < bv) return st.asc ? -1 : 1;
+        if (av > bv) return st.asc ? 1 : -1;
+        return 0;
+    });
+}
+function sortUsers(field){
+    const map = { name: 'username', email: 'email', company: 'company' };
+    genericSort(users, map[field] || field, 'users');
+    renderUsers();
+}
+function sortCompanies(field){
+    const map = { company: 'companyName', owner: 'ownerName', email: 'email', registered: 'createdAt' };
+    genericSort(companies, map[field] || field, 'companies');
+    renderCompanies();
+}
+function sortTable(field){
+    const map = { invoice: 'invoice', customer: 'customer', email: 'email', date: 'date' };
+    if (field === 'amount') {
+        genericSort(payments, 'amount', 'payments', (p) => calculateInvoiceAmount(p));
+    } else {
+        genericSort(payments, map[field] || field, 'payments');
+    }
+    renderPayments();
+}
+function sortNotifications(field){
+    const map = { title: 'title', recipient: 'recipient', date: 'date' };
+    genericSort(notifications, map[field] || field, 'notifications');
+    renderNotifications();
+}
+function sortLogs(field){
+    const map = { date: 'date', user: 'user', module: 'module' };
+    genericSort(logs, map[field] || field, 'logs');
+    renderLogs();
+}
+function sortSupportTickets(field){
+    const map = { ticketId: 'ticket', subject: 'subject', customer: 'customer', date: 'date' };
+    genericSort(supportTickets, map[field] || field, 'support');
+    renderSupportTickets();
+}
+
+/* ===================== Bulk Selection Framework ===================== */
+const bulkSelections = { users: new Set(), companies: new Set(), payments: new Set(), notifications: new Set(), support: new Set(), logs: new Set() };
+const bulkConfig = {
+    users: { rowClass: 'user-row-checkbox', barId: 'userBulkBar', countId: 'selectedUserCount', selectAllId: 'selectAllUsers' },
+    companies: { rowClass: 'companies-row-checkbox', barId: 'companyBulkBar', countId: 'selectedCompanyCount', selectAllId: 'selectAllCompanies' },
+    payments: { rowClass: 'payments-row-checkbox', barId: 'bulkActionBar', countId: 'selectedCount', selectAllId: 'selectAllPayments' },
+    notifications: { rowClass: 'notifications-row-checkbox', barId: 'notificationBulkBar', countId: 'selectedNotificationCount', selectAllId: 'selectAllNotifications' },
+    support: { rowClass: 'support-row-checkbox', barId: 'supportBulkBar', countId: 'selectedSupportCount', selectAllId: 'selectAllSupport' },
+    logs: { rowClass: 'logs-row-checkbox', barId: 'logBulkBar', countId: 'selectedLogCount', selectAllId: 'selectAllLogs' }
+};
+
+function onRowCheckToggle(key){
+    const cfg = bulkConfig[key];
+    const boxes = document.querySelectorAll('.' + cfg.rowClass);
+    const set = bulkSelections[key];
+    set.clear();
+    boxes.forEach(b => { if (b.checked) set.add(b.value); });
+    updateBulkBar(key);
+}
+
+function updateBulkBar(key){
+    const cfg = bulkConfig[key];
+    const set = bulkSelections[key];
+    const bar = document.getElementById(cfg.barId);
+    const countEl = document.getElementById(cfg.countId);
+    if (countEl) countEl.textContent = set.size;
+    if (bar) bar.classList.toggle('hidden', set.size === 0);
+    const selectAllBox = document.getElementById(cfg.selectAllId);
+    if (selectAllBox) {
+        const boxes = document.querySelectorAll('.' + cfg.rowClass);
+        selectAllBox.checked = boxes.length > 0 && Array.from(boxes).every(b => b.checked);
+    }
+}
+
+function toggleSelectAllGeneric(key, checked){
+    const cfg = bulkConfig[key];
+    const boxes = document.querySelectorAll('.' + cfg.rowClass);
+    boxes.forEach(b => b.checked = checked);
+    onRowCheckToggle(key);
+}
+function toggleSelectAllUsers(cb){ toggleSelectAllGeneric('users', cb.checked); }
+function toggleSelectAllCompanies(cb){ toggleSelectAllGeneric('companies', cb.checked); }
+function toggleSelectAll(cb){ toggleSelectAllGeneric('payments', cb.checked); }
+function toggleSelectAllNotifications(cb){ toggleSelectAllGeneric('notifications', cb.checked); }
+function toggleSelectAllSupport(cb){ toggleSelectAllGeneric('support', cb.checked); }
+function toggleSelectAllLogs(cb){ toggleSelectAllGeneric('logs', cb.checked); }
+
+// Users bulk actions
+function bulkActivateUsers(){
+    const ids = Array.from(bulkSelections.users).map(Number);
+    users.forEach(u => { if (ids.includes(u.id)) u.status = 'Active'; });
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Info", "Developer", `Bulk activated ${ids.length} users`, "Users");
+    bulkSelections.users.clear();
+    renderUsers();
+}
+function bulkSuspendUsers(){
+    const ids = Array.from(bulkSelections.users).map(Number);
+    users.forEach(u => { if (ids.includes(u.id)) u.status = 'Suspended'; });
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Warning", "Developer", `Bulk suspended ${ids.length} users`, "Users");
+    bulkSelections.users.clear();
+    renderUsers();
+}
+function bulkDeleteUsers(){
+    if(!confirm("Delete all selected users?")) return;
+    const ids = Array.from(bulkSelections.users).map(Number);
+    users = users.filter(u => !ids.includes(u.id));
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Error", "Developer", `Bulk deleted ${ids.length} users`, "Users");
+    bulkSelections.users.clear();
+    renderUsers();
+}
+
+// Companies bulk actions
+function bulkExportCompanies(){
+    const ids = Array.from(bulkSelections.companies);
+    const selected = companies.filter(c => ids.includes(String(c.id || c.companyName)));
+    const blob = new Blob([JSON.stringify(selected, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "companies_selected.json";
+    a.click();
+}
+function bulkDeleteCompanies(){
+    if(!confirm("Delete all selected companies?")) return;
+    const ids = Array.from(bulkSelections.companies);
+    companies = companies.filter(c => !ids.includes(String(c.id || c.companyName)));
+    localStorage.setItem(COMPANY_KEY, JSON.stringify(companies));
+    addLog("Error", "Developer", `Bulk deleted ${ids.length} companies`, "Companies");
+    bulkSelections.companies.clear();
+    renderCompanies();
+}
+
+// Payments bulk actions
+function bulkMarkAsPaid(){
+    const ids = Array.from(bulkSelections.payments).map(Number);
+    payments.forEach(p => { if (ids.includes(p.id)) p.status = 'Completed'; });
+    localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+    addLog("Info", "Developer", `Bulk marked ${ids.length} payments as completed`, "Payments");
+    bulkSelections.payments.clear();
+    renderPayments();
+}
+function bulkSendReceipts(){
+    const ids = Array.from(bulkSelections.payments);
+    alert(`Receipts dispatched for ${ids.length} selected transactions.`);
+    bulkSelections.payments.clear();
+    renderPayments();
+}
+function bulkDelete(){
+    if(!confirm("Delete all selected payments?")) return;
+    const ids = Array.from(bulkSelections.payments).map(Number);
+    payments = payments.filter(p => !ids.includes(p.id));
+    localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+    addLog("Error", "Developer", `Bulk deleted ${ids.length} payments`, "Payments");
+    bulkSelections.payments.clear();
+    renderPayments();
+}
+
+// Notifications bulk actions
+function bulkMarkAsRead(){
+    const ids = Array.from(bulkSelections.notifications).map(Number);
+    notifications.forEach(n => { if (ids.includes(n.id)) n.status = 'Read'; });
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    bulkSelections.notifications.clear();
+    renderNotifications();
+}
+function bulkResendNotifications(){
+    const ids = Array.from(bulkSelections.notifications).map(Number);
+    notifications.forEach(n => { if (ids.includes(n.id) && n.status === 'Failed') n.status = 'Sent'; });
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    addLog("Info", "Developer", `Resent ${ids.length} failed notifications`, "Notifications");
+    bulkSelections.notifications.clear();
+    renderNotifications();
+}
+function bulkDeleteNotifications(){
+    if(!confirm("Delete all selected notifications?")) return;
+    const ids = Array.from(bulkSelections.notifications).map(Number);
+    notifications = notifications.filter(n => !ids.includes(n.id));
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    bulkSelections.notifications.clear();
+    renderNotifications();
+}
+
+// Support bulk actions
+function bulkAssignTickets(){
+    const ids = Array.from(bulkSelections.support);
+    alert(`${ids.length} tickets assigned to the current developer queue.`);
+    bulkSelections.support.clear();
+    renderSupportTickets();
+}
+function bulkCloseTickets(){
+    const ids = Array.from(bulkSelections.support).map(Number);
+    supportTickets.forEach(t => { if (ids.includes(t.id)) t.status = 'Resolved'; });
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    bulkSelections.support.clear();
+    renderSupportTickets();
+}
+function bulkDeleteTickets(){
+    if(!confirm("Delete all selected tickets?")) return;
+    const ids = Array.from(bulkSelections.support).map(Number);
+    supportTickets = supportTickets.filter(t => !ids.includes(t.id));
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    bulkSelections.support.clear();
+    renderSupportTickets();
+}
+
+// Logs bulk actions
+function bulkExportSelectedLogs(){
+    const ids = Array.from(bulkSelections.logs).map(Number);
+    const selected = logs.filter(l => ids.includes(l.id));
+    const blob = new Blob([JSON.stringify(selected, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "logs_selected.json";
+    a.click();
+}
+function bulkDeleteSelectedLogs(){
+    if(!confirm("Delete all selected logs?")) return;
+    const ids = Array.from(bulkSelections.logs).map(Number);
+    logs = logs.filter(l => !ids.includes(l.id));
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    bulkSelections.logs.clear();
+    renderLogs();
+}
+
+/* ===================== Filter helpers ===================== */
+function populateFilterOptions(selectId, values){
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const current = select.value;
+    const unique = Array.from(new Set(values)).sort();
+    select.innerHTML = `<option value="">All Companies</option>` + unique.map(v => `<option value="${v}">${v}</option>`).join('');
+    select.value = unique.includes(current) ? current : "";
+}
+
+function resetUserFilters(){
+    document.getElementById("userSearch").value = "";
+    document.getElementById("userRoleFilter").value = "";
+    document.getElementById("userStatusFilter").value = "";
+    document.getElementById("userCompanyFilter").value = "";
+    paginationState.users.page = 1;
+    renderUsers();
+}
+
+function resetCompanyFilters(){
+    document.getElementById("companySearch").value = "";
+    document.getElementById("companyPlanFilter").value = "";
+    document.getElementById("companyStatusFilter").value = "";
+    paginationState.companies.page = 1;
+    renderCompanies();
+}
+
+/* ===================== Misc missing functions ===================== */
+function triggerFileInput(){
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            document.getElementById('userAvatar').src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+function renderDashboard(){ loadDashboard(); addLog("Info", "Developer", "Synced Dashboard Metrics", "Dashboard"); }
+
+function updateDashboardChart(){ loadDashboard(); }
+
+function exportDashboardReport(){
+    const summary = {
+        generatedAt: new Date().toLocaleString(),
+        totalUsers: users.length,
+        totalCompanies: companies.length,
+        totalWebsites: websites.length,
+        totalRevenue: payments.filter(p => p.status === 'Completed').reduce((a, p) => a + calculateInvoiceAmount(p), 0),
+        supportTickets: supportTickets.length
+    };
+    const blob = new Blob([JSON.stringify(summary, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "dashboard_summary.json";
+    a.click();
+}
+
+function exportConfig(){
+    const config = { settings, accounts: Object.keys(ACCOUNTS) };
+    const blob = new Blob([JSON.stringify(config, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "system_config.json";
+    a.click();
+}
+
+function saveAllSettings(){
+    savePlatformSettings();
+    savePreferences();
+}
+
+function resetSettings(){
+    if(!confirm("Reset all settings to defaults?")) return;
+    settings = {};
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    loadSettings();
+    alert("Settings restored to system defaults.");
+}
+
+function openBulkImportUsersModal(){
+    const bodyHtml = `
+        <p class="text-xs text-gray-500 mb-2">Paste CSV with header: username,email,company,role,status</p>
+        <textarea id="bulkUsers_csv" placeholder="jdoe,jdoe@example.com,Acme Ltd,Editor,Active" class="w-full p-2 border rounded text-sm h-32 font-mono"></textarea>
+    `;
+    openModal("Bulk Import Users (CSV)", bodyHtml, () => {
+        const raw = document.getElementById("bulkUsers_csv").value.trim();
+        if (!raw) return;
+        const lines = raw.split(/\r?\n/);
+        let imported = 0;
+        lines.forEach(line => {
+            if (!line.trim()) return;
+            const parts = line.split(',').map(s => s.trim());
+            if (parts[0].toLowerCase() === 'username') return; // skip header row
+            const [username, email, company, role, status] = parts;
+            if (!username) return;
+            users.push({ id: Date.now() + imported, username, email: email || '', company: company || '', role: role || 'Viewer', status: status || 'Active' });
+            imported++;
+        });
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        addLog("Info", "Developer", `Bulk imported ${imported} users via CSV`, "Users");
+        renderUsers();
+    });
+}
+
 window.onload = function () {
     const session = JSON.parse(localStorage.getItem("developerSession"));
     if (!session) return;
@@ -3037,6 +4251,7 @@ window.onload = function () {
     document.getElementById("welcome").textContent = `Welcome, ${session.fullName}`;
     document.getElementById("role").textContent = session.role;
     
+    applyTheme((settings && settings.theme) || "Light", false);
     renderWebsites();
     renderPayments();
     renderUsers();
@@ -3047,7 +4262,28 @@ window.onload = function () {
     renderReports();
     loadSettings();
     loadDashboard();
+
+    // Keep the panel in sync with the customer app (same browser storage).
+    window.addEventListener("storage", devAutoRefresh);
+    setInterval(devAutoRefresh, 4000);
 };
+
+function devAutoRefresh(){
+    try {
+        users = loadUsersFromStores();
+        companies = loadCompaniesFromStores(users);
+        payments = loadPaymentsFromStores();
+        syncChatWidgetTickets();
+        const active = document.querySelector(".page.active");
+        const id = active ? active.id : null;
+        if (id === "companies") renderCompanies();
+        else if (id === "users") renderUsers();
+        else if (id === "support") renderSupportTickets();
+        else if (id === "payments") renderPayments();
+        else if (id === "dashboard") loadDashboard();
+        else if (id === "analytics") refreshAnalytics();
+    } catch(e){ console.error("devAutoRefresh failed", e); }
+}
 </script>
 </body>
 </html>
