@@ -4,8 +4,39 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Spear Developer Panel</title>
+<script>
+  window.__SUPA_URL__ = 'https://skatovltmnsuiolduwfr.supabase.co';
+  window.__SUPA_KEY__ = 'sb_publishable_AS3lfXtQELv5CTl8HX6OPQ_8HtYBfQp';
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        blue: {
+          50:'#EEF5F5', 100:'#D9EAE9', 200:'#B3D5D3', 300:'#84B9B6',
+          400:'#579A97', 500:'#357D79', 600:'#22615D',
+          700:'#1A4B48', 800:'#143A38', 900:'#0E2B29', 950:'#081918'
+        }
+      },
+      fontFamily: {
+        sans: ['Inter','system-ui','sans-serif'],
+        mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','monospace']
+      },
+      boxShadow: {
+        sm: '0 1px 2px 0 rgba(14,26,25,.05)',
+        DEFAULT: '0 1px 3px 0 rgba(14,26,25,.08)',
+        md: '0 4px 10px -2px rgba(14,26,25,.08)',
+        lg: '0 10px 20px -6px rgba(14,26,25,.10)'
+      }
+    }
+  }
+}
+</script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -13,14 +44,14 @@
 margin:0;
 padding:0;
 box-sizing:border-box;
-font-family:Cambria,serif;
+font-family:Cambria,Georgia,serif;
 }
 body{
-background:#f3f4f6;
+background:#f6f6f4;
 overflow:hidden;
 }
 .hidden{
-display:none;
+display:none!important;
 }
 button{
 cursor:pointer;
@@ -30,40 +61,56 @@ height:100vh;
 display:flex;
 justify-content:center;
 align-items:center;
-background:linear-gradient(135deg,#0f172a,#1e3a8a);
+background:linear-gradient(160deg,#081918 0%,#0E2B29 55%,#1A4B48 100%);
 }
 .login-card{
 width:400px;
 background:#fff;
 padding:35px;
-border-radius:15px;
-box-shadow:0 20px 40px rgba(0,0,0,.25);
+border-radius:10px;
+box-shadow:0 20px 40px rgba(8,25,24,.35);
+border:1px solid #e7e5e0;
 }
 .login-card h1{
-font-size:28px;
-margin-bottom:25px;
+font-size:26px;
+font-weight:700;
+margin-bottom:4px;
 text-align:center;
-color:#1e3a8a;
+color:#0E2B29;
+}
+.login-card .login-sub{
+text-align:center;
+color:#6b7573;
+font-size:13px;
+margin-bottom:22px;
 }
 .login-card input{
 width:100%;
 padding:12px;
 margin-bottom:15px;
-border:1px solid #ccc;
-border-radius:8px;
+border:1px solid #d7d5cf;
+border-radius:7px;
 font-size:15px;
+background:#fbfbf9;
+}
+.login-card input:focus{
+outline:none;
+border-color:#357D79;
+background:#fff;
 }
 .login-card button{
 width:100%;
 padding:12px;
 border:none;
-background:#2563eb;
+background:#22615D;
 color:#fff;
-font-size:16px;
-border-radius:8px;
+font-size:15px;
+font-weight:600;
+border-radius:7px;
+letter-spacing:.2px;
 }
 .login-card button:hover{
-background:#1d4ed8;
+background:#1A4B48;
 }
 #error{
 color:red;
@@ -76,47 +123,55 @@ display:flex;
 height:100vh;
 }
 .sidebar{
-width:260px;
-background:#111827;
-color:white;
+width:250px;
+background:#0A1615;
+color:#E7ECEB;
 display:flex;
 flex-direction:column;
+border-right:1px solid rgba(255,255,255,.06);
 }
 .logo{
-padding:20px;
-font-size:24px;
-font-weight:bold;
+padding:22px 20px;
+font-size:19px;
+font-weight:700;
+font-family:'JetBrains Mono',monospace;
+letter-spacing:-.2px;
 text-align:center;
-border-bottom:1px solid rgba(255,255,255,.1);
+border-bottom:1px solid rgba(255,255,255,.08);
+color:#fff;
 }
 .sidebar ul{
 list-style:none;
-padding:15px;
+padding:12px;
 }
 .sidebar li{
-margin-bottom:8px;
+margin-bottom:2px;
 }
 .sidebar button{
 width:100%;
-padding:12px;
+padding:11px 12px;
 background:none;
 border:none;
-color:white;
+color:#B7C2C0;
 text-align:left;
-border-radius:8px;
-font-size:15px;
+border-radius:7px;
+font-size:14px;
+font-weight:500;
+transition:background .12s,color .12s;
 }
 .sidebar button:hover{
-background:#2563eb;
+background:rgba(87,154,151,.15);
+color:#fff;
 }
 .topbar{
-height:70px;
+height:66px;
 background:white;
 display:flex;
 justify-content:space-between;
 align-items:center;
 padding:0 25px;
-box-shadow:0 2px 8px rgba(0,0,0,.08);
+border-bottom:1px solid #e7e5e0;
+box-shadow:none;
 }
 .content{
 flex:1;
@@ -134,23 +189,27 @@ display:block;
 .cards{
 display:grid;
 grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-gap:20px;
+gap:16px;
 margin-top:20px;
 }
 .card{
 background:white;
 padding:20px;
-border-radius:10px;
-box-shadow:0 4px 12px rgba(0,0,0,.08);
+border-radius:8px;
+border:1px solid #e7e5e0;
+box-shadow:0 1px 2px rgba(14,26,25,.04);
 }
 .card h2{
-font-size:15px;
-margin-bottom:10px;
-color:#666;
+font-size:13px;
+font-weight:600;
+margin-bottom:8px;
+color:#6b7573;
 }
 .card h1{
-font-size:32px;
-color:#2563eb;
+font-size:30px;
+font-weight:700;
+font-family:'JetBrains Mono',monospace;
+color:#22615D;
 }
 table{
 width:100%;
@@ -160,12 +219,14 @@ background:white;
 }
 th,td{
 padding:12px;
-border:1px solid #ddd;
+border:1px solid #e7e5e0;
 text-align:left;
 }
 th{
-background:#2563eb;
-color:white;
+background:#0E2B29;
+color:#fff;
+font-weight:600;
+font-size:13px;
 }
 .modal{
 position:fixed;
@@ -181,17 +242,17 @@ z-index:1000;
 }
 
 /* ==== Dark mode ==================================================== */
-body.dark-mode{background:#0b1220;color:#e5e7eb;}
-body.dark-mode .topbar{background:#111827;color:#e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,.5);}
-body.dark-mode .card{background:#111827;color:#e5e7eb;box-shadow:0 4px 12px rgba(0,0,0,.5);}
+body.dark-mode{background:#0A1615;color:#e5e7eb;}
+body.dark-mode .topbar{background:#0F201F;color:#e5e7eb;box-shadow:none;border-bottom:1px solid #1c2f2d;}
+body.dark-mode .card{background:#0F201F;color:#e5e7eb;border-color:#1c2f2d;box-shadow:none;}
 body.dark-mode .card h2{color:#9ca3af;}
-body.dark-mode .card h1{color:#60a5fa;}
-body.dark-mode table{background:#111827;}
-body.dark-mode th{background:#1d4ed8;color:#fff;}
+body.dark-mode .card h1{color:#579A97;}
+body.dark-mode table{background:#0F201F;}
+body.dark-mode th{background:#1A4B48;color:#fff;}
 body.dark-mode td{border-color:#1f2937;color:#e5e7eb;}
 body.dark-mode th{border-color:#1f2937;}
-body.dark-mode .modal>div{background:#111827!important;color:#e5e7eb;}
-body.dark-mode .bg-white,body.dark-mode .bg-gray-50,body.dark-mode .bg-gray-100{background-color:#111827!important;}
+body.dark-mode .modal>div{background:#0F201F!important;color:#e5e7eb;}
+body.dark-mode .bg-white,body.dark-mode .bg-gray-50,body.dark-mode .bg-gray-100{background-color:#0F201F!important;}
 body.dark-mode .bg-gray-200{background-color:#1f2937!important;}
 body.dark-mode .page.bg-gray-50{background-color:#0b1220!important;}
 body.dark-mode .text-gray-900,body.dark-mode .text-gray-800,body.dark-mode .text-gray-700{color:#e5e7eb!important;}
@@ -203,17 +264,172 @@ body.dark-mode input::placeholder,body.dark-mode textarea::placeholder{color:#6b
 body.dark-mode .divide-gray-100>*+*{border-color:#1f2937!important;}
 body.dark-mode .hover\:bg-gray-50:hover,body.dark-mode .hover\:bg-gray-100:hover{background-color:#1f2937!important;}
 body.dark-mode pre.code-view{background:#020617;color:#93c5fd;}
-.code-view{background:#0b1220;color:#93c5fd;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;padding:16px;overflow:auto;white-space:pre;height:100%;}
+body.home-mode{overflow:auto;}
+.home-nav{position:sticky;top:0;z-index:40;background:rgba(246,246,244,.9);backdrop-filter:blur(8px);border-bottom:1px solid #e7e5e0;}
+.home-hero{background:linear-gradient(160deg,#081918 0%,#0E2B29 55%,#1A4B48 100%);}
+.project-card{transition:border-color .15s,transform .15s;}
+.project-card:hover{border-color:#357D79;transform:translateY(-2px);}
 </style>
 </head>
-<body>
-<div class="login-page" id="loginPage">
+<body class="home-mode">
+
+<!-- ============== PUBLIC HOME PAGE ============== -->
+<div id="homePage">
+
+  <nav class="home-nav">
+    <div class="max-w-5xl mx-auto flex items-center justify-between px-6 py-4">
+      <span class="font-mono font-bold text-lg text-[#0E2B29]">spear.dev</span>
+      <div class="flex items-center gap-6 text-sm font-medium text-gray-700">
+        <a href="#work" class="hover:text-[#22615D]">Work</a>
+        <a href="#pricing" class="hover:text-[#22615D]">Pricing</a>
+        <a href="#contact" class="hover:text-[#22615D]">Contact</a>
+        <button onclick="showLogin()" class="bg-[#22615D] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#1A4B48] transition">Client Login</button>
+      </div>
+    </div>
+  </nav>
+
+  <header class="home-hero text-white">
+    <div class="max-w-5xl mx-auto px-6 py-24">
+      <p class="text-[#84B9B6] font-mono text-sm mb-4">Independent web developer</p>
+      <h1 class="text-4xl sm:text-5xl font-bold leading-tight max-w-2xl">I design and build websites, then stick around to run them.</h1>
+      <p class="mt-5 text-[#C9D6D4] max-w-xl text-base leading-relaxed">Small businesses and teams hire me to build a site or app, and to keep it running afterward — hosting, updates, and a support desk like the one behind this page.</p>
+      <div class="mt-8 flex gap-3">
+        <a href="#work" class="bg-white text-[#0E2B29] px-5 py-3 rounded-lg font-semibold text-sm hover:bg-gray-100 transition">See recent work</a>
+        <a href="#contact" class="border border-white/30 text-white px-5 py-3 rounded-lg font-semibold text-sm hover:bg-white/10 transition">Get in touch</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="max-w-5xl mx-auto px-6 py-16">
+    <h2 class="text-2xl font-bold text-gray-900">What I do</h2>
+    <div class="grid sm:grid-cols-3 gap-6 mt-8">
+      <div>
+        <h3 class="font-semibold text-gray-900">Websites</h3>
+        <p class="mt-2 text-sm text-gray-600 leading-relaxed">Marketing sites, booking pages, and storefronts, built to load fast and be easy to update.</p>
+      </div>
+      <div>
+        <h3 class="font-semibold text-gray-900">Apps &amp; dashboards</h3>
+        <p class="mt-2 text-sm text-gray-600 leading-relaxed">Internal tools and customer-facing apps, plus the admin panel to run them day to day.</p>
+      </div>
+      <div>
+        <h3 class="font-semibold text-gray-900">Ongoing support</h3>
+        <p class="mt-2 text-sm text-gray-600 leading-relaxed">Once a site ships, I keep maintaining it — fixes, small changes, and a support desk clients can reach.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="work" class="bg-white border-t border-b border-gray-200">
+    <div class="max-w-5xl mx-auto px-6 py-16">
+      <h2 class="text-2xl font-bold text-gray-900">What I've built</h2>
+      <p class="mt-2 text-sm text-gray-500 max-w-xl">A full business ERP suite, plus a couple of standalone finance tools — each one live and in active use.</p>
+
+      <p class="text-xs font-mono text-[#22615D] mt-10 mb-3">Acacia Books — ERP suite</p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Acacia Books</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">The main hub tying every module together — company setup, users, and the shared data every other app below reads from.</p>
+        </a>
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Acacia CRM</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Leads, contacts, and a sales pipeline for tracking deals from first contact to close.</p>
+        </a>
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Acacia Sales Hub</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Quotations and sales orders, built to work hand in hand with CRM and Inventory.</p>
+        </a>
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Acacia Inventory</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Stock control, movements, price lists, bundles, and shipments across one or more warehouses.</p>
+        </a>
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Acacia Expense</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Operating costs, recurring costs, cost centres, approvals, and receipts.</p>
+        </a>
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Acacia Payroll</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Employees, attendance, payslips, and statutory deductions, with reports ready for filing.</p>
+        </a>
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Acacia Project</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Projects, milestones, tasks, timesheets, and budgets for teams delivering client work.</p>
+        </a>
+      </div>
+
+      <p class="text-xs font-mono text-[#22615D] mt-12 mb-3">Standalone tools</p>
+      <div class="grid sm:grid-cols-2 gap-5">
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">BiasharaStart KE</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Helps someone in Kenya work out what a business really costs to start, by business type and county, before they commit any money.</p>
+        </a>
+        <a href="#" class="project-card block p-5 rounded-lg border border-gray-200">
+          <h3 class="font-semibold text-gray-900">Business Finance Calculator</h3>
+          <p class="mt-2 text-sm text-gray-600 leading-relaxed">Works out what a loan really costs and how low stock can run, for owners sizing up financing decisions.</p>
+        </a>
+      </div>
+      <p class="mt-6 text-xs text-gray-400">Add links to each app once they're live at their own addresses.</p>
+    </div>
+  </section>
+
+  <section id="pricing" class="bg-[#F4F1EC] border-b border-gray-200">
+    <div class="max-w-5xl mx-auto px-6 py-16">
+      <h2 class="text-2xl font-bold text-gray-900">Pricing</h2>
+      <p class="mt-2 text-sm text-gray-600 max-w-lg">Acacia Books runs on a simple ladder — start free, move up a tier the moment you need it. Every plan shares the same data, so nothing gets re-entered.</p>
+      <div class="grid sm:grid-cols-3 gap-4 mt-8 max-w-3xl">
+        <div class="bg-white rounded-lg border border-gray-200 p-5">
+          <p class="text-xs font-mono text-[#22615D]">Free</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">KES 0</p>
+          <p class="mt-2 text-xs text-gray-500 leading-relaxed">Dashboard, Funds, Reports, Inventory, Customers, Suppliers, and Accountant at a basic level.</p>
+        </div>
+        <div class="bg-white rounded-lg border-2 border-[#22615D] p-5">
+          <p class="text-xs font-mono text-[#22615D]">Pro</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">KES 5,000<span class="text-sm font-normal text-gray-500">/mo</span></p>
+          <p class="mt-2 text-xs text-gray-500 leading-relaxed">Adds advanced reporting and analytics for growing businesses. Most popular.</p>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-5">
+          <p class="text-xs font-mono text-[#22615D]">Enterprise</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1">KES 12,000<span class="text-sm font-normal text-gray-500">/mo</span></p>
+          <p class="mt-2 text-xs text-gray-500 leading-relaxed">Multiple branches, full payroll, and priority support.</p>
+        </div>
+      </div>
+      <a href="#" class="inline-block mt-6 bg-[#22615D] text-white px-5 py-3 rounded-lg font-semibold text-sm hover:bg-[#1A4B48] transition">See all plans &amp; sign up</a>
+      <p class="mt-3 text-xs text-gray-400">Update this link once Acacia Books is live at its own address. Also shows a Starter and Business tier in between.</p>
+    </div>
+  </section>
+
+  <section id="contact" class="max-w-5xl mx-auto px-6 py-16">
+    <h2 class="text-2xl font-bold text-gray-900">Get in touch</h2>
+    <p class="mt-2 text-sm text-gray-500 max-w-md">Tell me a bit about your project and I'll get back to you.</p>
+    <form class="mt-8 max-w-md space-y-4" onsubmit="return submitContactForm(event)">
+      <input id="contactName" required placeholder="Your name" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#357D79]">
+      <input id="contactEmail" type="email" required placeholder="Email address" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#357D79]">
+      <textarea id="contactMessage" required placeholder="What are you building?" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#357D79]"></textarea>
+      <button type="submit" class="bg-[#22615D] text-white px-5 py-3 rounded-lg font-semibold text-sm hover:bg-[#1A4B48] transition">Send message</button>
+      <p id="contactConfirm" class="text-sm text-[#22615D] hidden">Thanks — message sent. I'll reply by email shortly.</p>
+    </form>
+  </section>
+
+  <footer class="border-t border-gray-200 bg-white">
+    <div class="max-w-5xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+      <span>&copy; <span id="footerYear"></span> Spear Tech dvlp. Built and maintained by me.</span>
+      <div class="flex items-center gap-5">
+        <a href="mailto:hello@example.com" class="hover:text-[#22615D]">hello@example.com</a>
+        <button onclick="showLogin()" class="hover:text-[#22615D]">Client / developer login</button>
+      </div>
+    </div>
+  </footer>
+
+</div>
+<!-- ============== END PUBLIC HOME PAGE ============== -->
+
+<div class="login-page hidden" id="loginPage">
 <div class="login-card">
 <h1>Developer Login</h1>
+<p class="login-sub">Sign in to manage your app</p>
 <input id="username" placeholder="Username">
 <input id="password" type="password" placeholder="Password">
 <button onclick="login()">Login</button>
 <div id="error">Invalid Username or Password</div>
+<button onclick="showHome()" style="background:none;color:#6b7573;font-weight:500;font-size:13px;margin-top:6px;padding:6px;">&larr; Back to site</button>
 </div>
 </div>
 <div id="app" class="hidden">
@@ -1551,6 +1767,17 @@ body.dark-mode pre.code-view{background:#020617;color:#93c5fd;}
                         </select>
                     </div>
                     <div>
+                        <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Font Style</label>
+                        <select id="fontStyle" onchange="applyFont(this.value, true)" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all">
+                            <option value="Cambria" selected>Cambria (Default)</option>
+                            <option value="Inter">Inter (Sans-serif)</option>
+                            <option value="JetBrains Mono">JetBrains Mono (Technical)</option>
+                            <option value="Georgia">Georgia (Serif)</option>
+                            <option value="Verdana">Verdana (Classic)</option>
+                            <option value="system-ui">System Default</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Timezone</label>
                         <select id="timezone" class="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 transition-all">
                             <option value="UTC+3" selected>Africa/Nairobi (UTC+3)</option>
@@ -1885,6 +2112,52 @@ const SUPPORT_KEY = "acacia_support";
 const SETTINGS_KEY = "acacia_settings";
 const LOG_KEY = "acacia_logs";
 
+/* ==== Supabase sync bridge =============================================
+   Every other Acacia app (CRM, Sales, Inventory, Payroll, Project,
+   Expenses, Acacia Books) stores its data in one shared Supabase table,
+   app_state(key text, value jsonb, updated_at). This panel used to only
+   read its own browser's localStorage, so it never saw real company,
+   user, or payment data, and two team members on different computers
+   saw completely different data. This bridge mirrors the shared
+   Supabase keys into localStorage on load and on every refresh, and
+   pushes local writes back up — so every existing function in this file
+   that already reads/writes localStorage keeps working unchanged, but
+   now reads and writes the real shared data. ======================== */
+const SUPA_SYNC_KEYS = ["companies","acacia_companies","users","acacia_users",
+    "acacia_payments","acacia_notifications","acacia_support","acacia_logs",
+    "acacia_websites","selectedPlan","selectedPrice"];
+let sb = null;
+try { if (window.supabase && window.__SUPA_URL__) sb = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_KEY__); } catch(e){}
+
+function devSyncableBase(key){ return String(key || "").split("::")[0]; }
+function devIsSyncKey(key){ return SUPA_SYNC_KEYS.indexOf(devSyncableBase(key)) !== -1; }
+
+const _rawSetItem = Storage.prototype.setItem.bind(localStorage);
+localStorage.setItem = function(key, value){
+    _rawSetItem(key, value);
+    if (!sb || !devIsSyncKey(key)) return;
+    let parsed;
+    try { parsed = JSON.parse(value); } catch(e){ parsed = value; }
+    sb.from('app_state').upsert(
+        { key: key, value: parsed, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+    ).then(()=>{}, ()=>{});
+};
+
+async function pullSupabaseState(){
+    if (!sb) return;
+    try {
+        const filter = SUPA_SYNC_KEYS.map(k => `key.eq.${k},key.like.${k}::%`).join(',');
+        const { data, error } = await sb.from('app_state').select('key,value').or(filter);
+        if (error || !data) return;
+        data.forEach(row => {
+            if (!devIsSyncKey(row.key)) return;
+            const str = typeof row.value === "string" ? row.value : JSON.stringify(row.value);
+            _rawSetItem(row.key, str);
+        });
+    } catch(e){ console.error("pullSupabaseState failed", e); }
+}
+
 /* ==== Cross-app data adapter =========================================
    The customer app (index.html) writes:
      users     -> "users"      (may be company-namespaced: "users::comp_x")
@@ -2108,6 +2381,23 @@ const DEFAULT_WEBSITES = [];
 let websites = JSON.parse(localStorage.getItem(WEBSITE_KEY) || "null") || [];
 function saveWebsites(){ localStorage.setItem(WEBSITE_KEY, JSON.stringify(websites)); }
 
+function showLogin(){
+    document.getElementById("homePage").classList.add("hidden");
+    document.getElementById("loginPage").classList.remove("hidden");
+    document.body.classList.remove("home-mode");
+}
+function showHome(){
+    document.getElementById("loginPage").classList.add("hidden");
+    document.getElementById("homePage").classList.remove("hidden");
+    document.body.classList.add("home-mode");
+}
+function submitContactForm(e){
+    e.preventDefault();
+    document.getElementById("contactConfirm").classList.remove("hidden");
+    e.target.reset();
+    return false;
+}
+
 function login() {
     const u = document.getElementById("username").value.trim().toLowerCase();
     const p = document.getElementById("password").value;
@@ -2121,9 +2411,11 @@ function login() {
     document.getElementById("welcome").textContent = `Welcome, ${account.fullName}`;
     document.getElementById("role").textContent = account.role;
     document.getElementById("loginPage").classList.add("hidden");
+    document.getElementById("homePage").classList.add("hidden");
+    document.body.classList.remove("home-mode");
     document.getElementById("app").classList.remove("hidden");
     addLog("Info", account.fullName, "User Logged In Successfully", "Auth");
-    loadDashboard();
+    pullSupabaseState().then(loadDashboard).catch(loadDashboard);
 }
 
 function logout(){
@@ -2998,11 +3290,24 @@ function toggleDarkMode(){
     applyTheme(isDark ? "Light" : "Dark", true);
 }
 
+function applyFont(fontName, persist){
+    const font = fontName || "Cambria";
+    document.body.style.fontFamily = font === "Cambria" ? "Cambria, Georgia, serif" : `'${font}', system-ui, sans-serif`;
+    const select = document.getElementById("fontStyle");
+    if (select && fontName) select.value = fontName;
+    if (persist) {
+        settings.font = font;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    }
+}
+
 function savePreferences(){
     settings.currency = document.getElementById("currency").value;
     settings.language = document.getElementById("language").value;
     settings.theme = document.getElementById("theme").value;
+    settings.font = document.getElementById("fontStyle").value;
     applyTheme(settings.theme, false);
+    applyFont(settings.font, false);
     settings.lastSaved = new Date().toLocaleString();
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     document.getElementById("lastSaved").textContent = "Last Saved: " + settings.lastSaved;
@@ -3085,6 +3390,8 @@ function loadSettings(){
     document.getElementById("language").value = settings.language || "English";
     document.getElementById("theme").value = settings.theme || "Light";
     applyTheme(settings.theme || "Light", false);
+    document.getElementById("fontStyle").value = settings.font || "Cambria";
+    applyFont(settings.font || "Cambria", false);
     document.getElementById("lastSaved").textContent = "Last Saved: " + (settings.lastSaved || "Never");
 }
 
@@ -3621,7 +3928,7 @@ function drawAnalyticsCharts(users, companies, payments, websites){
             labels,
             datasets: [
                 { label: "Collected Revenue (KES)", data: revSeries.map(b => b.value),
-                  borderColor: "#2563eb", backgroundColor: devGradient(revCanvas, "#2563eb"), fill: true },
+                  borderColor: "#22615D", backgroundColor: devGradient(revCanvas, "#22615D"), fill: true },
                 { label: "Outstanding (KES)", data: pendSeries.map(b => b.value),
                   borderColor: "#f59e0b", backgroundColor: "transparent", borderDash: [5, 4], fill: false }
             ]
@@ -3655,7 +3962,7 @@ function drawAnalyticsCharts(users, companies, payments, websites){
             labels,
             datasets: [
                 { label: "Transactions", data: txSeries.map(b => b.count),
-                  borderColor: "#3b82f6", backgroundColor: devGradient(wCanvas, "#3b82f6"), fill: true },
+                  borderColor: "#579A97", backgroundColor: devGradient(wCanvas, "#579A97"), fill: true },
                 { label: "Support Requests", data: ticketSeries.map(b => b.count),
                   borderColor: "#ef4444", backgroundColor: "transparent", fill: false },
                 { label: "Active Apps", data: labels.map(() => (websites || []).filter(w => w.status === "Active").length),
@@ -3799,8 +4106,8 @@ function loadDashboard(){
                 data: {
                     labels: rev.map(b => b.label),
                     datasets: [
-                        { label: "Revenue (KES)", data: rev.map(b => b.value), borderColor: "#2563eb",
-                          backgroundColor: devGradient(canvas, "#2563eb"), fill: true, yAxisID: "y" },
+                        { label: "Revenue (KES)", data: rev.map(b => b.value), borderColor: "#22615D",
+                          backgroundColor: devGradient(canvas, "#22615D"), fill: true, yAxisID: "y" },
                         { label: "New Users", data: usr.map(b => b.count), borderColor: "#10b981",
                           backgroundColor: "transparent", yAxisID: "y1" },
                         { label: "New Companies", data: cmp.map(b => b.count), borderColor: "#f59e0b",
@@ -4244,45 +4551,56 @@ function openBulkImportUsersModal(){
 }
 
 window.onload = function () {
+    document.getElementById("footerYear").textContent = new Date().getFullYear();
     const session = JSON.parse(localStorage.getItem("developerSession"));
     if (!session) return;
+    document.getElementById("homePage").classList.add("hidden");
     document.getElementById("loginPage").classList.add("hidden");
+    document.body.classList.remove("home-mode");
     document.getElementById("app").classList.remove("hidden");
     document.getElementById("welcome").textContent = `Welcome, ${session.fullName}`;
     document.getElementById("role").textContent = session.role;
-    
-    applyTheme((settings && settings.theme) || "Light", false);
-    renderWebsites();
-    renderPayments();
-    renderUsers();
-    renderCompanies();
-    renderNotifications();
-    renderLogs();
-    renderSupportTickets();
-    renderReports();
-    loadSettings();
-    loadDashboard();
 
-    // Keep the panel in sync with the customer app (same browser storage).
+    function renderAll(){
+        applyTheme((settings && settings.theme) || "Light", false);
+        renderWebsites();
+        renderPayments();
+        renderUsers();
+        renderCompanies();
+        renderNotifications();
+        renderLogs();
+        renderSupportTickets();
+        renderReports();
+        loadSettings();
+        loadDashboard();
+    }
+    pullSupabaseState().then(renderAll).catch(renderAll);
+
+    // Keep the panel in sync with the customer apps: same-browser storage
+    // events fire instantly, and devAutoRefresh also re-pulls the shared
+    // Supabase state every few seconds so a teammate's change on another
+    // computer shows up here too.
     window.addEventListener("storage", devAutoRefresh);
     setInterval(devAutoRefresh, 4000);
 };
 
 function devAutoRefresh(){
-    try {
-        users = loadUsersFromStores();
-        companies = loadCompaniesFromStores(users);
-        payments = loadPaymentsFromStores();
-        syncChatWidgetTickets();
-        const active = document.querySelector(".page.active");
-        const id = active ? active.id : null;
-        if (id === "companies") renderCompanies();
-        else if (id === "users") renderUsers();
-        else if (id === "support") renderSupportTickets();
-        else if (id === "payments") renderPayments();
-        else if (id === "dashboard") loadDashboard();
-        else if (id === "analytics") refreshAnalytics();
-    } catch(e){ console.error("devAutoRefresh failed", e); }
+    pullSupabaseState().finally(() => {
+        try {
+            users = loadUsersFromStores();
+            companies = loadCompaniesFromStores(users);
+            payments = loadPaymentsFromStores();
+            syncChatWidgetTickets();
+            const active = document.querySelector(".page.active");
+            const id = active ? active.id : null;
+            if (id === "companies") renderCompanies();
+            else if (id === "users") renderUsers();
+            else if (id === "support") renderSupportTickets();
+            else if (id === "payments") renderPayments();
+            else if (id === "dashboard") loadDashboard();
+            else if (id === "analytics") refreshAnalytics();
+        } catch(e){ console.error("devAutoRefresh failed", e); }
+    });
 }
 </script>
 </body>
