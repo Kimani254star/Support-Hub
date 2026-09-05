@@ -4,11 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Spear Developer Panel</title>
-<script>
-  window.__SUPA_URL__ = 'https://skatovltmnsuiolduwfr.supabase.co';
-  window.__SUPA_KEY__ = 'sb_publishable_AS3lfXtQELv5CTl8HX6OPQ_8HtYBfQp';
-</script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -2112,52 +2107,6 @@ const SUPPORT_KEY = "acacia_support";
 const SETTINGS_KEY = "acacia_settings";
 const LOG_KEY = "acacia_logs";
 
-/* ==== Supabase sync bridge =============================================
-   Every other Acacia app (CRM, Sales, Inventory, Payroll, Project,
-   Expenses, Acacia Books) stores its data in one shared Supabase table,
-   app_state(key text, value jsonb, updated_at). This panel used to only
-   read its own browser's localStorage, so it never saw real company,
-   user, or payment data, and two team members on different computers
-   saw completely different data. This bridge mirrors the shared
-   Supabase keys into localStorage on load and on every refresh, and
-   pushes local writes back up — so every existing function in this file
-   that already reads/writes localStorage keeps working unchanged, but
-   now reads and writes the real shared data. ======================== */
-const SUPA_SYNC_KEYS = ["companies","acacia_companies","users","acacia_users",
-    "acacia_payments","acacia_notifications","acacia_support","acacia_logs",
-    "acacia_websites","selectedPlan","selectedPrice"];
-let sb = null;
-try { if (window.supabase && window.__SUPA_URL__) sb = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_KEY__); } catch(e){}
-
-function devSyncableBase(key){ return String(key || "").split("::")[0]; }
-function devIsSyncKey(key){ return SUPA_SYNC_KEYS.indexOf(devSyncableBase(key)) !== -1; }
-
-const _rawSetItem = Storage.prototype.setItem.bind(localStorage);
-localStorage.setItem = function(key, value){
-    _rawSetItem(key, value);
-    if (!sb || !devIsSyncKey(key)) return;
-    let parsed;
-    try { parsed = JSON.parse(value); } catch(e){ parsed = value; }
-    sb.from('app_state').upsert(
-        { key: key, value: parsed, updated_at: new Date().toISOString() },
-        { onConflict: 'key' }
-    ).then(()=>{}, ()=>{});
-};
-
-async function pullSupabaseState(){
-    if (!sb) return;
-    try {
-        const filter = SUPA_SYNC_KEYS.map(k => `key.eq.${k},key.like.${k}::%`).join(',');
-        const { data, error } = await sb.from('app_state').select('key,value').or(filter);
-        if (error || !data) return;
-        data.forEach(row => {
-            if (!devIsSyncKey(row.key)) return;
-            const str = typeof row.value === "string" ? row.value : JSON.stringify(row.value);
-            _rawSetItem(row.key, str);
-        });
-    } catch(e){ console.error("pullSupabaseState failed", e); }
-}
-
 /* ==== Cross-app data adapter =========================================
    The customer app (index.html) writes:
      users     -> "users"      (may be company-namespaced: "users::comp_x")
@@ -2415,7 +2364,7 @@ function login() {
     document.body.classList.remove("home-mode");
     document.getElementById("app").classList.remove("hidden");
     addLog("Info", account.fullName, "User Logged In Successfully", "Auth");
-    pullSupabaseState().then(loadDashboard).catch(loadDashboard);
+    loadDashboard();
 }
 
 function logout(){
@@ -4560,47 +4509,39 @@ window.onload = function () {
     document.getElementById("app").classList.remove("hidden");
     document.getElementById("welcome").textContent = `Welcome, ${session.fullName}`;
     document.getElementById("role").textContent = session.role;
+    
+    applyTheme((settings && settings.theme) || "Light", false);
+    renderWebsites();
+    renderPayments();
+    renderUsers();
+    renderCompanies();
+    renderNotifications();
+    renderLogs();
+    renderSupportTickets();
+    renderReports();
+    loadSettings();
+    loadDashboard();
 
-    function renderAll(){
-        applyTheme((settings && settings.theme) || "Light", false);
-        renderWebsites();
-        renderPayments();
-        renderUsers();
-        renderCompanies();
-        renderNotifications();
-        renderLogs();
-        renderSupportTickets();
-        renderReports();
-        loadSettings();
-        loadDashboard();
-    }
-    pullSupabaseState().then(renderAll).catch(renderAll);
-
-    // Keep the panel in sync with the customer apps: same-browser storage
-    // events fire instantly, and devAutoRefresh also re-pulls the shared
-    // Supabase state every few seconds so a teammate's change on another
-    // computer shows up here too.
+    // Keep the panel in sync with the customer app (same browser storage).
     window.addEventListener("storage", devAutoRefresh);
     setInterval(devAutoRefresh, 4000);
 };
 
 function devAutoRefresh(){
-    pullSupabaseState().finally(() => {
-        try {
-            users = loadUsersFromStores();
-            companies = loadCompaniesFromStores(users);
-            payments = loadPaymentsFromStores();
-            syncChatWidgetTickets();
-            const active = document.querySelector(".page.active");
-            const id = active ? active.id : null;
-            if (id === "companies") renderCompanies();
-            else if (id === "users") renderUsers();
-            else if (id === "support") renderSupportTickets();
-            else if (id === "payments") renderPayments();
-            else if (id === "dashboard") loadDashboard();
-            else if (id === "analytics") refreshAnalytics();
-        } catch(e){ console.error("devAutoRefresh failed", e); }
-    });
+    try {
+        users = loadUsersFromStores();
+        companies = loadCompaniesFromStores(users);
+        payments = loadPaymentsFromStores();
+        syncChatWidgetTickets();
+        const active = document.querySelector(".page.active");
+        const id = active ? active.id : null;
+        if (id === "companies") renderCompanies();
+        else if (id === "users") renderUsers();
+        else if (id === "support") renderSupportTickets();
+        else if (id === "payments") renderPayments();
+        else if (id === "dashboard") loadDashboard();
+        else if (id === "analytics") refreshAnalytics();
+    } catch(e){ console.error("devAutoRefresh failed", e); }
 }
 </script>
 </body>
