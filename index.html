@@ -3276,8 +3276,8 @@ function changePassword(){
 
 function clearSystemCache(){
     if(!confirm("Perform deep system cache cleanup?")) return;
-    localStorage.clear();
-    alert("Application LocalStorage cache purged fully. Reloading framework.");
+    Object.keys(localStorage).filter(function(k){ return k.indexOf("acacia_") === 0 || k === "developerSession"; }).forEach(function(k){ localStorage.removeItem(k); });
+    alert("Support Hub cache cleared (other apps' data was left untouched). Reloading.");
     location.reload();
 }
 
@@ -4544,5 +4544,188 @@ function devAutoRefresh(){
     } catch(e){ console.error("devAutoRefresh failed", e); }
 }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script id="hubCloud">
+/* Support Hub cloud control: approve new accounts, deactivate on expiry, live user counts. */
+(function(){
+  var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
+  if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
+  var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
+  var canWrite = false, cloudOK = false, rows = [], accts = [], busy = false;
+
+  function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
+  function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
+  function plus(days){ var d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); }
+  function eff(r){ return (r.status === 'active' && r.paid_until && new Date(r.paid_until) < new Date()) ? 'expired' : r.status; }
+  function who(){ try { return (JSON.parse(localStorage.getItem('developerSession') || '{}').fullName) || 'Developer'; } catch(e){ return 'Developer'; } }
+
+  function pill(){
+    var p = document.getElementById('hubCloudPill');
+    if (!p){ p = document.createElement('div'); p.id = 'hubCloudPill';
+      p.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9999;padding:6px 12px;border-radius:999px;font-size:12px;background:#0f172a;color:#e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+      document.body.appendChild(p); }
+    p.textContent = !cloudOK ? '\u2601 Cloud offline' : (canWrite ? '\u2601 Live \u00b7 approvals enabled' : '\u2601 Live \u00b7 read-only (admin sign-in missing)');
+    p.style.background = !cloudOK ? '#7f1d1d' : (canWrite ? '#14532d' : '#78350f');
+  }
+  async function roleCheck(){
+    try { var s = await sb.auth.getSession(); var u = s && s.data && s.data.session && s.data.session.user;
+      canWrite = !!(u && u.app_metadata && u.app_metadata.role === 'hub_admin'); } catch(e){ canWrite = false; }
+    pill();
+  }
+  async function signIn(email, pass){
+    try { var r = await sb.auth.signInWithPassword({ email: email, password: pass });
+      if (r.error) console.warn('[hub cloud] sign-in', r.error.message); } catch(e){}
+    await roleCheck();
+  }
+
+  async function refresh(){
+    if (busy) return; busy = true;
+    try {
+      var st = await sb.from('acacia_company_status').select('*').order('created_at', { ascending: false });
+      if (st.error) throw st.error;
+      rows = st.data || [];
+      var ac = await sb.from('app_accounts').select('login_id,username,company_id,data,updated_at');
+      accts = (ac.data || []);
+      cloudOK = true;
+    } catch(e){ cloudOK = false; console.warn('[hub cloud]', e); pill(); busy = false; return; }
+    if (canWrite){
+      var exp = rows.filter(function(r){ return r.status === 'active' && r.paid_until && new Date(r.paid_until) < new Date(); });
+      for (var i = 0; i < exp.length; i++){
+        var u = await sb.from('acacia_company_status').update({ status: 'suspended', note: 'Payment expired ' + fmt(exp[i].paid_until), updated_at: new Date().toISOString() }).eq('company_id', exp[i].company_id);
+        if (!u.error){ exp[i].status = 'suspended'; try { addLog('Warning', 'System', 'Auto-deactivated (payment expired): ' + (exp[i].company_name || exp[i].company_id), 'Companies'); } catch(e){} }
+      }
+    }
+    merge(); pill(); busy = false;
+  }
+
+  function merge(){
+    var byId = {}; rows.forEach(function(r){ byId[r.company_id] = r; });
+    var cu = accts.map(function(a){
+      var d = Object.assign({}, a.data || {});
+      ['password','passwordHash','pass','salt','hash'].forEach(function(k){ delete d[k]; });
+      d.companyId = d.companyId || a.company_id; d.email = d.email || a.login_id; d.username = d.username || a.username;
+      var r = byId[d.companyId];
+      if (r){ var e = eff(r); d.status = e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'); }
+      return d;
+    });
+    users = normalizeUsers(loadUsersFromStores().concat(cu));
+    var cs = rows.map(function(r){
+      return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
+        email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), status: title(eff(r)),
+        registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', _row: r };
+    });
+    var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
+    var extra = normalizeCompanies(companiesFromUsers(users).concat(devCollect(COMPANY_STORE_KEYS)))
+      .filter(function(c){ return !known[String(c.companyId).toLowerCase()]; })
+      .map(function(c){ c.status = 'Untracked'; return c; });
+    companies = cs.concat(extra);
+    var n = rows.filter(function(r){ return r.status === 'pending'; }).length;
+    var btn = document.querySelector("button[onclick=\"openPage('companies')\"]");
+    if (btn) btn.innerHTML = 'Companies' + (n ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:6px">' + n + ' pending</span>' : '');
+    var tu = document.getElementById('totalUsers'); if (tu) tu.textContent = users.length;
+    try { renderCompanies(); } catch(e){}
+    try { if (document.getElementById('users').classList.contains('active')) renderUsers(); } catch(e){}
+    try { if (document.getElementById('dashboard').classList.contains('active')) loadDashboard(); } catch(e){}
+  }
+
+  async function patch(id, fields, msg){
+    if (!canWrite){ alert('Read-only. Sign in works only if the hub admin users exist in Supabase Auth with role hub_admin (see acacia_control_setup.sql).'); return false; }
+    fields.updated_at = new Date().toISOString();
+    var r = await sb.from('acacia_company_status').update(fields).eq('company_id', id).select();
+    if (r.error || !r.data || !r.data.length){ alert('Update failed: ' + (r.error ? r.error.message : 'no permission')); return false; }
+    try { addLog('Info', who(), msg, 'Companies'); } catch(e){}
+    await refresh(); return true;
+  }
+  function askDate(def){
+    var v = prompt('Paid until (YYYY-MM-DD). Leave empty for no expiry:', def || '');
+    if (v === null) return undefined; v = v.trim(); if (!v) return null;
+    var d = new Date(v + 'T23:59:59'); if (isNaN(d)) { alert('Invalid date'); return undefined; }
+    return d.toISOString();
+  }
+  function co(id){ return companies.find(function(c){ return String(c.companyId) === String(id); }) || {}; }
+
+  window.hubApprove = async function(id){ var c = co(id); var pu = askDate(Number(c.price || 0) > 0 ? plus(30) : ''); if (pu === undefined) return;
+    await patch(id, { status: 'active', paid_until: pu, approved_at: new Date().toISOString(), note: 'Approved' }, 'Approved ' + (c.companyName || id)); };
+  window.hubReject = async function(id){ if (!confirm('Reject this registration?')) return;
+    await patch(id, { status: 'rejected', note: 'Rejected by admin' }, 'Rejected ' + (co(id).companyName || id)); };
+  window.hubSuspend = async function(id){ if (!confirm('Deactivate this company? Its users will be locked out.')) return;
+    await patch(id, { status: 'suspended', note: 'Deactivated by admin' }, 'Deactivated ' + (co(id).companyName || id)); };
+  window.hubReactivate = async function(id){ var pu = askDate(plus(30)); if (pu === undefined) return;
+    await patch(id, { status: 'active', paid_until: pu, note: 'Reactivated' }, 'Reactivated ' + (co(id).companyName || id)); };
+  window.hubExtend = async function(id, days){ var r = (co(id)._row || {}); var base = (r.paid_until && new Date(r.paid_until) > new Date()) ? new Date(r.paid_until) : new Date();
+    base.setDate(base.getDate() + days);
+    await patch(id, { status: 'active', paid_until: base.toISOString(), note: 'Extended ' + days + ' days' }, 'Extended ' + (co(id).companyName || id) + ' by ' + days + ' days'); };
+  window.hubTrack = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = co(id);
+    var r = await sb.from('acacia_company_status').insert({ company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' });
+    if (r.error) alert('Failed: ' + r.error.message); await refresh(); };
+
+  var badge = { Pending: 'bg-amber-100 text-amber-800', Active: 'bg-green-100 text-green-800', Suspended: 'bg-red-100 text-red-800', Expired: 'bg-red-100 text-red-800', Rejected: 'bg-gray-200 text-gray-700', Untracked: 'bg-blue-100 text-blue-800' };
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
+  function actions(c){
+    var id = String(c.companyId).replace(/\\/g, '\\\\').replace(/'/g, "\\'"), b = function(l, fn, cls){ return '<button class="' + cls + ' text-white px-2 py-1 text-xs rounded mr-1 mb-1" onclick="' + fn + '">' + l + '</button>'; };
+    var s = c.status, out = '';
+    if (s === 'Pending') out += b('Approve', "hubApprove('" + id + "')", 'bg-green-600') + b('Reject', "hubReject('" + id + "')", 'bg-gray-600');
+    else if (s === 'Active') out += b('+30d', "hubExtend('" + id + "',30)", 'bg-blue-900') + b('+1y', "hubExtend('" + id + "',365)", 'bg-blue-900') + b('Deactivate', "hubSuspend('" + id + "')", 'bg-red-600');
+    else if (s === 'Suspended' || s === 'Expired' || s === 'Rejected') out += b('Reactivate', "hubReactivate('" + id + "')", 'bg-green-600');
+    else if (s === 'Untracked') out += b('Start tracking', "hubTrack('" + id + "')", 'bg-blue-900');
+    return out;
+  }
+  window.renderCompanies = function(){
+    var tbody = document.getElementById('companiesTable'); if (!tbody) return;
+    var search = (document.getElementById('companySearch').value || '').toLowerCase();
+    var planFilter = (document.getElementById('companyPlanFilter') || {}).value || '';
+    var statusFilter = (document.getElementById('companyStatusFilter') || {}).value || '';
+    populateFilterOptionsLabeled('companyPlanFilter', companies.map(function(c){ return c.plan; }), 'All Plans');
+    populateFilterOptionsLabeled('companyStatusFilter', companies.map(function(c){ return c.status; }), 'All Statuses');
+    var f = companies.filter(function(c){ return (c.companyName || '').toLowerCase().indexOf(search) > -1 || (c.ownerName || '').toLowerCase().indexOf(search) > -1 || (c.email || '').toLowerCase().indexOf(search) > -1; });
+    if (planFilter) f = f.filter(function(c){ return c.plan === planFilter; });
+    if (statusFilter) f = f.filter(function(c){ return c.status === statusFilter; });
+    var pg = paginate(f, 'companies'), html = '';
+    if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
+    pg.pageItems.forEach(function(c){
+      html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
+        '<td>' + esc(c.companyName) + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '</td>' +
+        '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
+        (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
+        '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';
+    });
+    tbody.innerHTML = html;
+    var set = function(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; };
+    set('companyCount', companies.length); set('totalCompanies', companies.length);
+    set('activeCompanies', companies.filter(function(c){ return c.status === 'Active'; }).length);
+    set('trialCompanies', companies.filter(function(c){ return c.status === 'Pending'; }).length);
+    set('paidCompanies', companies.filter(function(c){ return Number(c.price || 0) > 0; }).length);
+    set('companyShowingCount', pg.pageItems.length);
+    renderPageNumbers('companyPageNumbers', 'companies', pg.totalPages, gotoCompanyPage);
+    updateBulkBar('companies');
+  };
+  window.syncCompanies = async function(){
+    await refresh();
+    var un = companies.filter(function(c){ return c.status === 'Untracked'; });
+    if (un.length && canWrite && confirm(un.length + ' existing companies are not in the control list yet. Add them all as Active (no expiry date)?')){
+      var ins = un.map(function(c){ return { company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' }; });
+      var r = await sb.from('acacia_company_status').insert(ins); if (r.error) alert('Failed: ' + r.error.message);
+      await refresh();
+    }
+  };
+
+  var _login = window.login;
+  window.login = function(){
+    var em = ((document.getElementById('username') || {}).value || '').trim().toLowerCase(), pw = (document.getElementById('password') || {}).value || '';
+    var r = _login.apply(this, arguments);
+    if (localStorage.getItem('developerSession')) signIn(em, pw).then(refresh);
+    return r;
+  };
+  var _logout = window.logout;
+  window.logout = function(){ try { sb.auth.signOut(); } catch(e){} return _logout.apply(this, arguments); };
+
+  function start(){ if (!localStorage.getItem('developerSession')) { pill(); return; } roleCheck().then(refresh); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  setInterval(function(){ if (localStorage.getItem('developerSession')) refresh(); }, 60000);
+})();
+</script>
+
 </body>
 </html>
