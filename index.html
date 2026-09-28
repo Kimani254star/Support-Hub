@@ -4649,8 +4649,10 @@ window.onload = function () {
 
 function devAutoRefresh(){
     try {
-        users = loadUsersFromStores();
-        companies = loadCompaniesFromStores(users);
+        if (!window.__acxCloudReady){
+          users = loadUsersFromStores();
+          companies = loadCompaniesFromStores(users);
+        }
         payments = loadPaymentsFromStores();
         syncChatWidgetTickets();
         const active = document.querySelector(".page.active");
@@ -4717,6 +4719,7 @@ function devAutoRefresh(){
         if (!u.error){ exp[i].status = 'suspended'; try { addLog('Warning', 'System', 'Auto-deactivated (payment expired): ' + (exp[i].company_name || exp[i].company_id), 'Companies'); } catch(e){} }
       }
     }
+    window.__acxCloudReady = true;
     merge(); mergeTickets(); pill(); busy = false;
   }
 
