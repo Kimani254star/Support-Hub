@@ -4551,7 +4551,7 @@ function devAutoRefresh(){
   var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
-  var canWrite = false, cloudOK = false, rows = [], accts = [], busy = false;
+  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], busy = false;
 
   function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
   function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
@@ -4586,6 +4586,7 @@ function devAutoRefresh(){
       rows = st.data || [];
       var ac = await sb.from('app_accounts').select('login_id,username,company_id,data,updated_at');
       accts = (ac.data || []);
+      var us = await sb.from('acacia_app_usage').select('company_id,app,user_key,role,last_seen'); usage = us.error ? [] : (us.data || []);
       cloudOK = true;
     } catch(e){ cloudOK = false; console.warn('[hub cloud]', e); pill(); busy = false; return; }
     if (canWrite){
@@ -4598,6 +4599,14 @@ function devAutoRefresh(){
     merge(); pill(); busy = false;
   }
 
+  function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
+  function usageText(id){
+    var by = {}, last = 0;
+    usage.filter(function(x){ return String(x.company_id) === String(id); }).forEach(function(x){
+      var a = by[x.app] = by[x.app] || { n: 0 }; a.n++; var t = new Date(x.last_seen).getTime(); if (t > last) last = t; });
+    var parts = Object.keys(by).map(function(k){ return k + ' ' + by[k].n; });
+    return parts.length ? parts.join(' \u00b7 ') + ' \u00b7 active ' + ago(last) : 'No app activity yet';
+  }
   function merge(){
     var byId = {}; rows.forEach(function(r){ byId[r.company_id] = r; });
     var cu = accts.map(function(a){
@@ -4608,11 +4617,13 @@ function devAutoRefresh(){
       if (r){ var e = eff(r); d.status = e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'); }
       return d;
     });
-    users = normalizeUsers(loadUsersFromStores().concat(cu));
+    var uu = usage.map(function(x){ var r = byId[x.company_id], e = r ? eff(r) : 'active';
+      return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended') }; });
+    users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
       return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
         email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), status: title(eff(r)),
-        registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', _row: r };
+        registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
     });
     var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
     var extra = normalizeCompanies(companiesFromUsers(users).concat(devCollect(COMPANY_STORE_KEYS)))
@@ -4686,7 +4697,7 @@ function devAutoRefresh(){
     if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
     pg.pageItems.forEach(function(c){
       html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
-        '<td>' + esc(c.companyName) + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '</td>' +
+        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '</td>' +
         '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
         (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
         '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';
