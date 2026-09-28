@@ -4702,7 +4702,7 @@ function devAutoRefresh(){
       accts = (ac.data || []);
       var us = await sb.from('acacia_app_usage').select('company_id,app,user_key,role,last_seen'); usage = us.error ? [] : (us.data || []);
       cloudOK = true;
-    } catch(e){ cloudOK = false; console.warn('[hub cloud]', e); pill(); busy = false; return; }
+    } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
     if (canWrite){
       var exp = rows.filter(function(r){ return r.status === 'active' && r.paid_until && new Date(r.paid_until) < new Date(); });
       for (var i = 0; i < exp.length; i++){
@@ -4722,6 +4722,9 @@ function devAutoRefresh(){
     return parts.length ? parts.join(' \u00b7 ') + ' \u00b7 active ' + ago(last) : 'No app activity yet';
   }
   function merge(){
+    var __prevCompanies = (typeof companies !== 'undefined' && companies) ? companies.slice() : [];
+    var __prevUsers = (typeof users !== 'undefined' && users) ? users.slice() : [];
+    try {
     var byId = {}; rows.forEach(function(r){ byId[r.company_id] = r; });
     var cu = accts.map(function(a){
       var d = Object.assign({}, a.data || {});
@@ -4749,8 +4752,11 @@ function devAutoRefresh(){
     if (btn) btn.innerHTML = 'Companies' + (n ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:6px">' + n + ' pending</span>' : '');
     var tu = document.getElementById('totalUsers'); if (tu) tu.textContent = users.length;
     try { renderCompanies(); } catch(e){}
+    if (!companies.length && __prevCompanies.length) { companies = __prevCompanies; console.warn('[hub cloud] merge produced an empty company list; keeping the previous list on screen.'); }
+    if (!users.length && __prevUsers.length) { users = __prevUsers; }
     try { if (document.getElementById('users').classList.contains('active')) renderUsers(); } catch(e){}
     try { if (document.getElementById('dashboard').classList.contains('active')) loadDashboard(); } catch(e){}
+    } catch(e){ console.error('[hub cloud] merge failed, keeping previous list', e); companies = __prevCompanies; users = __prevUsers; try { renderCompanies(); } catch(e2){} }
   }
 
   async function patch(id, fields, msg){
