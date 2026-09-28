@@ -3182,14 +3182,20 @@ function renderSupportTickets(){
             <tr>
                 <td class="p-4 pl-6"><input type="checkbox" class="support-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${t.id}" onclick="onRowCheckToggle('support')"></td>
                 <td>${t.ticket}</td>
-                <td>${t.subject}${t.source === 'chat' ? ' <span class="ml-1 text-[10px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full align-middle">💬 AI Chat</span>' : ''}</td>
+                <td>${t.subject}${t.source === 'chat' ? ' <span class="ml-1 text-[10px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full align-middle">💬 AI Chat</span>' : ''}${t.source === 'cloud' ? ' <span class="ml-1 text-[10px] font-semibold text-white bg-emerald-600 px-1.5 py-0.5 rounded-full align-middle">☁ Live</span>' : ''}${t.unread ? ' <span class="ml-1 text-[10px] font-semibold text-white bg-red-600 px-1.5 py-0.5 rounded-full align-middle">new</span>' : ''}</td>
                 <td>${t.customer}</td>
                 <td><span class="${t.priority==='High'?'text-red-600 font-bold':''}">${t.priority}</span></td>
                 <td><span class="text-blue-500">${t.status}</span></td>
                 <td>${t.date}</td>
                 <td>
+${t.source === 'cloud' ? `
+                    <button class="bg-emerald-700 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubOpenTicket('${t.id}')">Open &amp; reply</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubResolveTicket('${t.id}')">Resolve</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="hubDeleteTicket('${t.id}')">Delete</button>
+                    ` : `
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="resolveTicket('${t.id}')">Resolve</button>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteTicket('${t.id}')">Delete</button>
+                    `}
                 </td>
             </tr>`;
         });
@@ -4665,7 +4671,7 @@ function devAutoRefresh(){
   var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
-  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], busy = false;
+  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], busy = false;
 
   function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
   function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
@@ -4701,6 +4707,7 @@ function devAutoRefresh(){
       var ac = await sb.from('app_accounts').select('login_id,username,company_id,data,updated_at');
       accts = (ac.data || []);
       var us = await sb.from('acacia_app_usage').select('company_id,app,user_key,role,last_seen'); usage = us.error ? [] : (us.data || []);
+      var tk = await sb.from('acacia_tickets').select('*').order('updated_at', { ascending: false }); tix = tk.error ? [] : (tk.data || []);
       cloudOK = true;
     } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
     if (canWrite){
@@ -4710,7 +4717,7 @@ function devAutoRefresh(){
         if (!u.error){ exp[i].status = 'suspended'; try { addLog('Warning', 'System', 'Auto-deactivated (payment expired): ' + (exp[i].company_name || exp[i].company_id), 'Companies'); } catch(e){} }
       }
     }
-    merge(); pill(); busy = false;
+    merge(); mergeTickets(); pill(); busy = false;
   }
 
   function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
@@ -4721,6 +4728,61 @@ function devAutoRefresh(){
     var parts = Object.keys(by).map(function(k){ return k + ' ' + by[k].n; });
     return parts.length ? parts.join(' \u00b7 ') + ' \u00b7 active ' + ago(last) : 'No app activity yet';
   }
+
+  function mergeTickets(){
+    if (typeof supportTickets === 'undefined') return;
+    try {
+      var local = supportTickets.filter(function(t){ return t.source !== 'cloud'; });
+      var cloud = tix.map(function(r){
+        return { id: 'sb:' + r.id, sbId: r.id, ticket: r.id.slice(0, 8).toUpperCase(),
+          customer: r.user_name || r.user_email || r.company_name || 'Customer', company: r.company_name || r.company_id || '',
+          subject: r.subject || 'Support request', priority: r.priority || 'Medium',
+          status: r.status === 'resolved' ? 'Resolved' : 'Open', message: '', app: r.app || '',
+          date: new Date(r.updated_at || r.created_at).toLocaleDateString(),
+          unread: r.status === 'open' && r.last_sender === 'customer', source: 'cloud' };
+      });
+      supportTickets = local.concat(cloud);
+      localStorage.setItem(SUPPORT_KEY, JSON.stringify(local));
+      if (document.getElementById('support') && document.getElementById('support').classList.contains('active')) renderSupportTickets();
+      var badge = document.querySelector("button[onclick=\"openPage('support')\"]");
+      var openCloud = cloud.filter(function(t){ return t.unread; }).length;
+      if (badge) badge.innerHTML = 'Support' + (openCloud ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:6px">' + openCloud + '</span>' : '');
+    } catch(e){ console.error('[hub cloud] ticket merge failed', e); }
+  }
+  async function ticketThread(sbId){
+    var m = await sb.from('acacia_ticket_messages').select('*').eq('ticket_id', sbId).order('created_at', { ascending: true });
+    return m.error ? [] : (m.data || []);
+  }
+  window.hubOpenTicket = async function(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); });
+    if (!t || t.source !== 'cloud') return;
+    var msgs = await ticketThread(t.sbId);
+    var text = msgs.map(function(m){ return (m.sender === 'customer' ? t.customer : 'Support') + ' (' + new Date(m.created_at).toLocaleString() + '):\n' + m.body; }).join('\n\n---\n\n');
+    alert((t.subject) + '\n\n' + text);
+    var reply = prompt('Reply to ' + t.customer + ' (leave empty to just close this):', '');
+    if (reply && reply.trim()){
+      var r = await sb.from('acacia_ticket_messages').insert({ ticket_id: t.sbId, sender: 'support', body: reply.trim() });
+      if (r.error) { alert('Could not send: ' + r.error.message); return; }
+      await sb.from('acacia_tickets').update({ status: 'open', last_sender: 'support', updated_at: new Date().toISOString() }).eq('id', t.sbId);
+      try { addLog('Info', who(), 'Replied to ticket ' + t.ticket + ' (' + t.customer + ')', 'Support'); } catch(e){}
+      await refresh();
+    }
+  };
+  window.hubResolveTicket = async function(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); }); if (!t || t.source !== 'cloud') return;
+    var r = await sb.from('acacia_tickets').update({ status: 'resolved', updated_at: new Date().toISOString() }).eq('id', t.sbId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Resolved ticket ' + t.ticket, 'Support'); } catch(e){}
+    await refresh();
+  };
+  window.hubDeleteTicket = async function(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); }); if (!t || t.source !== 'cloud') return;
+    if (!confirm('Delete this conversation permanently?')) return;
+    var r = await sb.from('acacia_tickets').delete().eq('id', t.sbId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    await refresh();
+  };
+
   function merge(){
     var __prevCompanies = (typeof companies !== 'undefined' && companies) ? companies.slice() : [];
     var __prevUsers = (typeof users !== 'undefined' && users) ? users.slice() : [];
