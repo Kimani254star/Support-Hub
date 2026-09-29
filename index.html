@@ -4649,7 +4649,12 @@ window.onload = function () {
 
 function devAutoRefresh(){
     try {
-        if (!window.__acxCloudReady){
+        // Companies and Users are owned by the cloud sync (hubCloud script) once it is
+        // active, so this local-storage refresh must never touch them - even for a
+        // moment - or it repeatedly wipes the cloud list back down to whatever is
+        // saved in this one browser.
+        var cloudOwns = !!window.__acxCloudActive;
+        if (!cloudOwns){
           users = loadUsersFromStores();
           companies = loadCompaniesFromStores(users);
         }
@@ -4657,11 +4662,11 @@ function devAutoRefresh(){
         syncChatWidgetTickets();
         const active = document.querySelector(".page.active");
         const id = active ? active.id : null;
-        if (id === "companies") renderCompanies();
-        else if (id === "users") renderUsers();
+        if (id === "companies") { if (!cloudOwns) renderCompanies(); }
+        else if (id === "users") { if (!cloudOwns) renderUsers(); }
         else if (id === "support") renderSupportTickets();
         else if (id === "payments") renderPayments();
-        else if (id === "dashboard") loadDashboard();
+        else if (id === "dashboard") { if (!cloudOwns) loadDashboard(); }
         else if (id === "analytics") refreshAnalytics();
     } catch(e){ console.error("devAutoRefresh failed", e); }
 }
@@ -4797,10 +4802,11 @@ function devAutoRefresh(){
       d.companyId = d.companyId || a.company_id; d.email = d.email || a.login_id; d.username = d.username || a.username;
       var r = byId[d.companyId];
       if (r){ var e = eff(r); d.status = e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'); }
+      d.source = 'cloud';
       return d;
     });
     var uu = usage.map(function(x){ var r = byId[x.company_id], e = r ? eff(r) : 'active';
-      return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended') }; });
+      return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'), source: 'cloud' }; });
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
       return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
@@ -4858,6 +4864,7 @@ function devAutoRefresh(){
     if (r.error) alert('Failed: ' + r.error.message); await refresh(); };
 
   var badge = { Pending: 'bg-amber-100 text-amber-800', Active: 'bg-green-100 text-green-800', Suspended: 'bg-red-100 text-red-800', Expired: 'bg-red-100 text-red-800', Rejected: 'bg-gray-200 text-gray-700', Untracked: 'bg-blue-100 text-blue-800' };
+  function money(n){ n = Number(n || 0); return n > 0 ? 'KES ' + n.toLocaleString() : 'Free'; }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
   function actions(c){
     var id = String(c.companyId).replace(/\\/g, '\\\\').replace(/'/g, "\\'"), b = function(l, fn, cls){ return '<button class="' + cls + ' text-white px-2 py-1 text-xs rounded mr-1 mb-1" onclick="' + fn + '">' + l + '</button>'; };
@@ -4882,7 +4889,7 @@ function devAutoRefresh(){
     if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
     pg.pageItems.forEach(function(c){
       html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
-        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '</td>' +
+        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '<div class="text-xs text-gray-500 mt-1">' + money(c.price) + '</div></td>' +
         '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
         (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
         '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';
@@ -4916,6 +4923,73 @@ function devAutoRefresh(){
   };
   var _logout = window.logout;
   window.logout = function(){ try { sb.auth.signOut(); } catch(e){} return _logout.apply(this, arguments); };
+
+  window.__acxCloudActive = true;
+
+  var _origDeleteCompany = window.deleteCompany, _origDeleteUser = window.deleteUser;
+  var _origBulkDeleteCompanies = window.bulkDeleteCompanies, _origBulkDeleteUsers = window.bulkDeleteUsers;
+
+  async function purgeCompany(id){
+    await sb.from('acacia_company_status').delete().eq('company_id', id);
+    await sb.from('app_accounts').delete().eq('company_id', id);
+    await sb.from('acacia_app_usage').delete().eq('company_id', id);
+    await sb.from('acacia_tickets').delete().eq('company_id', id);
+  }
+  async function purgeUser(login){
+    login = String(login || '').toLowerCase(); if (!login) return;
+    await sb.from('app_accounts').delete().or('login_id.eq.' + login + ',username.eq.' + login);
+    await sb.from('acacia_app_usage').delete().eq('user_key', login);
+  }
+
+  window.deleteCompany = async function(idOrName){
+    var c = companies.find(function(x){ return String(x.id || x.companyName) == String(idOrName); });
+    if (!c || !c._row){ return _origDeleteCompany ? _origDeleteCompany.apply(this, arguments) : undefined; }
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Permanently delete "' + (c.companyName || idOrName) + '"? This removes the company, its users and its tickets from Supabase - they will not come back. Their business records in company_state are kept.')) return;
+    await purgeCompany(c.companyId);
+    try { addLog('Error', who(), 'Permanently deleted company: ' + (c.companyName || idOrName), 'Companies'); } catch(e){}
+    await refresh();
+  };
+  window.bulkDeleteCompanies = async function(){
+    var ids = Array.from(bulkSelections.companies);
+    var cloudIds = ids.filter(function(id){ var c = companies.find(function(x){ return String(x.id || x.companyName) === String(id); }); return c && c._row; });
+    var localIds = ids.filter(function(id){ return cloudIds.indexOf(id) === -1; });
+    if (cloudIds.length){
+      if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+      if (!confirm('Permanently delete ' + cloudIds.length + ' compan' + (cloudIds.length === 1 ? 'y' : 'ies') + ' from Supabase? Their users and tickets go too, and they will not come back.')) return;
+      for (var i = 0; i < cloudIds.length; i++){
+        var c = companies.find(function(x){ return String(x.id || x.companyName) === String(cloudIds[i]); });
+        if (c) await purgeCompany(c.companyId);
+      }
+      try { addLog('Error', who(), 'Bulk permanently deleted ' + cloudIds.length + ' companies', 'Companies'); } catch(e){}
+    }
+    bulkSelections.companies.clear();
+    if (localIds.length){ bulkSelections.companies = new Set(localIds); if (_origBulkDeleteCompanies) await _origBulkDeleteCompanies.apply(this, arguments); }
+    await refresh();
+  };
+  window.deleteUser = async function(id){
+    var u = users.find(function(x){ return x.id === id; });
+    if (!u || u.source !== 'cloud'){ return _origDeleteUser ? _origDeleteUser.apply(this, arguments) : undefined; }
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Permanently delete "' + (u.username || u.email) + '"? They will lose access immediately and this cannot be undone.')) return;
+    await purgeUser(u.email || u.username);
+    try { addLog('Error', who(), 'Permanently deleted user: ' + (u.email || u.username), 'Users'); } catch(e){}
+    await refresh();
+  };
+  window.bulkDeleteUsers = async function(){
+    var ids = Array.from(bulkSelections.users).map(Number);
+    var cloud = users.filter(function(u){ return ids.includes(u.id) && u.source === 'cloud'; });
+    var local = ids.filter(function(id){ return !cloud.some(function(u){ return u.id === id; }); });
+    if (cloud.length){
+      if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+      if (!confirm('Permanently delete ' + cloud.length + ' user(s)? They will lose access immediately.')) return;
+      for (var i = 0; i < cloud.length; i++) await purgeUser(cloud[i].email || cloud[i].username);
+      try { addLog('Error', who(), 'Bulk permanently deleted ' + cloud.length + ' users', 'Users'); } catch(e){}
+    }
+    bulkSelections.users.clear();
+    if (local.length){ bulkSelections.users = new Set(local); if (_origBulkDeleteUsers) await _origBulkDeleteUsers.apply(this, arguments); }
+    await refresh();
+  };
 
   function start(){ if (!localStorage.getItem('developerSession')) { pill(); return; } roleCheck().then(refresh); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
