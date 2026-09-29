@@ -536,7 +536,7 @@ body.home-mode{background:#F6F7F4;}
 <p class="login-sub">Sign in to manage your app</p>
 <input id="username" placeholder="Username">
 <input id="password" type="password" placeholder="Password">
-<button onclick="login()">Login</button>
+<button id="loginBtn" onclick="login()">Sign In</button>
 <div id="error">Invalid Username or Password</div>
 <button onclick="showHome()" style="background:none;color:#6b7573;font-weight:500;font-size:13px;margin-top:6px;padding:6px;">&larr; Back to site</button>
 </div>
@@ -2207,10 +2207,6 @@ body.home-mode{background:#F6F7F4;}
 </div>
 </div>
 <script>
-const ACCOUNTS = {
-    "adminacaciabooks@gmail.com": { password: "admin123", role: "Administrator", fullName: "System Administrator" },
-    "developeracaciabooks@gmail.com": { password: "dvlp123", role: "Developer", fullName: "System Developer" }
-};
 
 const USERS_KEY = "users";
 const COMPANY_KEY = "acacia_companies";
@@ -2461,28 +2457,49 @@ function submitContactForm(e){
     return false;
 }
 
-function login() {
+async function login() {
+    const btn = document.getElementById("loginBtn");
+    const errEl = document.getElementById("error");
+    errEl.style.display = "none";
     const u = document.getElementById("username").value.trim().toLowerCase();
     const p = document.getElementById("password").value;
-    const account = ACCOUNTS[u];
-    if (!account || account.password !== p) {
-        document.getElementById("error").style.display = "block";
-        return;
+    if (!u || !p) { errEl.textContent = "Enter your email and password."; errEl.style.display = "block"; return; }
+    if (btn) { btn.disabled = true; btn.textContent = "Signing in\u2026"; }
+    try {
+      if (!window.supabase || !window.__SUPA_URL__) throw new Error("Cloud connection unavailable. Check your internet and reload.");
+      var sbAuth = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_KEY__, { auth: { storageKey: "acacia-hub-auth", persistSession: true } });
+      var r = await sbAuth.auth.signInWithPassword({ email: u, password: p });
+      if (r.error) throw new Error("Incorrect email or password.");
+      var user = r.data.user;
+      var role = user && user.app_metadata && user.app_metadata.role;
+      if (role !== "hub_admin" && role !== "hub_viewer") {
+        await sbAuth.auth.signOut();
+        throw new Error("This account is not authorized for the Support Hub.");
+      }
+      var fullName = (user.user_metadata && user.user_metadata.fullName) || (user.email || "").split("@")[0];
+      var roleLabel = role === "hub_admin" ? "Administrator" : "Viewer (read-only)";
+      const session = { email: user.email, role: roleLabel, hubRole: role, fullName: fullName, loginTime: new Date().toISOString() };
+      localStorage.setItem("developerSession", JSON.stringify(session));
+      document.getElementById("welcome").textContent = `Welcome, ${fullName}`;
+      document.getElementById("role").textContent = roleLabel;
+      document.getElementById("loginPage").classList.add("hidden");
+      document.getElementById("homePage").classList.add("hidden");
+      document.body.classList.remove("home-mode");
+      document.getElementById("app").classList.remove("hidden");
+      addLog("Info", fullName, "User Logged In Successfully (" + roleLabel + ")", "Auth");
+      loadDashboard();
+      if (window.__acxHubBoot) window.__acxHubBoot();
+    } catch (e) {
+      errEl.textContent = e.message || "Sign-in failed.";
+      errEl.style.display = "block";
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "Sign In"; }
     }
-    const session = { email: u, role: account.role, fullName: account.fullName, loginTime: new Date().toISOString() };
-    localStorage.setItem("developerSession", JSON.stringify(session));
-    document.getElementById("welcome").textContent = `Welcome, ${account.fullName}`;
-    document.getElementById("role").textContent = account.role;
-    document.getElementById("loginPage").classList.add("hidden");
-    document.getElementById("homePage").classList.add("hidden");
-    document.body.classList.remove("home-mode");
-    document.getElementById("app").classList.remove("hidden");
-    addLog("Info", account.fullName, "User Logged In Successfully", "Auth");
-    loadDashboard();
 }
 
 function logout(){
     localStorage.removeItem("developerSession");
+    try { if (window.__acxHubSignOut) window.__acxHubSignOut(); } catch(e){}
     location.reload();
 }
 
@@ -2794,7 +2811,7 @@ function renderPayments() {
             tbody.innerHTML += `
             <tr class="hover:bg-gray-50/70 transition-colors">
                 <td class="p-4 pl-6"><input type="checkbox" class="payments-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${p.id}" onclick="onRowCheckToggle('payments')"></td>
-                <td class="p-4 font-semibold text-blue-600 select-all">${p.invoice}</td>
+                <td class="p-4 font-semibold text-blue-600 select-all">${p.invoice}${p.source === 'cloud' ? ' <span class="text-[10px] font-semibold text-white bg-emerald-600 px-1.5 py-0.5 rounded-full align-middle">☁ Live</span>' : ''}</td>
                 <td class="p-4">
                     <div class="font-medium text-gray-900">${p.customer}</div>
                     <div class="text-xs text-gray-400">${planMeta} Tier (${p.billing || 'Monthly'})</div>
@@ -2810,9 +2827,9 @@ function renderPayments() {
                 <td class="p-4 text-gray-500">${p.date}</td>
                 <td class="p-4 pr-6 text-right">
                     <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="previewPayment('${p.id}')">Preview</button>
-                    <button class="bg-emerald-700 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-emerald-600 transition" onclick="renewPayment('${p.id}')">Renew</button>
-                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="openPaymentModal('${p.id}')">Edit</button>
-                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-red-700 transition" onclick="deletePayment('${p.id}')">Delete</button>
+                    <button class="bg-emerald-700 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-emerald-600 transition" onclick="${p.source === 'cloud' ? `hubRenewPayment('${p.id}')` : `renewPayment('${p.id}')`}">Renew</button>
+                    ${p.source === 'cloud' ? '' : `<button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="openPaymentModal('${p.id}')">Edit</button>`}
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-red-700 transition" onclick="${p.source === 'cloud' ? `hubDeletePayment('${p.id}')` : `deletePayment('${p.id}')`}">Delete</button>
                 </td>
             </tr>`;
         });
@@ -3384,14 +3401,7 @@ function savePreferences(){
 }
 
 function changePassword(){
-    const bodyHtml = `<input id="newAdminPassword" type="password" placeholder="Enter New Access Key Pass" class="w-full p-2 border rounded text-sm">`;
-    openModal("Change Administration Password", bodyHtml, () => {
-        const passValue = document.getElementById("newAdminPassword").value;
-        if(passValue.length < 4) return alert("Password too weak.");
-        ACCOUNTS["adminacaciabooks@gmail.com"].password = passValue;
-        addLog("Warning", "Developer", "Updated Global Administrator Master Root Password", "Security");
-        alert("Root key mutated successfully.");
-    });
+    alert("Passwords are now managed in Supabase (Authentication \u2192 Users \u2192 your account \u2192 Reset password), not here. This keeps them out of this file.");
 }
 
 function clearSystemCache(){
@@ -4573,7 +4583,7 @@ function exportDashboardReport(){
 }
 
 function exportConfig(){
-    const config = { settings, accounts: Object.keys(ACCOUNTS) };
+    const config = { settings: settings };
     const blob = new Blob([JSON.stringify(config, null, 2)], {type: "application/json"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -4678,7 +4688,7 @@ function devAutoRefresh(){
   var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
-  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], busy = false;
+  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], busy = false;
 
   function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
   function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
@@ -4715,6 +4725,7 @@ function devAutoRefresh(){
       accts = (ac.data || []);
       var us = await sb.from('acacia_app_usage').select('company_id,app,user_key,role,last_seen'); usage = us.error ? [] : (us.data || []);
       var tk = await sb.from('acacia_tickets').select('*').order('updated_at', { ascending: false }); tix = tk.error ? [] : (tk.data || []);
+      var pm = await sb.from('acacia_payments').select('*').order('created_at', { ascending: false }); pays = pm.error ? [] : (pm.data || []);
       cloudOK = true;
     } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
     if (canWrite){
@@ -4725,7 +4736,7 @@ function devAutoRefresh(){
       }
     }
     window.__acxCloudReady = true;
-    merge(); mergeTickets(); pill(); busy = false;
+    merge(); mergeTickets(); mergePayments(); pill(); busy = false;
   }
 
   function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
@@ -4914,15 +4925,8 @@ function devAutoRefresh(){
     }
   };
 
-  var _login = window.login;
-  window.login = function(){
-    var em = ((document.getElementById('username') || {}).value || '').trim().toLowerCase(), pw = (document.getElementById('password') || {}).value || '';
-    var r = _login.apply(this, arguments);
-    if (localStorage.getItem('developerSession')) signIn(em, pw).then(refresh);
-    return r;
-  };
-  var _logout = window.logout;
-  window.logout = function(){ try { sb.auth.signOut(); } catch(e){} return _logout.apply(this, arguments); };
+  window.__acxHubBoot = function(){ roleCheck().then(refresh); };
+  window.__acxHubSignOut = function(){ try { sb.auth.signOut(); } catch(e){} };
 
   window.__acxCloudActive = true;
 
@@ -4988,6 +4992,43 @@ function devAutoRefresh(){
     }
     bulkSelections.users.clear();
     if (local.length){ bulkSelections.users = new Set(local); if (_origBulkDeleteUsers) await _origBulkDeleteUsers.apply(this, arguments); }
+    await refresh();
+  };
+
+
+  function mergePayments(){
+    if (typeof payments === 'undefined') return;
+    try {
+      var local = payments.filter(function(p){ return p.source !== 'cloud'; });
+      var cloud = pays.map(function(r){
+        return { id: 'sb:' + r.id, sbId: r.id, invoice: r.invoice, customer: r.customer, email: r.email,
+          company: r.company_id, plan: r.plan, billing: r.billing, amount: Number(r.amount || 0), addonsCount: 0,
+          method: r.method, status: r.status, date: new Date(r.created_at).toLocaleDateString(), source: 'cloud' };
+      });
+      payments = local.concat(cloud);
+      if (document.getElementById('payments') && document.getElementById('payments').classList.contains('active')) renderPayments();
+    } catch(e){ console.error('[hub cloud] payment merge failed', e); }
+  }
+  window.hubRenewPayment = async function(id){
+    var p = payments.find(function(x){ return String(x.id) === String(id); }); if (!p || p.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = companies.find(function(x){ return String(x.companyId) === String(p.company); });
+    var days = prompt('Extend "' + p.customer + '" by how many days?', '30'); if (days === null) return;
+    days = parseInt(days, 10); if (!days || days <= 0) { alert('Enter a whole number of days.'); return; }
+    var amount = prompt('Amount received (KES)?', String(p.amount || (c ? c.price : 0) || 0)); if (amount === null) return;
+    var r = await sb.rpc('acx_record_payment', { p_company: p.company, p_invoice: null, p_customer: p.customer, p_email: p.email || '',
+      p_plan: p.plan || '', p_billing: p.billing || 'Monthly', p_amount: Number(amount) || 0, p_method: p.method || 'M-Pesa',
+      p_reference: 'Hub manual renewal', p_days: days });
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Renewed ' + p.customer + ' by ' + days + ' days (KES ' + (Number(amount) || 0).toLocaleString() + ')', 'Payments'); } catch(e){}
+    await refresh();
+  };
+  window.hubDeletePayment = async function(id){
+    var p = payments.find(function(x){ return String(x.id) === String(id); }); if (!p || p.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Delete this payment record? It will not reverse the extension already applied.')) return;
+    var r = await sb.from('acacia_payments').delete().eq('id', p.sbId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
     await refresh();
   };
 
