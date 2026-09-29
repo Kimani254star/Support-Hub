@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<style id="hubUniformText">
+/* Whole Support Hub: Cambria, and every heading/paragraph/button/label at one uniform size (Tailwind text-sm) */
+*{font-family:Cambria,Georgia,'Times New Roman',serif !important;}
+body, body :not(i):not(svg):not(svg *){font-size:.875rem !important;line-height:1.25rem !important;}
+</style>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Spear Developer Panel</title>
@@ -536,7 +541,7 @@ body.home-mode{background:#F6F7F4;}
 <p class="login-sub">Sign in to manage your app</p>
 <input id="username" placeholder="Username">
 <input id="password" type="password" placeholder="Password">
-<button onclick="login()">Login</button>
+<button id="loginBtn" onclick="login()">Sign In</button>
 <div id="error">Invalid Username or Password</div>
 <button onclick="showHome()" style="background:none;color:#6b7573;font-weight:500;font-size:13px;margin-top:6px;padding:6px;">&larr; Back to site</button>
 </div>
@@ -575,6 +580,7 @@ body.home-mode{background:#F6F7F4;}
 </main>
 </div>
 <div class="page active p-4 sm:p-6 w-full bg-gray-50 min-h-screen" id="dashboard">
+    <div id="hubRevenueCard" class="mb-6"></div>
     <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-5 mb-6">
         <div>
             <div class="flex items-center gap-3">
@@ -1788,6 +1794,7 @@ body.home-mode{background:#F6F7F4;}
     </div>
 </div>
 <div class="page p-4 sm:p-6 w-full bg-gray-50 min-h-screen" id="settings">
+    <div id="hubAccessCard" class="bg-white border border-gray-200 rounded-xl p-5 mb-6"></div>
     <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-5 mb-6">
         <div>
             <div class="flex items-center gap-3">
@@ -2207,10 +2214,6 @@ body.home-mode{background:#F6F7F4;}
 </div>
 </div>
 <script>
-const ACCOUNTS = {
-    "adminacaciabooks@gmail.com": { password: "admin123", role: "Administrator", fullName: "System Administrator" },
-    "developeracaciabooks@gmail.com": { password: "dvlp123", role: "Developer", fullName: "System Developer" }
-};
 
 const USERS_KEY = "users";
 const COMPANY_KEY = "acacia_companies";
@@ -2461,28 +2464,54 @@ function submitContactForm(e){
     return false;
 }
 
-function login() {
+async function login() {
+    const btn = document.getElementById("loginBtn");
+    const errEl = document.getElementById("error");
+    errEl.style.display = "none";
     const u = document.getElementById("username").value.trim().toLowerCase();
     const p = document.getElementById("password").value;
-    const account = ACCOUNTS[u];
-    if (!account || account.password !== p) {
-        document.getElementById("error").style.display = "block";
-        return;
+    if (!u || !p) { errEl.textContent = "Enter your email and password."; errEl.style.display = "block"; return; }
+    if (btn) { btn.disabled = true; btn.textContent = "Signing in\u2026"; }
+    try {
+      if (!window.supabase || !window.__SUPA_URL__) throw new Error("Cloud connection unavailable. Check your internet and reload.");
+      var sbAuth = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_KEY__, { auth: { storageKey: "acacia-hub-auth", persistSession: true } });
+      var r = await sbAuth.auth.signInWithPassword({ email: u, password: p });
+      if (r.error) throw new Error("Incorrect email or password.");
+      var user = r.data.user;
+      var role = user && user.app_metadata && user.app_metadata.role;
+      if (role !== "hub_admin" && role !== "hub_viewer") {
+        await sbAuth.auth.signOut();
+        throw new Error("This account is not authorized for the Support Hub.");
+      }
+      var allow = await sbAuth.from("acacia_hub_users").select("email").eq("email", u).maybeSingle();
+      if (allow.error || !allow.data) {
+        await sbAuth.auth.signOut();
+        throw new Error("This email has not been given access to the Support Hub. Ask an admin to add it under Settings.");
+      }
+      var fullName = (user.user_metadata && user.user_metadata.fullName) || (user.email || "").split("@")[0];
+      var roleLabel = role === "hub_admin" ? "Administrator" : "Viewer (read-only)";
+      const session = { email: user.email, role: roleLabel, hubRole: role, fullName: fullName, loginTime: new Date().toISOString() };
+      localStorage.setItem("developerSession", JSON.stringify(session));
+      document.getElementById("welcome").textContent = `Welcome, ${fullName}`;
+      document.getElementById("role").textContent = roleLabel;
+      document.getElementById("loginPage").classList.add("hidden");
+      document.getElementById("homePage").classList.add("hidden");
+      document.body.classList.remove("home-mode");
+      document.getElementById("app").classList.remove("hidden");
+      addLog("Info", fullName, "User Logged In Successfully (" + roleLabel + ")", "Auth");
+      loadDashboard();
+      if (window.__acxHubBoot) window.__acxHubBoot();
+    } catch (e) {
+      errEl.textContent = e.message || "Sign-in failed.";
+      errEl.style.display = "block";
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "Sign In"; }
     }
-    const session = { email: u, role: account.role, fullName: account.fullName, loginTime: new Date().toISOString() };
-    localStorage.setItem("developerSession", JSON.stringify(session));
-    document.getElementById("welcome").textContent = `Welcome, ${account.fullName}`;
-    document.getElementById("role").textContent = account.role;
-    document.getElementById("loginPage").classList.add("hidden");
-    document.getElementById("homePage").classList.add("hidden");
-    document.body.classList.remove("home-mode");
-    document.getElementById("app").classList.remove("hidden");
-    addLog("Info", account.fullName, "User Logged In Successfully", "Auth");
-    loadDashboard();
 }
 
 function logout(){
     localStorage.removeItem("developerSession");
+    try { if (window.__acxHubSignOut) window.__acxHubSignOut(); } catch(e){}
     location.reload();
 }
 
@@ -2794,7 +2823,7 @@ function renderPayments() {
             tbody.innerHTML += `
             <tr class="hover:bg-gray-50/70 transition-colors">
                 <td class="p-4 pl-6"><input type="checkbox" class="payments-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${p.id}" onclick="onRowCheckToggle('payments')"></td>
-                <td class="p-4 font-semibold text-blue-600 select-all">${p.invoice}</td>
+                <td class="p-4 font-semibold text-blue-600 select-all">${p.invoice}${p.source === 'cloud' ? ' <span class="text-[10px] font-semibold text-white bg-emerald-600 px-1.5 py-0.5 rounded-full align-middle">☁ Live</span>' : ''}</td>
                 <td class="p-4">
                     <div class="font-medium text-gray-900">${p.customer}</div>
                     <div class="text-xs text-gray-400">${planMeta} Tier (${p.billing || 'Monthly'})</div>
@@ -2810,9 +2839,9 @@ function renderPayments() {
                 <td class="p-4 text-gray-500">${p.date}</td>
                 <td class="p-4 pr-6 text-right">
                     <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="previewPayment('${p.id}')">Preview</button>
-                    <button class="bg-emerald-700 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-emerald-600 transition" onclick="renewPayment('${p.id}')">Renew</button>
-                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="openPaymentModal('${p.id}')">Edit</button>
-                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-red-700 transition" onclick="deletePayment('${p.id}')">Delete</button>
+                    <button class="bg-emerald-700 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-emerald-600 transition" onclick="${p.source === 'cloud' ? `hubRenewPayment('${p.id}')` : `renewPayment('${p.id}')`}">Renew</button>
+                    ${p.source === 'cloud' ? '' : `<button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="openPaymentModal('${p.id}')">Edit</button>`}
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-red-700 transition" onclick="${p.source === 'cloud' ? `hubDeletePayment('${p.id}')` : `deletePayment('${p.id}')`}">Delete</button>
                 </td>
             </tr>`;
         });
@@ -3384,14 +3413,7 @@ function savePreferences(){
 }
 
 function changePassword(){
-    const bodyHtml = `<input id="newAdminPassword" type="password" placeholder="Enter New Access Key Pass" class="w-full p-2 border rounded text-sm">`;
-    openModal("Change Administration Password", bodyHtml, () => {
-        const passValue = document.getElementById("newAdminPassword").value;
-        if(passValue.length < 4) return alert("Password too weak.");
-        ACCOUNTS["adminacaciabooks@gmail.com"].password = passValue;
-        addLog("Warning", "Developer", "Updated Global Administrator Master Root Password", "Security");
-        alert("Root key mutated successfully.");
-    });
+    alert("Passwords are now managed in Supabase (Authentication \u2192 Users \u2192 your account \u2192 Reset password), not here. This keeps them out of this file.");
 }
 
 function clearSystemCache(){
@@ -4573,7 +4595,7 @@ function exportDashboardReport(){
 }
 
 function exportConfig(){
-    const config = { settings, accounts: Object.keys(ACCOUNTS) };
+    const config = { settings: settings };
     const blob = new Blob([JSON.stringify(config, null, 2)], {type: "application/json"});
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -4678,7 +4700,7 @@ function devAutoRefresh(){
   var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
-  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], busy = false;
+  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], busy = false;
 
   function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
   function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
@@ -4715,6 +4737,8 @@ function devAutoRefresh(){
       accts = (ac.data || []);
       var us = await sb.from('acacia_app_usage').select('company_id,app,user_key,role,last_seen'); usage = us.error ? [] : (us.data || []);
       var tk = await sb.from('acacia_tickets').select('*').order('updated_at', { ascending: false }); tix = tk.error ? [] : (tk.data || []);
+      var pm = await sb.from('acacia_payments').select('*').order('created_at', { ascending: false }); pays = pm.error ? [] : (pm.data || []);
+      var hu = await sb.from('acacia_hub_users').select('*').order('created_at', { ascending: true }); hubUsers = hu.error ? [] : (hu.data || []);
       cloudOK = true;
     } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
     if (canWrite){
@@ -4725,7 +4749,7 @@ function devAutoRefresh(){
       }
     }
     window.__acxCloudReady = true;
-    merge(); mergeTickets(); pill(); busy = false;
+    merge(); mergeTickets(); mergePayments(); renderHubAccess(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
   }
 
   function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
@@ -4914,15 +4938,8 @@ function devAutoRefresh(){
     }
   };
 
-  var _login = window.login;
-  window.login = function(){
-    var em = ((document.getElementById('username') || {}).value || '').trim().toLowerCase(), pw = (document.getElementById('password') || {}).value || '';
-    var r = _login.apply(this, arguments);
-    if (localStorage.getItem('developerSession')) signIn(em, pw).then(refresh);
-    return r;
-  };
-  var _logout = window.logout;
-  window.logout = function(){ try { sb.auth.signOut(); } catch(e){} return _logout.apply(this, arguments); };
+  window.__acxHubBoot = function(){ roleCheck().then(refresh); };
+  window.__acxHubSignOut = function(){ try { sb.auth.signOut(); } catch(e){} };
 
   window.__acxCloudActive = true;
 
@@ -4990,6 +5007,155 @@ function devAutoRefresh(){
     if (local.length){ bulkSelections.users = new Set(local); if (_origBulkDeleteUsers) await _origBulkDeleteUsers.apply(this, arguments); }
     await refresh();
   };
+
+
+  function mergePayments(){
+    if (typeof payments === 'undefined') return;
+    try {
+      var local = payments.filter(function(p){ return p.source !== 'cloud'; });
+      var cloud = pays.map(function(r){
+        return { id: 'sb:' + r.id, sbId: r.id, invoice: r.invoice, customer: r.customer, email: r.email,
+          company: r.company_id, plan: r.plan, billing: r.billing, amount: Number(r.amount || 0), addonsCount: 0,
+          method: r.method, status: r.status, date: new Date(r.created_at).toLocaleDateString(), source: 'cloud' };
+      });
+      payments = local.concat(cloud);
+      if (document.getElementById('payments') && document.getElementById('payments').classList.contains('active')) renderPayments();
+    } catch(e){ console.error('[hub cloud] payment merge failed', e); }
+  }
+  window.hubRenewPayment = async function(id){
+    var p = payments.find(function(x){ return String(x.id) === String(id); }); if (!p || p.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = companies.find(function(x){ return String(x.companyId) === String(p.company); });
+    var days = prompt('Extend "' + p.customer + '" by how many days?', '30'); if (days === null) return;
+    days = parseInt(days, 10); if (!days || days <= 0) { alert('Enter a whole number of days.'); return; }
+    var amount = prompt('Amount received (KES)?', String(p.amount || (c ? c.price : 0) || 0)); if (amount === null) return;
+    var r = await sb.rpc('acx_record_payment', { p_company: p.company, p_invoice: null, p_customer: p.customer, p_email: p.email || '',
+      p_plan: p.plan || '', p_billing: p.billing || 'Monthly', p_amount: Number(amount) || 0, p_method: p.method || 'M-Pesa',
+      p_reference: 'Hub manual renewal', p_days: days });
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Renewed ' + p.customer + ' by ' + days + ' days (KES ' + (Number(amount) || 0).toLocaleString() + ')', 'Payments'); } catch(e){}
+    await refresh();
+  };
+  window.hubDeletePayment = async function(id){
+    var p = payments.find(function(x){ return String(x.id) === String(id); }); if (!p || p.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Delete this payment record? It will not reverse the extension already applied.')) return;
+    var r = await sb.from('acacia_payments').delete().eq('id', p.sbId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    await refresh();
+  };
+
+
+  // ---- Hub Access (Settings page) --------------------------------------
+  function renderHubAccess(){
+    var box = document.getElementById('hubAccessCard'); if (!box) return;
+    var me0 = (JSON.parse(localStorage.getItem('developerSession') || '{}').email || '').toLowerCase();
+    var rows0 = hubUsers.map(function(u){
+      return '<tr class="border-t border-gray-100"><td class="py-2 pr-4">' + esc(u.email) + (u.full_name ? '<div class="text-xs text-gray-400">' + esc(u.full_name) + '</div>' : '') + '</td>' +
+        '<td class="py-2 pr-4">' + (u.role === 'hub_admin' ? '<span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Admin</span>' : '<span class="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">Viewer (read-only)</span>') + '</td>' +
+        '<td class="py-2 text-right">' + (canWrite && u.email.toLowerCase() !== me0 ? '<button class="text-xs text-red-600 hover:underline" onclick="hubRemoveAccess(\'' + u.email.replace(/'/g, "\\'") + '\')">Remove</button>' : '') + '</td></tr>';
+    }).join('');
+    box.innerHTML =
+      '<div class="flex items-center justify-between mb-3"><h3 class="font-bold text-gray-900">Hub Access</h3>' +
+      (canWrite ? '<button class="bg-blue-900 text-white text-xs px-3 py-1.5 rounded" onclick="hubAddAccessPrompt()">+ Add person</button>' : '') + '</div>' +
+      '<table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th class="pb-2">Email</th><th class="pb-2">Access</th><th></th></tr></thead><tbody>' +
+      (rows0 || '<tr><td colspan="3" class="py-3 text-gray-400">No one on the list yet.</td></tr>') + '</tbody></table>' +
+      '<p class="text-xs text-gray-400 mt-3">Adding someone here lets them sign in once they also have a Supabase login with the matching role. Create that under Supabase \u2192 Authentication \u2192 Users, tick Auto Confirm, then set their role with the SQL from setup part 5 or 7.</p>';
+  }
+  window.hubAddAccessPrompt = async function(){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var email = prompt('Email address to give access to:'); if (!email) return;
+    email = email.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('That does not look like an email address.'); return; }
+    var viewer = confirm('Click OK for read-only (Viewer), or Cancel for full Admin access.');
+    var role = viewer ? 'hub_viewer' : 'hub_admin';
+    var r = await sb.from('acacia_hub_users').upsert({ email: email, role: role, added_by: who() });
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Granted ' + role + ' Hub access to ' + email, 'Security'); } catch(e){}
+    alert(email + ' is now on the allow-list. Remember: they also need a matching Supabase login before they can actually sign in.');
+    await refresh();
+  };
+  window.hubRemoveAccess = async function(email){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Remove Hub access for ' + email + '?')) return;
+    var r = await sb.from('acacia_hub_users').delete().eq('email', email);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Removed Hub access for ' + email, 'Security'); } catch(e){}
+    await refresh();
+  };
+  var _origLoadSettings = window.loadSettings;
+  window.loadSettings = function(){ var r = _origLoadSettings ? _origLoadSettings.apply(this, arguments) : undefined; renderHubAccess(); return r; };
+
+  // ---- Alerts: new pending company or new open ticket, while this tab is open ----
+  var seenPending = null, seenTickets = null, notifyAsked = false;
+  function beep(){
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.08;
+      o.connect(g); g.connect(ctx.destination); o.start();
+      setTimeout(function(){ o.stop(); ctx.close(); }, 220);
+    } catch(e){}
+  }
+  function desktopNotify(title, body){
+    try {
+      if (!('Notification' in window)) return;
+      if (!notifyAsked) { notifyAsked = true; Notification.requestPermission(); }
+      if (Notification.permission === 'granted') new Notification(title, { body: body });
+    } catch(e){}
+  }
+  function checkForAlerts(){
+    var nowPending = new Set(rows.filter(function(r){ return r.status === 'pending'; }).map(function(r){ return r.company_id; }));
+    var nowTickets = new Set(tix.filter(function(t){ return t.status === 'open' && t.last_sender === 'customer'; }).map(function(t){ return t.id; }));
+    if (seenPending !== null){
+      var newP = Array.from(nowPending).filter(function(id){ return !seenPending.has(id); });
+      var newT = Array.from(nowTickets).filter(function(id){ return !seenTickets.has(id); });
+      if (newP.length || newT.length){
+        beep();
+        if (newP.length) desktopNotify('New company waiting for approval', newP.length + ' new registration(s) need approval.');
+        if (newT.length) desktopNotify('New support message', newT.length + ' new customer message(s) came in.');
+      }
+    }
+    seenPending = nowPending; seenTickets = nowTickets;
+  }
+
+
+  // ---- Revenue / growth dashboard card ----------------------------------
+  function monthKey(d){ d = new Date(d); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  function monthLabel(k){ var p = k.split('-'); var names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[Number(p[1]) - 1] + ' ' + p[0]; }
+  function renderRevenueCard(){
+    var box = document.getElementById('hubRevenueCard'); if (!box) return;
+    var completed = pays.filter(function(p){ return p.status === 'Completed'; });
+    var totalRevenue = completed.reduce(function(s, p){ return s + Number(p.amount || 0); }, 0);
+    var now = new Date(), thisMonth = monthKey(now);
+    var thisMonthRev = completed.filter(function(p){ return monthKey(p.created_at) === thisMonth; }).reduce(function(s, p){ return s + Number(p.amount || 0); }, 0);
+    var last6 = [];
+    for (var i = 5; i >= 0; i--){ var d = new Date(now.getFullYear(), now.getMonth() - i, 1); last6.push(monthKey(d)); }
+    var byMonth = {}; last6.forEach(function(k){ byMonth[k] = 0; });
+    completed.forEach(function(p){ var k = monthKey(p.created_at); if (k in byMonth) byMonth[k] += Number(p.amount || 0); });
+    var maxRev = Math.max.apply(null, last6.map(function(k){ return byMonth[k]; }).concat([1]));
+    var bars = last6.map(function(k){
+      var h2 = Math.max(4, Math.round((byMonth[k] / maxRev) * 64));
+      return '<div class="flex flex-col items-center gap-1" style="width:44px"><div class="text-[10px] text-gray-400">' + (byMonth[k] ? Math.round(byMonth[k] / 1000) + 'k' : '') + '</div>' +
+        '<div style="height:64px" class="flex items-end"><div style="width:20px;height:' + h2 + 'px;background:#2563eb;border-radius:3px 3px 0 0"></div></div>' +
+        '<div class="text-[10px] text-gray-500">' + monthLabel(k).split(' ')[0] + '</div></div>';
+    }).join('');
+    var active = companies.filter(function(c){ return c.status === 'Active'; }).length;
+    var suspended = companies.filter(function(c){ return c.status === 'Suspended' || c.status === 'Expired'; }).length;
+    var pending = companies.filter(function(c){ return c.status === 'Pending'; }).length;
+    var totalKnown = active + suspended + pending || 1;
+    function seg(n, color){ return n ? '<div style="width:' + (n / totalKnown * 100) + '%;background:' + color + '"></div>' : ''; }
+    box.innerHTML =
+      '<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">' +
+      '<div class="bg-white p-5 rounded-xl border border-gray-200"><div class="text-xs text-gray-500">Total revenue (all time)</div><div class="text-2xl font-extrabold text-gray-900 mt-1">KES ' + totalRevenue.toLocaleString() + '</div><div class="text-xs text-gray-500 mt-2">This month: <span class="font-semibold text-gray-700">KES ' + thisMonthRev.toLocaleString() + '</span></div></div>' +
+      '<div class="bg-white p-5 rounded-xl border border-gray-200"><div class="text-xs text-gray-500 mb-2">Last 6 months</div><div class="flex items-end justify-between">' + bars + '</div></div>' +
+      '<div class="bg-white p-5 rounded-xl border border-gray-200"><div class="text-xs text-gray-500 mb-2">Companies (' + totalKnown + ')</div>' +
+      '<div class="flex h-3 rounded-full overflow-hidden mb-3">' + seg(active, '#059669') + seg(pending, '#d97706') + seg(suspended, '#dc2626') + '</div>' +
+      '<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">' +
+      '<span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#059669"></span>Active ' + active + '</span>' +
+      '<span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#d97706"></span>Pending ' + pending + '</span>' +
+      '<span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#dc2626"></span>Suspended ' + suspended + '</span></div></div>' +
+      '</div>';
+  }
 
   function start(){ if (!localStorage.getItem('developerSession')) { pill(); return; } roleCheck().then(refresh); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
