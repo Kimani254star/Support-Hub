@@ -2473,8 +2473,10 @@ async function login() {
     if (!u || !p) { errEl.textContent = "Enter your email and password."; errEl.style.display = "block"; return; }
     if (btn) { btn.disabled = true; btn.textContent = "Signing in\u2026"; }
     try {
-      if (!window.supabase || !window.__SUPA_URL__) throw new Error("Cloud connection unavailable. Check your internet and reload.");
-      var sbAuth = window.supabase.createClient(window.__SUPA_URL__, window.__SUPA_KEY__, { auth: { storageKey: "acacia-hub-auth", persistSession: true } });
+      var SUPA_URL = window.__SUPA_URL__ || "https://xglsampckermarjpczdf.supabase.co";
+      var SUPA_KEY = window.__SUPA_KEY__ || "sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A";
+      if (!window.supabase) throw new Error("Cloud connection unavailable. Check your internet and reload.");
+      var sbAuth = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { storageKey: "acacia-hub-auth", persistSession: true } });
       var r = await sbAuth.auth.signInWithPassword({ email: u, password: p });
       if (r.error) throw new Error("Incorrect email or password.");
       var user = r.data.user;
@@ -4698,6 +4700,7 @@ function devAutoRefresh(){
 /* Support Hub cloud control: approve new accounts, deactivate on expiry, live user counts. */
 (function(){
   var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
+  window.__SUPA_URL__ = URL_; window.__SUPA_KEY__ = KEY_;
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
   var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], busy = false;
