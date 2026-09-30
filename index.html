@@ -495,6 +495,53 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 #homePage .hp-getstarted{padding:10px 14px;}
 #homePage .hp-preview,#homePage .hp-form-card,#homePage .hp-feature-main,#homePage .hp-feature-side{padding:24px;}
 }
+
+/* single-view navigation: only the chosen page shows */
+#homePage .hp-page{display:none;}
+#homePage .hp-page.hp-active{display:block;animation:hpFade .35s ease;}
+#homePage .hp-hero.hp-active{display:flex;}
+#homePage .hp-section.hp-page,#homePage .hp-section-alt.hp-page{margin-top:80px;min-height:calc(100vh - 80px);}
+#homePage .hp-nav a.hp-current{color:var(--hp-accent);font-weight:700;}
+@keyframes hpFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+#homePage .hp-billing{display:flex;justify-content:center;align-items:center;gap:12px;margin:0 auto 36px;font-weight:600;color:var(--hp-ink);}
+#homePage .hp-billing em{font-style:normal;color:var(--hp-accent);font-size:13px;}
+#homePage .hp-switch{position:relative;width:48px;height:26px;display:inline-block;cursor:pointer;}
+#homePage .hp-switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1;}
+#homePage .hp-switch i{position:absolute;inset:0;background:var(--hp-accent);border-radius:999px;transition:.2s;}
+#homePage .hp-switch i::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;}
+#homePage .hp-switch input:checked+i::after{transform:translateX(22px);}
+#homePage .hp-switch input:focus-visible+i{outline:3px solid var(--hp-accent-light);outline-offset:2px;}
+#homePage .hp-tiers6{max-width:1400px;margin:0 auto;display:grid;grid-template-columns:repeat(6,1fr);gap:16px;align-items:stretch;}
+#homePage .hp-tiers6 .hp-tier{padding:28px 18px 20px;display:flex;flex-direction:column;}
+#homePage .hp-tiers6 .hp-tier h3{font-size:19px;margin-bottom:2px;}
+#homePage .hp-tiers6 .hp-tag{font-size:13px;color:var(--hp-muted);margin-bottom:14px;min-height:2.6em;}
+#homePage .hp-tiers6 .hp-price{font-size:24px;margin-bottom:14px;}
+#homePage .hp-tiers6 .hp-price.hp-custom{font-size:20px;}
+#homePage .hp-feats{list-style:none;margin:0 0 8px;padding:0;flex:1;}
+#homePage .hp-feats li{font-size:13px;line-height:1.45;color:var(--hp-text);padding:7px 0;border-top:1px solid var(--hp-soft);}
+#homePage .hp-feats li:first-child{border-top:0;}
+#homePage .hp-feats li.hp-extra{display:none;}
+#homePage .hp-tier.hp-open .hp-feats li.hp-extra{display:block;}
+#homePage .hp-more{background:none;border:0;color:var(--hp-accent);font-size:12px;font-weight:700;text-align:left;padding:4px 0 14px;cursor:pointer;}
+#homePage .hp-more:hover{text-decoration:underline;}
+#homePage .hp-tier-btn{display:block;text-align:center;background:var(--hp-accent);color:#fff;font-weight:600;font-size:14px;padding:10px 12px;border-radius:8px;transition:.2s;}
+#homePage .hp-tier-btn:hover{background:var(--hp-accent-d);}
+#homePage .hp-subhead{text-align:center;margin:64px auto 20px;}
+#homePage .hp-subhead h3{font-size:24px;font-weight:800;color:var(--hp-ink);margin-bottom:6px;}
+#homePage .hp-subhead p{font-size:15px;color:var(--hp-muted);}
+#homePage .hp-tablewrap{max-width:1000px;margin:0 auto;overflow-x:auto;border:1px solid var(--hp-line);border-radius:12px;background:var(--hp-card);}
+#homePage .hp-table{width:100%;border-collapse:collapse;font-size:14px;color:var(--hp-text);}
+#homePage .hp-table th,#homePage .hp-table td{padding:12px 16px;text-align:left;border-bottom:1px solid var(--hp-soft);white-space:nowrap;}
+#homePage .hp-table thead th{background:var(--hp-alt);color:var(--hp-ink);font-weight:700;}
+#homePage .hp-table tbody tr:last-child td,#homePage .hp-table tbody tr:last-child th{border-bottom:0;}
+#homePage .hp-limits th,#homePage .hp-limits td{text-align:center;}
+#homePage .hp-limits th:first-child,#homePage .hp-limits td:first-child{text-align:left;}
+#homePage .hp-limits tbody th{color:var(--hp-ink);font-weight:600;}
+#homePage .hp-yes{color:#16a34a;font-weight:600;}
+@media (max-width:1279px){#homePage .hp-tiers6{grid-template-columns:repeat(3,1fr);}}
+@media (max-width:899px){#homePage .hp-tiers6{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:639px){#homePage .hp-tiers6{grid-template-columns:1fr;}}
 </style>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 </head>
@@ -531,7 +578,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </header>
 
-  <section class="hp-hero">
+  <section class="hp-hero hp-page" data-page="top">
     <div class="hp-slides" aria-hidden="true">
       <div class="hp-slide active" style="background-image:url('https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1920&q=80');"></div>
       <div class="hp-slide" style="background-image:url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1920&q=80');"></div>
@@ -562,7 +609,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </section>
 
-  <section class="hp-section" id="about">
+  <section class="hp-section hp-page" id="about" data-page="about">
     <div class="hp-two">
       <div class="hp-text">
         <div class="hp-title left">
@@ -592,7 +639,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </section>
 
-  <section class="hp-section-alt" id="services">
+  <section class="hp-section-alt hp-page" id="services" data-page="services">
     <div class="hp-title">
       <span>What I do</span>
       <h2>Build it, launch it, keep it running</h2>
@@ -617,7 +664,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </section>
 
-  <section class="hp-section" id="process">
+  <section class="hp-section hp-page" id="process" data-page="process">
     <div class="hp-title">
       <span>How I work</span>
       <h2>From first conversation to long-term support</h2>
@@ -642,7 +689,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </section>
 
-  <section class="hp-section-alt" id="work">
+  <section class="hp-section-alt hp-page" id="work" data-page="work">
     <div class="hp-title">
       <span>What I've built</span>
       <h2>A full business suite, plus standalone finance tools</h2>
@@ -725,35 +772,166 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </section>
 
-  <section class="hp-section" id="pricing">
+  <section class="hp-section hp-page" id="pricing" data-page="pricing">
     <div class="hp-title">
       <span>Pricing</span>
-      <h2>Start free, move up when you need to</h2>
-      <p>Acacia Books runs on a simple ladder: start free, move up a tier the moment you need it. Every plan shares the same data, so nothing gets re-entered.</p>
+      <h2>Pricing that grows with the business</h2>
+      <p>Start on Free, move up a tier the moment you need it &mdash; every plan shares the same data, so nothing gets re-entered.</p>
     </div>
-    <div class="hp-tiers">
+    <div class="hp-billing">
+      <span>Monthly</span>
+      <label class="hp-switch"><input type="checkbox" id="hpBilling" onchange="hpBillingToggle()" aria-label="Bill yearly"><i></i></label>
+      <span>Yearly <em>(2 months free)</em></span>
+    </div>
+    <div class="hp-tiers6">
       <div class="hp-tier">
         <h3>Free</h3>
-        <div class="hp-price">KES 0</div>
-        <p>Dashboard, Funds, Reports, Inventory, Customers, Suppliers, and Accountant at a basic level.</p>
+        <div class="hp-tag">Start your business</div>
+        <div class="hp-price"><span class="hp-amt" data-month="0" data-year="0">KES 0</span><small class="hp-per">/mo</small></div>
+        <ul class="hp-feats">
+          <li>📦 Inventory &amp; Stock Movements</li>
+          <li>👥 Customers, Invoices &amp; Receipts</li>
+          <li>🚚 Suppliers &amp; Supplier Payments</li>
+          <li>🧾 Operational Costs</li>
+          <li>🧮 Manual Journals &amp; Chart of Accounts</li>
+          <li class="hp-extra">🏦 Current Accounts</li>
+          <li class="hp-extra">💵 Employees, Earnings &amp; Attendance</li>
+          <li class="hp-extra">📁 Files &amp; Recycle Bin</li>
+          <li class="hp-extra">⚙️ Org Profile, Preferences, Users</li>
+          <li class="hp-extra">📬 Acacia Mail included free</li>
+          <li class="hp-extra">📏 1 user · 100 products · 100 customers · 25 invoices/mo · 1 warehouse · 100 MB</li>
+        </ul>
+        <button type="button" class="hp-more" onclick="hpMore(this)" data-n="6">Show 6 more features &#9662;</button>
+        <a href="https://kimani254star.github.io/acacia-books/" target="_blank" rel="noopener" class="hp-tier-btn">Get Started</a>
+      </div>
+      <div class="hp-tier">
+        <h3>Starter</h3>
+        <div class="hp-tag">Run your daily operations</div>
+        <div class="hp-price"><span class="hp-amt" data-month="1500" data-year="15000">KES 1,500</span><small class="hp-per">/mo</small></div>
+        <ul class="hp-feats">
+          <li><strong>Everything in Free, plus:</strong></li>
+          <li>🧾 Quotes &amp; Delivery</li>
+          <li>📄 Customer &amp; Supplier Statements</li>
+          <li>📥 GRN &amp; Supplier Bills</li>
+          <li>🏬 Warehouses, Shipments &amp; Price Lists</li>
+          <li class="hp-extra">🧮 VAT &amp; Transaction Locking</li>
+          <li class="hp-extra">🔗 Integrations &amp; Settings Templates</li>
+          <li class="hp-extra">🗂️ Subscription Plans tracking</li>
+          <li class="hp-extra">📏 3 users · 1,000 products · 500 customers · 200 invoices/mo · 2 warehouses · 1 GB</li>
+        </ul>
+        <button type="button" class="hp-more" onclick="hpMore(this)" data-n="4">Show 4 more features &#9662;</button>
+        <a href="https://kimani254star.github.io/acacia-books/" target="_blank" rel="noopener" class="hp-tier-btn">Choose</a>
       </div>
       <div class="hp-tier featured">
         <div class="hp-pop">Most popular</div>
         <h3>Pro</h3>
-        <div class="hp-price">KES 5,000<small>/mo</small></div>
-        <p>Adds advanced reporting and analytics for growing businesses.</p>
+        <div class="hp-tag">Run your complete business</div>
+        <div class="hp-price"><span class="hp-amt" data-month="3500" data-year="35000">KES 3,500</span><small class="hp-per">/mo</small></div>
+        <ul class="hp-feats">
+          <li><strong>Everything in Starter, plus:</strong></li>
+          <li>🧾 Sales Orders &amp; Purchase Orders</li>
+          <li>↩️ Credit Notes, Debit Notes &amp; Returns</li>
+          <li>📦 Inventory Costing</li>
+          <li>🧮 Recurring Journals &amp; Currency Adjustments</li>
+          <li class="hp-extra">📊 Budgets</li>
+          <li class="hp-extra">💵 Gross Pay &amp; Payslips</li>
+          <li class="hp-extra">🗂️ Projects</li>
+          <li class="hp-extra">📏 10 users · 5,000 products · 2,500 customers · 1,000 invoices/mo · 5 warehouses · 5 GB</li>
+        </ul>
+        <button type="button" class="hp-more" onclick="hpMore(this)" data-n="4">Show 4 more features &#9662;</button>
+        <a href="https://kimani254star.github.io/acacia-books/" target="_blank" rel="noopener" class="hp-tier-btn">Choose</a>
+      </div>
+      <div class="hp-tier">
+        <h3>Business</h3>
+        <div class="hp-tag">Automate and scale</div>
+        <div class="hp-price"><span class="hp-amt" data-month="7500" data-year="75000">KES 7,500</span><small class="hp-per">/mo</small></div>
+        <ul class="hp-feats">
+          <li><strong>Everything in Pro, plus:</strong></li>
+          <li>⚡ Bulk &amp; Recurring Invoices</li>
+          <li>⚡ Bulk Billing &amp; Bulk Costing</li>
+          <li>🧮 Tax Payments &amp; Tax Adjustments</li>
+          <li>🏛️ Non-Current Assets, Liabilities &amp; Equity</li>
+          <li class="hp-extra">💵 Statutory Deductions &amp; Payroll Reports</li>
+          <li class="hp-extra">📈 Project Revenue</li>
+          <li class="hp-extra">⚙️ System Configuration &amp; Integrations Hub</li>
+          <li class="hp-extra">🔍 User Activity</li>
+          <li class="hp-extra">📏 25 users · 25,000 products · 10,000 customers · 5,000 invoices/mo · 15 warehouses · 25 GB</li>
+        </ul>
+        <button type="button" class="hp-more" onclick="hpMore(this)" data-n="5">Show 5 more features &#9662;</button>
+        <a href="https://kimani254star.github.io/acacia-books/" target="_blank" rel="noopener" class="hp-tier-btn">Choose</a>
       </div>
       <div class="hp-tier">
         <h3>Enterprise</h3>
-        <div class="hp-price">KES 12,000<small>/mo</small></div>
-        <p>Multiple branches, full payroll, and priority support.</p>
+        <div class="hp-tag">Control your organization</div>
+        <div class="hp-price hp-custom">Custom</div>
+        <ul class="hp-feats">
+          <li><strong>Everything in Business, plus:</strong></li>
+          <li>👥 Custom user limits</li>
+          <li>💾 Custom storage</li>
+          <li>🔢 Custom transaction limits</li>
+          <li>🛡️ Advanced administration &amp; controls</li>
+          <li class="hp-extra">📈 Advanced reporting</li>
+          <li class="hp-extra">🔗 Enterprise integrations</li>
+          <li class="hp-extra">⚙️ Dedicated configuration</li>
+          <li class="hp-extra">🤝 Custom support arrangements</li>
+        </ul>
+        <button type="button" class="hp-more" onclick="hpMore(this)" data-n="4">Show 4 more features &#9662;</button>
+        <a href="#contact" data-scroll class="hp-tier-btn">Talk to Sales</a>
+      </div>
+      <div class="hp-tier">
+        <h3>All Access</h3>
+        <div class="hp-tag">Everything Acacia</div>
+        <div class="hp-price"><span class="hp-amt" data-month="15000" data-year="150000">KES 15,000</span><small class="hp-per">/mo</small></div>
+        <ul class="hp-feats">
+          <li><strong>Everything in Acacia Books, plus:</strong></li>
+          <li>📬 Acacia Mail</li>
+          <li>🤝 Acacia Books CRM</li>
+          <li>🗂️ Acacia Projects</li>
+          <li>💵 Acacia Payroll</li>
+          <li class="hp-extra">🛒 Acacia Sell</li>
+          <li class="hp-extra">✅ No separate companion-app subscriptions</li>
+          <li class="hp-extra">📏 Enterprise-level or custom limits</li>
+        </ul>
+        <button type="button" class="hp-more" onclick="hpMore(this)" data-n="3">Show 3 more features &#9662;</button>
+        <a href="https://kimani254star.github.io/acacia-books/" target="_blank" rel="noopener" class="hp-tier-btn">Choose</a>
       </div>
     </div>
-    <p class="hp-tier-note">Starter and Business tiers sit in between.</p>
-    <div class="hp-tier-cta"><a href="https://kimani254star.github.io/acacia-books/" target="_blank" rel="noopener" class="hp-btn">See all plans and sign up <i class="fa-solid fa-arrow-right"></i></a></div>
+
+    <div class="hp-subhead"><h3>Companion apps</h3><p>Add them to any plan, or get them all with All Access.</p></div>
+    <div class="hp-tablewrap">
+      <table class="hp-table">
+        <thead><tr><th>Companion App</th><th>Add-on price</th><th>All Access</th></tr></thead>
+        <tbody>
+          <tr><td>&#128236; Acacia Mail</td><td>Free</td><td class="hp-yes">&#10003; Included</td></tr>
+          <tr><td>&#129309; Acacia Books CRM</td><td>KES 1,200/month</td><td class="hp-yes">&#10003; Included</td></tr>
+          <tr><td>&#128194; Acacia Projects</td><td>KES 1,500/month</td><td class="hp-yes">&#10003; Included</td></tr>
+          <tr><td>&#128181; Acacia Payroll</td><td>KES 2,000/month</td><td class="hp-yes">&#10003; Included</td></tr>
+          <tr><td>&#128722; Acacia Sell</td><td>KES 2,500/month</td><td class="hp-yes">&#10003; Included</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="hp-subhead"><h3>Usage limits</h3><p>Every plan shares the same data &mdash; only the ceilings change.</p></div>
+    <div class="hp-tablewrap">
+      <table class="hp-table hp-limits">
+        <thead><tr><th>Limit</th><th>Free</th><th>Starter</th><th>Pro</th><th>Business</th><th>Enterprise</th></tr></thead>
+        <tbody>
+          <tr><th>Users</th><td>1</td><td>3</td><td>10</td><td>25</td><td>Custom</td></tr>
+          <tr><th>Warehouses</th><td>1</td><td>2</td><td>5</td><td>15</td><td>Custom</td></tr>
+          <tr><th>Customers</th><td>100</td><td>500</td><td>2,500</td><td>10,000</td><td>Custom</td></tr>
+          <tr><th>Suppliers</th><td>50</td><td>250</td><td>1,000</td><td>5,000</td><td>Custom</td></tr>
+          <tr><th>Products</th><td>100</td><td>1,000</td><td>5,000</td><td>25,000</td><td>Custom</td></tr>
+          <tr><th>Invoices / month</th><td>25</td><td>200</td><td>1,000</td><td>5,000</td><td>Custom</td></tr>
+          <tr><th>Bills / month</th><td>25</td><td>200</td><td>1,000</td><td>5,000</td><td>Custom</td></tr>
+          <tr><th>Projects</th><td>0</td><td>0</td><td>10</td><td>50</td><td>Custom</td></tr>
+          <tr><th>Payroll employees</th><td>5</td><td>25</td><td>100</td><td>500</td><td>Custom</td></tr>
+          <tr><th>File storage</th><td>100 MB</td><td>1 GB</td><td>5 GB</td><td>25 GB</td><td>Custom</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
-  <section class="hp-section-alt" id="faq">
+  <section class="hp-section-alt hp-page" id="faq" data-page="faq">
     <div class="hp-title">
       <span>Good questions</span>
       <h2>Frequently asked questions</h2>
@@ -783,7 +961,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </section>
 
-  <section class="hp-section" id="contact">
+  <section class="hp-section hp-page" id="contact" data-page="contact">
     <div class="hp-two">
       <div class="hp-text">
         <div class="hp-title left">
@@ -807,7 +985,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     </div>
   </section>
 
-  <section class="hp-cta">
+  <section class="hp-cta hp-page" data-page="top">
     <div class="hp-ctabox">
       <div>
         <h2>Ready to build something that lasts?</h2>
@@ -862,6 +1040,20 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
   </footer>
 
   <script>
+  function hpMore(btn){
+    var card=btn.closest('.hp-tier');
+    var open=card.classList.toggle('hp-open');
+    btn.innerHTML=open?'Show less &#9652;':'Show '+btn.getAttribute('data-n')+' more features &#9662;';
+  }
+  function hpBillingToggle(){
+    var yearly=document.getElementById('hpBilling').checked;
+    document.querySelectorAll('#homePage .hp-amt').forEach(function(el){
+      var p=yearly?+el.getAttribute('data-year'):+el.getAttribute('data-month');
+      el.textContent='KES '+p.toLocaleString('en-US');
+      var per=el.parentElement.querySelector('.hp-per');
+      if(per) per.textContent=yearly?'/yr':'/mo';
+    });
+  }
   (function(){
     var root=document.getElementById('homePage');
     // hero background slider
@@ -878,19 +1070,28 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
       var open=nav.classList.toggle('open');
       burger.setAttribute('aria-expanded',open?'true':'false');
     });
-    // smooth in-page scrolling without touching the rest of the app
+    // single-view navigation: each nav link shows only its own page
+    var pages=root.querySelectorAll('.hp-page');
+    var valid={top:1,about:1,services:1,process:1,work:1,pricing:1,faq:1,contact:1};
+    function show(id,push){
+      if(!valid[id]) id='top';
+      pages.forEach(function(p){p.classList.toggle('hp-active',p.getAttribute('data-page')===id);});
+      root.querySelectorAll('.hp-nav a').forEach(function(a){
+        a.classList.toggle('hp-current',a.getAttribute('href')==='#'+id);
+      });
+      nav.classList.remove('open');
+      burger.setAttribute('aria-expanded','false');
+      window.scrollTo(0,0);
+      if(push!==false){ try{history.pushState(null,'','#'+id);}catch(e){} }
+    }
     root.querySelectorAll('a[data-scroll]').forEach(function(a){
       a.addEventListener('click',function(e){
-        var id=a.getAttribute('href');
-        var target=id==='#top'?root:document.querySelector(id);
-        if(!target) return;
         e.preventDefault();
-        nav.classList.remove('open');
-        burger.setAttribute('aria-expanded','false');
-        if(id==='#top'){window.scrollTo({top:0,behavior:'smooth'});}
-        else{target.scrollIntoView({behavior:'smooth',block:'start'});}
+        show(a.getAttribute('href').slice(1));
       });
     });
+    window.addEventListener('popstate',function(){show((location.hash||'#top').slice(1),false);});
+    show((location.hash||'#top').slice(1),false);
   })();
   </script>
 
@@ -3003,8 +3204,14 @@ function renderUsers() {
                 <td><span class="${u.status === 'Active' ? 'text-green-600 font-bold' : 'text-red-500'}">${u.status || 'Active'}</span></td>
                 <td>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="previewUser(${u.id})">Preview</button>
+                    ${u.source === 'cloud' ? `
+                    <button class="bg-amber-600 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubResetPassword(${u.id})">Reset password</button>
+                    <button class="bg-slate-600 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubChangeEmail(${u.id})">Change email</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteUser(${u.id})">Delete</button>
+                    ` : `
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="openUserModal(${u.id})">Edit</button>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteUser(${u.id})">Delete</button>
+                    `}
                 </td>
             </tr>`;
         });
@@ -5281,6 +5488,7 @@ function devAutoRefresh(){
     else if (s === 'Active') out += b('+30d', "hubExtend('" + id + "',30)", 'bg-blue-900') + b('+1y', "hubExtend('" + id + "',365)", 'bg-blue-900') + b('Deactivate', "hubSuspend('" + id + "')", 'bg-red-600');
     else if (s === 'Suspended' || s === 'Expired' || s === 'Rejected') out += b('Reactivate', "hubReactivate('" + id + "')", 'bg-green-600');
     else if (s === 'Untracked') out += b('Start tracking', "hubTrack('" + id + "')", 'bg-blue-900');
+    if (s !== 'Untracked') out += b('Rename', "hubRenameCompany('" + id + "')", 'bg-slate-600');
     return out;
   }
   window.renderCompanies = function(){
@@ -5589,6 +5797,86 @@ function devAutoRefresh(){
       '<span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#dc2626"></span>Suspended ' + suspended + '</span></div></div>' +
       '</div>';
   }
+
+
+  // ---- Reset password / change email for a real (cloud) user account -----
+  // Matches Books' own scheme exactly: SHA-256(salt + ":" + password), hex.
+  // We can never see or recover someone's existing password - only Books,
+  // where it's typed, ever handles the plain text - but we can set a brand
+  // new one, or point the same account at a different email address.
+  function genSalt(){
+    var a = new Uint8Array(16); crypto.getRandomValues(a);
+    return Array.from(a).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  async function hashPw(password, salt){
+    var data = new TextEncoder().encode(salt + ':' + password);
+    var buf = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  async function fetchAccountRow(loginId){
+    var r = await sb.from('app_accounts').select('login_id,username,company_id,data').eq('login_id', loginId).maybeSingle();
+    if (r.error || !r.data) return null;
+    return r.data;
+  }
+  window.hubResetPassword = async function(id){
+    var u = users.find(function(x){ return x.id === id; }); if (!u || u.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var loginId = (u.email || u.username || '').toLowerCase();
+    var row = await fetchAccountRow(loginId);
+    if (!row){ alert('Could not find this account in app_accounts.'); return; }
+    var pw = prompt('New password for ' + (u.username || loginId) + ' (tell them this - it cannot be shown again):');
+    if (!pw) return;
+    if (pw.length < 4){ alert('Choose at least 4 characters.'); return; }
+    var salt = genSalt(), hash = await hashPw(pw, salt);
+    var data = Object.assign({}, row.data, { passwordHash: hash, passwordSalt: salt });
+    delete data.password;
+    var r = await sb.from('app_accounts').update({ data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Reset password for ' + loginId, 'Security'); } catch(e){}
+    alert('Password reset. Tell ' + (u.username || loginId) + ' their new password - it takes effect the moment they next sign in.');
+  };
+  window.hubChangeEmail = async function(id){
+    var u = users.find(function(x){ return x.id === id; }); if (!u || u.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var loginId = (u.email || u.username || '').toLowerCase();
+    var row = await fetchAccountRow(loginId);
+    if (!row){ alert('Could not find this account in app_accounts.'); return; }
+    var newEmail = prompt('New login email for ' + (u.username || loginId) + ':', loginId);
+    if (!newEmail) return;
+    newEmail = newEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) { alert('That does not look like an email address.'); return; }
+    if (newEmail === loginId) return;
+    var exists = await fetchAccountRow(newEmail);
+    if (exists){ alert('That email is already in use by another account.'); return; }
+    var data = Object.assign({}, row.data, { email: newEmail });
+    var r = await sb.from('app_accounts').update({ login_id: newEmail, data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Changed login email for ' + loginId + ' \u2192 ' + newEmail, 'Security'); } catch(e){}
+    alert('Done. They must sign in with ' + newEmail + ' from now on.');
+    await refresh();
+  };
+
+
+  window.hubRenameCompany = async function(id){
+    var c = companies.find(function(x){ return String(x.companyId) === String(id); }); if (!c || !c._row) return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var newName = prompt('New company name for "' + c.companyName + '":', c.companyName);
+    if (!newName || !newName.trim() || newName.trim() === c.companyName) return;
+    newName = newName.trim();
+    var r1 = await sb.from('acacia_company_status').update({ company_name: newName, updated_at: new Date().toISOString() }).eq('company_id', c.companyId);
+    if (r1.error) { alert('Failed: ' + r1.error.message); return; }
+    // Keep every login under this company showing the new name too.
+    var acc = await sb.from('app_accounts').select('login_id,data').eq('company_id', c.companyId);
+    if (!acc.error && acc.data){
+      for (var i = 0; i < acc.data.length; i++){
+        var row = acc.data[i], data = Object.assign({}, row.data, { companyName: newName });
+        await sb.from('app_accounts').update({ data: data }).eq('login_id', row.login_id);
+      }
+    }
+    try { addLog('Warning', who(), 'Renamed company "' + c.companyName + '" \u2192 "' + newName + '"', 'Companies'); } catch(e){}
+    alert('Renamed. It updates for their team the next time they sign in.');
+    await refresh();
+  };
 
   function start(){ if (!localStorage.getItem('developerSession')) { pill(); return; } roleCheck().then(refresh); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
