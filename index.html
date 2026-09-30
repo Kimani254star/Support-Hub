@@ -4951,6 +4951,7 @@ function devAutoRefresh(){
     updateBulkBar('companies');
   };
   // ---- Plan upgrade requests (Support page) ----
+  function upMoney(u){ return (/enterprise/i.test(u.requested_plan || '') && !Number(u.amount)) ? 'Custom price' : money(u.amount); }
   function renderUpgrades(){
     var tb = document.getElementById('upgradeReqTable'); if (!tb) return;
     var pend = upgrades.filter(function(u){ return u.status === 'pending'; });
@@ -4965,7 +4966,7 @@ function devAutoRefresh(){
         : '<span class="text-xs text-gray-400">' + esc(u.decided_by || '') + (u.decided_at ? ' \u00b7 ' + fmt(u.decided_at) : '') + '</span>';
       return '<tr class="border-t"><td class="p-3 pl-5"><div class="font-medium text-gray-900">' + esc(u.company_name || u.company_id) + '</div><div class="text-xs text-gray-500">' + esc(u.email || '') + ' \u00b7 ' + ago(u.created_at) + '</div></td>' +
         '<td class="p-3">' + esc(u.current_plan || 'Free') + '</td>' +
-        '<td class="p-3"><span class="font-semibold">' + esc(u.requested_plan) + '</span><div class="text-xs text-gray-500">' + money(u.amount) + ' \u00b7 ' + esc(u.billing || 'Monthly') + '</div></td>' +
+        '<td class="p-3"><span class="font-semibold">' + esc(u.requested_plan) + '</span><div class="text-xs text-gray-500">' + upMoney(u) + ' \u00b7 ' + esc(u.billing || 'Monthly') + '</div></td>' +
         '<td class="p-3 text-gray-600 max-w-xs">' + esc(u.message || '-') + '</td>' +
         '<td class="p-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (stBadge[u.status] || 'bg-gray-100 text-gray-700') + '">' + esc(title(u.status)) + '</span></td>' +
         '<td class="p-3 pr-5 text-right">' + act + '</td></tr>';
@@ -4979,9 +4980,11 @@ function devAutoRefresh(){
     var u = upgrades.find(function(x){ return String(x.id) === String(id); }); if (!u) return;
     var c = co(u.company_id), cur = (c._row || {}).paid_until;
     var def = (cur && new Date(cur) > new Date()) ? fmt(cur) : plus(30);
-    if (!confirm('Upgrade ' + (u.company_name || u.company_id) + ' from ' + (u.current_plan || 'Free') + ' to ' + u.requested_plan + ' (' + money(u.amount) + ')?')) return;
+    if (!confirm('Upgrade ' + (u.company_name || u.company_id) + ' from ' + (u.current_plan || 'Free') + ' to ' + u.requested_plan + ' (' + upMoney(u) + ')?')) return;
+    var price = null;
+    if (/enterprise/i.test(u.requested_plan)){ var pv = prompt('Enterprise is custom-priced. Agreed monthly price in KES:', String(u.amount || '')); if (pv === null) return; price = Number(String(pv).replace(/[^0-9.]/g, '')); if (!(price >= 0)){ alert('Enter a valid amount'); return; } }
     var pu = askDate(def); if (pu === undefined) return;
-    var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: true, p_paid_until: pu, p_note: null });
+    var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: true, p_paid_until: pu, p_note: null, p_price: price });
     if (r.error){ alert('Failed: ' + r.error.message); return; }
     try { addLog('Info', who(), 'Approved upgrade ' + (u.company_name || u.company_id) + ' -> ' + u.requested_plan, 'Companies'); } catch(e){}
     await refresh();
