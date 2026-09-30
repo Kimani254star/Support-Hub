@@ -2877,9 +2877,11 @@ function normalizeUsers(list){
     (list || []).forEach(u => {
         if (!u || typeof u !== "object" || !(u.username || u.email)) return;
         const key = String(u.email || u.username).toLowerCase();
-        const rec = Object.assign({}, map.get(key) || {}, u, {
+        const prev = map.get(key) || {};
+        const realName = (prev.username && !/@/.test(prev.username) && /@/.test(String(u.username || ""))) ? prev.username : u.username;
+        const rec = Object.assign({}, prev, u, {
             id: u.id || devHashId(key),
-            username: u.username || String(u.email).split("@")[0],
+            username: realName || String(u.email).split("@")[0],
             email: u.email || "",
             company: u.company || u.companyName || u.companyId || "",
             plan: devTitle(u.plan, "Free"),
@@ -5492,10 +5494,14 @@ function devAutoRefresh(){
       d.companyId = d.companyId || a.company_id; d.email = d.email || a.login_id; d.username = d.username || a.username;
       var r = byId[d.companyId];
       if (r){ var e = eff(r); d.status = e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'); }
+      if (String(d.role || '').toLowerCase() === 'custom' && d.customRole) d.role = d.customRole;
       d.source = 'cloud';
       return d;
     });
-    var uu = usage.map(function(x){ var r = byId[x.company_id], e = r ? eff(r) : 'active';
+    /* App-usage rows only carry a login key (often the email) and a generic role. They must never overwrite the real
+       username/role of an account that already exists, so keep them only for logins with no account record. */
+    var __have = {}; cu.forEach(function(d){ [d.email, d.username].forEach(function(v){ if (v) __have[String(v).toLowerCase()] = 1; }); });
+    var uu = usage.filter(function(x){ return !__have[String(x.user_key || '').toLowerCase()]; }).map(function(x){ var r = byId[x.company_id], e = r ? eff(r) : 'active';
       return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'), source: 'cloud' }; });
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
