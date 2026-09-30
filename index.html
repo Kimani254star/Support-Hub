@@ -3062,7 +3062,7 @@ async function login() {
       if (r.error) throw new Error("Incorrect email or password.");
       var user = r.data.user;
       var role = user && user.app_metadata && user.app_metadata.role;
-      if (role !== "hub_admin" && role !== "hub_viewer") {
+      if (["hub_admin","hub_viewer","hub_accounts","hub_support"].indexOf(role) === -1) {
         await sbAuth.auth.signOut();
         throw new Error("This account is not authorized for the Support Hub.");
       }
@@ -3072,7 +3072,7 @@ async function login() {
         throw new Error("This email has not been given access to the Support Hub. Ask an admin to add it under Settings.");
       }
       var fullName = (user.user_metadata && user.user_metadata.fullName) || (user.email || "").split("@")[0];
-      var roleLabel = role === "hub_admin" ? "Administrator" : "Viewer (read-only)";
+      var roleLabel = { hub_admin: "Administrator", hub_viewer: "Viewer (read-only)", hub_accounts: "Accounts", hub_support: "Customer Care" }[role] || "Viewer (read-only)";
       const session = { email: user.email, role: roleLabel, hubRole: role, fullName: fullName, loginTime: new Date().toISOString() };
       localStorage.setItem("developerSession", JSON.stringify(session));
       document.getElementById("welcome").textContent = `Welcome, ${fullName}`;
@@ -5298,6 +5298,78 @@ function devAutoRefresh(){
   function eff(r){ return (r.status === 'active' && r.paid_until && new Date(r.paid_until) < new Date()) ? 'expired' : r.status; }
   function who(){ try { return (JSON.parse(localStorage.getItem('developerSession') || '{}').fullName) || 'Developer'; } catch(e){ return 'Developer'; } }
 
+
+  /* ---- Permanent-delete memory ("tombstones") ----
+     Deleted companies/users are remembered so they can never be rebuilt from
+     leftover usage rows, cached accounts or this browser's local copies. */
+  var TOMB_KEY = 'acacia_hub_deleted';
+  function tombs(){ try { var t = JSON.parse(localStorage.getItem(TOMB_KEY) || '{}'); return { companies: t.companies || [], users: t.users || [] }; } catch(e){ return { companies: [], users: [] }; } }
+  function saveTombs(t){ try { localStorage.setItem(TOMB_KEY, JSON.stringify(t)); } catch(e){} }
+  function low(v){ return String(v == null ? '' : v).toLowerCase(); }
+  function addTomb(kind, v){ v = low(v); if (!v) return; var t = tombs(); if (t[kind].indexOf(v) === -1){ t[kind].push(v); saveTombs(t); } }
+  function scrubLocalStores(){
+    var t = tombs(); if (!t.companies.length && !t.users.length) return;
+    var bases = ['users', 'acacia_users', 'companies', 'acacia_companies'];
+    for (var i = 0; i < localStorage.length; i++){
+      var k = localStorage.key(i); if (!k || bases.indexOf(k.split('::')[0]) === -1) continue;
+      try {
+        var arr = JSON.parse(localStorage.getItem(k) || 'null'); if (!Array.isArray(arr)) continue;
+        var keep = arr.filter(function(x){
+          if (!x || typeof x !== 'object') return true;
+          var cid = low(x.companyId || x.id || x.companyName || x.name);
+          var ukey = low(x.email || x.username);
+          var isCompanyRec = k.split('::')[0].indexOf('compan') === 0;
+          if (isCompanyRec) return t.companies.indexOf(cid) === -1;
+          return t.users.indexOf(ukey) === -1 && t.companies.indexOf(low(x.companyId || x.companyName)) === -1;
+        });
+        if (keep.length !== arr.length) localStorage.setItem(k, JSON.stringify(keep));
+      } catch(e){}
+    }
+  }
+  function applyTombstones(){
+    var t = tombs(); if (!t.companies.length && !t.users.length) return;
+    rows  = rows.filter(function(r){ return t.companies.indexOf(low(r.company_id)) === -1; });
+    accts = accts.filter(function(a){ return t.companies.indexOf(low(a.company_id)) === -1 && t.users.indexOf(low(a.login_id)) === -1 && t.users.indexOf(low(a.username)) === -1; });
+    usage = usage.filter(function(x){ return t.companies.indexOf(low(x.company_id)) === -1 && t.users.indexOf(low(x.user_key)) === -1; });
+    tix   = tix.filter(function(x){ return t.companies.indexOf(low(x.company_id)) === -1; });
+    scrubLocalStores();
+  }
+  function failNote(what, errs){
+    alert('Could not fully delete ' + what + ' from Supabase:\n\n' + errs.join('\n') +
+      '\n\nIt is now hidden in this browser, but to remove it for good the hub admin needs DELETE permission on those tables (RLS policy).');
+  }
+
+
+  /* ---- Role-based access: Accounts (payments) and Customer Care (inquiries) ---- */
+  var hubRole = '';
+  var ROLE_PAGES = { hub_accounts: ['payments', 'companies'], hub_support: ['support'] };
+  var ROLE_NAME = { hub_admin: 'Admin', hub_viewer: 'Viewer (read-only)', hub_accounts: 'Accounts', hub_support: 'Customer Care' };
+  var ROLE_CSS = { hub_admin: 'text-emerald-700 bg-emerald-50', hub_viewer: 'text-blue-700 bg-blue-50', hub_accounts: 'text-purple-700 bg-purple-50', hub_support: 'text-amber-700 bg-amber-50' };
+  (function(){
+    var st = document.createElement('style');
+    st.textContent = 'body.role-limited #companiesTable td.text-right button,body.role-limited #paymentsTable td button,body.role-limited #upgradeReqTable button,body.role-limited #companies .bg-rose-600,body.role-limited #payments .bg-red-600{display:none!important}' +
+      'body.role-limited #companies input[type=checkbox],body.role-limited #payments input[type=checkbox]{display:none}';
+    document.head.appendChild(st);
+    var _open = window.openPage;
+    window.openPage = function(id){
+      var allow = ROLE_PAGES[hubRole];
+      if (allow && allow.indexOf(id) === -1) id = allow[0];
+      return _open.call(this, id);
+    };
+  })();
+  function applyRole(){
+    var allow = ROLE_PAGES[hubRole];
+    document.body.classList.toggle('role-limited', !!allow);
+    document.querySelectorAll('button[onclick^="openPage("]').forEach(function(b){
+      var m = /openPage\('([^']+)'\)/.exec(b.getAttribute('onclick') || ''); if (!m) return;
+      var li = b.closest('li') || b; li.style.display = (!allow || allow.indexOf(m[1]) > -1) ? '' : 'none';
+    });
+    if (allow){
+      var cur = document.querySelector('.page.active');
+      if (!cur || allow.indexOf(cur.id) === -1) window.openPage(allow[0]);
+    }
+  }
+
   function pill(){
     var p = document.getElementById('hubCloudPill');
     if (!p){ p = document.createElement('div'); p.id = 'hubCloudPill';
@@ -5308,8 +5380,9 @@ function devAutoRefresh(){
   }
   async function roleCheck(){
     try { var s = await sb.auth.getSession(); var u = s && s.data && s.data.session && s.data.session.user;
-      canWrite = !!(u && u.app_metadata && u.app_metadata.role === 'hub_admin'); } catch(e){ canWrite = false; }
-    pill();
+      hubRole = (u && u.app_metadata && u.app_metadata.role) || '';
+      canWrite = hubRole === 'hub_admin'; } catch(e){ canWrite = false; }
+    pill(); applyRole();
   }
   async function signIn(email, pass){
     try { var r = await sb.auth.signInWithPassword({ email: email, password: pass });
@@ -5339,6 +5412,7 @@ function devAutoRefresh(){
         if (!u.error){ exp[i].status = 'suspended'; try { addLog('Warning', 'System', 'Auto-deactivated (payment expired): ' + (exp[i].company_name || exp[i].company_id), 'Companies'); } catch(e){} }
       }
     }
+    applyTombstones();
     window.__acxCloudReady = true;
     merge(); mergeTickets(); mergePayments(); renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
   }
@@ -5587,38 +5661,55 @@ function devAutoRefresh(){
   var _origDeleteCompany = window.deleteCompany, _origDeleteUser = window.deleteUser;
   var _origBulkDeleteCompanies = window.bulkDeleteCompanies, _origBulkDeleteUsers = window.bulkDeleteUsers;
 
-  async function purgeCompany(id){
-    await sb.from('acacia_company_status').delete().eq('company_id', id);
-    await sb.from('app_accounts').delete().eq('company_id', id);
-    await sb.from('acacia_app_usage').delete().eq('company_id', id);
-    await sb.from('acacia_tickets').delete().eq('company_id', id);
+  async function delRows(q, label, errs){
+    var r = await q.select();
+    if (r.error) errs.push(label + ': ' + r.error.message);
+    return r;
+  }
+  async function purgeCompany(id, name){
+    var errs = [];
+    addTomb('companies', id); if (name) addTomb('companies', name);
+    var st = await delRows(sb.from('acacia_company_status').delete().eq('company_id', id), 'company record', errs);
+    if (!st.error && (!st.data || !st.data.length)) errs.push('company record: 0 rows deleted (no permission?)');
+    await delRows(sb.from('app_accounts').delete().eq('company_id', id), 'user accounts', errs);
+    await delRows(sb.from('acacia_app_usage').delete().eq('company_id', id), 'app usage', errs);
+    await delRows(sb.from('acacia_tickets').delete().eq('company_id', id), 'tickets', errs);
+    scrubLocalStores();
+    return errs;
   }
   async function purgeUser(login){
-    login = String(login || '').toLowerCase(); if (!login) return;
-    await sb.from('app_accounts').delete().or('login_id.eq.' + login + ',username.eq.' + login);
-    await sb.from('acacia_app_usage').delete().eq('user_key', login);
+    login = String(login || '').toLowerCase(); if (!login) return [];
+    var errs = [];
+    addTomb('users', login);
+    await delRows(sb.from('app_accounts').delete().or('login_id.eq.' + login + ',username.eq.' + login), 'user account', errs);
+    await delRows(sb.from('acacia_app_usage').delete().eq('user_key', login), 'user usage', errs);
+    scrubLocalStores();
+    return errs;
   }
 
   window.deleteCompany = async function(idOrName){
     var c = companies.find(function(x){ return String(x.id || x.companyName) == String(idOrName); });
-    if (!c || !c._row){ return _origDeleteCompany ? _origDeleteCompany.apply(this, arguments) : undefined; }
+    if (!c){ return _origDeleteCompany ? _origDeleteCompany.apply(this, arguments) : undefined; }
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     if (!confirm('Permanently delete "' + (c.companyName || idOrName) + '"? This removes the company, its users and its tickets from Supabase - they will not come back. Their business records in company_state are kept.')) return;
-    await purgeCompany(c.companyId);
+    var errs = await purgeCompany(c.companyId, c.companyName);
+    if (errs.length) failNote('"' + (c.companyName || idOrName) + '"', errs);
     try { addLog('Error', who(), 'Permanently deleted company: ' + (c.companyName || idOrName), 'Companies'); } catch(e){}
     await refresh();
   };
   window.bulkDeleteCompanies = async function(){
     var ids = Array.from(bulkSelections.companies);
-    var cloudIds = ids.filter(function(id){ var c = companies.find(function(x){ return String(x.id || x.companyName) === String(id); }); return c && c._row; });
+    var cloudIds = ids.filter(function(id){ return companies.some(function(x){ return String(x.id || x.companyName) === String(id); }); });
     var localIds = ids.filter(function(id){ return cloudIds.indexOf(id) === -1; });
     if (cloudIds.length){
       if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
       if (!confirm('Permanently delete ' + cloudIds.length + ' compan' + (cloudIds.length === 1 ? 'y' : 'ies') + ' from Supabase? Their users and tickets go too, and they will not come back.')) return;
+      var allErrs = [];
       for (var i = 0; i < cloudIds.length; i++){
         var c = companies.find(function(x){ return String(x.id || x.companyName) === String(cloudIds[i]); });
-        if (c) await purgeCompany(c.companyId);
+        if (c){ var e1 = await purgeCompany(c.companyId, c.companyName); if (e1.length) allErrs.push(c.companyName + ' - ' + e1[0]); }
       }
+      if (allErrs.length) failNote('some companies', allErrs);
       try { addLog('Error', who(), 'Bulk permanently deleted ' + cloudIds.length + ' companies', 'Companies'); } catch(e){}
     }
     bulkSelections.companies.clear();
@@ -5627,21 +5718,24 @@ function devAutoRefresh(){
   };
   window.deleteUser = async function(id){
     var u = users.find(function(x){ return x.id === id; });
-    if (!u || u.source !== 'cloud'){ return _origDeleteUser ? _origDeleteUser.apply(this, arguments) : undefined; }
+    if (!u){ return _origDeleteUser ? _origDeleteUser.apply(this, arguments) : undefined; }
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     if (!confirm('Permanently delete "' + (u.username || u.email) + '"? They will lose access immediately and this cannot be undone.')) return;
-    await purgeUser(u.email || u.username);
+    var ue = await purgeUser(u.email || u.username);
+    if (ue.length) failNote('"' + (u.username || u.email) + '"', ue);
     try { addLog('Error', who(), 'Permanently deleted user: ' + (u.email || u.username), 'Users'); } catch(e){}
     await refresh();
   };
   window.bulkDeleteUsers = async function(){
     var ids = Array.from(bulkSelections.users).map(Number);
-    var cloud = users.filter(function(u){ return ids.includes(u.id) && u.source === 'cloud'; });
+    var cloud = users.filter(function(u){ return ids.includes(u.id); });
     var local = ids.filter(function(id){ return !cloud.some(function(u){ return u.id === id; }); });
     if (cloud.length){
       if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
       if (!confirm('Permanently delete ' + cloud.length + ' user(s)? They will lose access immediately.')) return;
-      for (var i = 0; i < cloud.length; i++) await purgeUser(cloud[i].email || cloud[i].username);
+      var uErrs = [];
+      for (var i = 0; i < cloud.length; i++){ var e2 = await purgeUser(cloud[i].email || cloud[i].username); if (e2.length) uErrs.push((cloud[i].email || cloud[i].username) + ' - ' + e2[0]); }
+      if (uErrs.length) failNote('some users', uErrs);
       try { addLog('Error', who(), 'Bulk permanently deleted ' + cloud.length + ' users', 'Users'); } catch(e){}
     }
     bulkSelections.users.clear();
@@ -5693,7 +5787,7 @@ function devAutoRefresh(){
     var me0 = (JSON.parse(localStorage.getItem('developerSession') || '{}').email || '').toLowerCase();
     var rows0 = hubUsers.map(function(u){
       return '<tr class="border-t border-gray-100"><td class="py-2 pr-4">' + esc(u.email) + (u.full_name ? '<div class="text-xs text-gray-400">' + esc(u.full_name) + '</div>' : '') + '</td>' +
-        '<td class="py-2 pr-4">' + (u.role === 'hub_admin' ? '<span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Admin</span>' : '<span class="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">Viewer (read-only)</span>') + '</td>' +
+        '<td class="py-2 pr-4">' + '<span class="text-xs font-semibold ' + (ROLE_CSS[u.role] || ROLE_CSS.hub_viewer) + ' px-2 py-0.5 rounded-full">' + esc(ROLE_NAME[u.role] || u.role) + '</span>' + '</td>' +
         '<td class="py-2 text-right">' + (canWrite && u.email.toLowerCase() !== me0 ? '<button class="text-xs text-red-600 hover:underline" onclick="hubRemoveAccess(\'' + u.email.replace(/'/g, "\\'") + '\')">Remove</button>' : '') + '</td></tr>';
     }).join('');
     box.innerHTML =
@@ -5701,18 +5795,19 @@ function devAutoRefresh(){
       (canWrite ? '<button class="bg-blue-900 text-white text-xs px-3 py-1.5 rounded" onclick="hubAddAccessPrompt()">+ Add person</button>' : '') + '</div>' +
       '<table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th class="pb-2">Email</th><th class="pb-2">Access</th><th></th></tr></thead><tbody>' +
       (rows0 || '<tr><td colspan="3" class="py-3 text-gray-400">No one on the list yet.</td></tr>') + '</tbody></table>' +
-      '<p class="text-xs text-gray-400 mt-3">Adding someone here lets them sign in once they also have a Supabase login with the matching role. Create that under Supabase \u2192 Authentication \u2192 Users, tick Auto Confirm, then set their role with the SQL from setup part 5 or 7.</p>';
+      '<p class="text-xs text-gray-400 mt-3">Adding someone here lets them sign in once they also have a Supabase login with the matching role. Create that under Supabase \u2192 Authentication \u2192 Users, tick Auto Confirm, then set their role (hub_admin, hub_viewer, hub_accounts or hub_support) with the role SQL.</p>';
   }
   window.hubAddAccessPrompt = async function(){
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     var email = prompt('Email address to give access to:'); if (!email) return;
     email = email.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('That does not look like an email address.'); return; }
-    var viewer = confirm('Click OK for read-only (Viewer), or Cancel for full Admin access.');
-    var role = viewer ? 'hub_viewer' : 'hub_admin';
+    var pick = prompt('Choose access for ' + email + ':\n\n1 = Admin (full access)\n2 = Viewer (read-only, everything)\n3 = Accounts (Payments + Companies, read-only)\n4 = Customer Care (Support inquiries, can reply)', '3'); if (pick === null) return;
+    var role = { '1': 'hub_admin', '2': 'hub_viewer', '3': 'hub_accounts', '4': 'hub_support' }[String(pick).trim()];
+    if (!role){ alert('Enter 1, 2, 3 or 4.'); return; }
     var r = await sb.from('acacia_hub_users').upsert({ email: email, role: role, added_by: who() });
     if (r.error) { alert('Failed: ' + r.error.message); return; }
     try { addLog('Warning', who(), 'Granted ' + role + ' Hub access to ' + email, 'Security'); } catch(e){}
-    alert(email + ' is now on the allow-list. Remember: they also need a matching Supabase login before they can actually sign in.');
+    alert(email + ' is now on the allow-list as ' + ROLE_NAME[role] + '. They still need a Supabase login whose role is set to ' + role + ' (see the SQL I gave you).');
     await refresh();
   };
   window.hubRemoveAccess = async function(email){
