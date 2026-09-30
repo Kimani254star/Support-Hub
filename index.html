@@ -1664,6 +1664,24 @@ body.home-mode{background:#F6F7F4;}
         </div>
     </div>
 
+    <div id="upgradeReqCard" class="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900">Plan Upgrade Requests</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Requests sent from Acacia Books. Approving changes the company's plan and price.</p>
+            </div>
+            <span id="upgradePendingCount" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">0 pending</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-gray-50 text-xs uppercase text-gray-500"><tr>
+                    <th class="p-3 pl-5">Company</th><th class="p-3">Current</th><th class="p-3">Requested</th><th class="p-3">Message</th><th class="p-3">Status</th><th class="p-3 pr-5 text-right">Action</th>
+                </tr></thead>
+                <tbody id="upgradeReqTable"><tr><td colspan="6" class="text-center p-6 text-gray-500">No upgrade requests yet.</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
             <div>
@@ -4703,7 +4721,7 @@ function devAutoRefresh(){
   window.__SUPA_URL__ = URL_; window.__SUPA_KEY__ = KEY_;
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
-  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], busy = false;
+  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], upgrades = [], busy = false;
 
   function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
   function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
@@ -4742,6 +4760,7 @@ function devAutoRefresh(){
       var tk = await sb.from('acacia_tickets').select('*').order('updated_at', { ascending: false }); tix = tk.error ? [] : (tk.data || []);
       var pm = await sb.from('acacia_payments').select('*').order('created_at', { ascending: false }); pays = pm.error ? [] : (pm.data || []);
       var hu = await sb.from('acacia_hub_users').select('*').order('created_at', { ascending: true }); hubUsers = hu.error ? [] : (hu.data || []);
+      var ur = await sb.from('acacia_upgrade_requests').select('*').order('created_at', { ascending: false }).limit(100); upgrades = ur.error ? [] : (ur.data || []);
       cloudOK = true;
     } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
     if (canWrite){
@@ -4752,7 +4771,7 @@ function devAutoRefresh(){
       }
     }
     window.__acxCloudReady = true;
-    merge(); mergeTickets(); mergePayments(); renderHubAccess(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
+    merge(); mergeTickets(); mergePayments(); renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
   }
 
   function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
@@ -4931,6 +4950,52 @@ function devAutoRefresh(){
     renderPageNumbers('companyPageNumbers', 'companies', pg.totalPages, gotoCompanyPage);
     updateBulkBar('companies');
   };
+  // ---- Plan upgrade requests (Support page) ----
+  function renderUpgrades(){
+    var tb = document.getElementById('upgradeReqTable'); if (!tb) return;
+    var pend = upgrades.filter(function(u){ return u.status === 'pending'; });
+    var shown = pend.concat(upgrades.filter(function(u){ return u.status !== 'pending' && u.status !== 'cancelled'; }).slice(0, 8));
+    var cnt = document.getElementById('upgradePendingCount');
+    if (cnt){ cnt.textContent = pend.length + ' pending'; cnt.className = 'px-2.5 py-1 rounded-full text-xs font-semibold ' + (pend.length ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'); }
+    var stBadge = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-gray-200 text-gray-700' };
+    tb.innerHTML = shown.length ? shown.map(function(u){
+      var id = String(u.id).replace(/'/g, '');
+      var act = u.status === 'pending'
+        ? '<button class="bg-green-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="hubApproveUpgrade(\'' + id + '\')">Approve</button><button class="bg-gray-600 text-white px-2 py-1 text-xs rounded" onclick="hubRejectUpgrade(\'' + id + '\')">Reject</button>'
+        : '<span class="text-xs text-gray-400">' + esc(u.decided_by || '') + (u.decided_at ? ' \u00b7 ' + fmt(u.decided_at) : '') + '</span>';
+      return '<tr class="border-t"><td class="p-3 pl-5"><div class="font-medium text-gray-900">' + esc(u.company_name || u.company_id) + '</div><div class="text-xs text-gray-500">' + esc(u.email || '') + ' \u00b7 ' + ago(u.created_at) + '</div></td>' +
+        '<td class="p-3">' + esc(u.current_plan || 'Free') + '</td>' +
+        '<td class="p-3"><span class="font-semibold">' + esc(u.requested_plan) + '</span><div class="text-xs text-gray-500">' + money(u.amount) + ' \u00b7 ' + esc(u.billing || 'Monthly') + '</div></td>' +
+        '<td class="p-3 text-gray-600 max-w-xs">' + esc(u.message || '-') + '</td>' +
+        '<td class="p-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (stBadge[u.status] || 'bg-gray-100 text-gray-700') + '">' + esc(title(u.status)) + '</span></td>' +
+        '<td class="p-3 pr-5 text-right">' + act + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="text-center p-6 text-gray-500">No upgrade requests yet.</td></tr>';
+    var sb2 = document.querySelector("button[onclick=\"openPage('support')\"]");
+    if (sb2){ var t = (typeof supportTickets !== 'undefined' ? supportTickets : []).filter(function(x){ return x.source === 'cloud' && x.unread; }).length + pend.length;
+      sb2.innerHTML = 'Support' + (t ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:6px">' + t + '</span>' : ''); }
+  }
+  window.hubApproveUpgrade = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var u = upgrades.find(function(x){ return String(x.id) === String(id); }); if (!u) return;
+    var c = co(u.company_id), cur = (c._row || {}).paid_until;
+    var def = (cur && new Date(cur) > new Date()) ? fmt(cur) : plus(30);
+    if (!confirm('Upgrade ' + (u.company_name || u.company_id) + ' from ' + (u.current_plan || 'Free') + ' to ' + u.requested_plan + ' (' + money(u.amount) + ')?')) return;
+    var pu = askDate(def); if (pu === undefined) return;
+    var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: true, p_paid_until: pu, p_note: null });
+    if (r.error){ alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Approved upgrade ' + (u.company_name || u.company_id) + ' -> ' + u.requested_plan, 'Companies'); } catch(e){}
+    await refresh();
+  };
+  window.hubRejectUpgrade = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var u = upgrades.find(function(x){ return String(x.id) === String(id); }); if (!u) return;
+    var why = prompt('Reason for rejecting (shown to the customer, optional):', ''); if (why === null) return;
+    var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: false, p_paid_until: null, p_note: why.trim() || null });
+    if (r.error){ alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Rejected upgrade ' + (u.company_name || u.company_id) + ' -> ' + u.requested_plan, 'Companies'); } catch(e){}
+    await refresh();
+  };
+
   window.syncCompanies = async function(){
     await refresh();
     var un = companies.filter(function(c){ return c.status === 'Untracked'; });
