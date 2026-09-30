@@ -1376,8 +1376,9 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
             </select>
 
             <select id="userStatusFilter" onchange="renderUsers()" class="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500">
-                <option value="">All Statuses</option>
-                <option value="Active">Active</option>
+                <option value="Active" selected>Active</option>
+                <option value="">All</option>
+                <option value="Pending">Pending</option>
                 <option value="Inactive">Inactive</option>
                 <option value="Suspended">Suspended</option>
             </select>
@@ -5964,12 +5965,14 @@ function devAutoRefresh(){
     var acc = await sb.from('app_accounts').select('login_id,data').eq('company_id', c.companyId);
     if (!acc.error && acc.data){
       for (var i = 0; i < acc.data.length; i++){
-        var row = acc.data[i], data = Object.assign({}, row.data, { companyName: newName });
+        var row = acc.data[i], prev = Array.isArray(row.data && row.data.previousCompanyNames) ? row.data.previousCompanyNames.slice() : [];
+        if (c.companyName && prev.indexOf(c.companyName) < 0) prev.push(c.companyName);
+        var data = Object.assign({}, row.data, { companyName: newName, previousCompanyNames: prev });
         await sb.from('app_accounts').update({ data: data }).eq('login_id', row.login_id);
       }
     }
     try { addLog('Warning', who(), 'Renamed company "' + c.companyName + '" \u2192 "' + newName + '"', 'Companies'); } catch(e){}
-    alert('Renamed. It updates for their team the next time they sign in.');
+    alert('Renamed. Their team can sign in with the new name (the old name keeps working too) and it updates on their next sign-in.');
     await refresh();
   };
 
