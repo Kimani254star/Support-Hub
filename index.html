@@ -2876,7 +2876,7 @@ function normalizeUsers(list){
     const map = new Map();
     (list || []).forEach(u => {
         if (!u || typeof u !== "object" || !(u.username || u.email)) return;
-        const key = u.email ? String(u.email).toLowerCase() : (String(u.username).toLowerCase() + '|' + String(u.companyId || u.companyName || u.company || '').toLowerCase());
+        const key = (u.email ? String(u.email).toLowerCase() : String(u.username).toLowerCase()) + '|' + String(u.companyId || u.companyName || u.company || '').toLowerCase();
         const prev = map.get(key) || {};
         const realName = (prev.username && !/@/.test(prev.username) && /@/.test(String(u.username || ""))) ? prev.username : u.username;
         const rec = Object.assign({}, prev, u, {
@@ -5344,7 +5344,7 @@ function devAutoRefresh(){
           var ukey = low(x.email || x.username);
           var isCompanyRec = k.split('::')[0].indexOf('compan') === 0;
           if (isCompanyRec) return t.companies.indexOf(cid) === -1;
-          return t.users.indexOf(ukey) === -1 && t.companies.indexOf(low(x.companyId || x.companyName)) === -1;
+          return t.users.indexOf(ukey) === -1 && t.users.indexOf(low(x.companyId || x.companyName) + '|' + ukey) === -1 && t.companies.indexOf(low(x.companyId || x.companyName)) === -1;
         });
         if (keep.length !== arr.length) localStorage.setItem(k, JSON.stringify(keep));
       } catch(e){}
@@ -5353,8 +5353,8 @@ function devAutoRefresh(){
   function applyTombstones(){
     var t = tombs(); if (!t.companies.length && !t.users.length) return;
     rows  = rows.filter(function(r){ return t.companies.indexOf(low(r.company_id)) === -1; });
-    accts = accts.filter(function(a){ return t.companies.indexOf(low(a.company_id)) === -1 && t.users.indexOf(low(a.login_id)) === -1 && t.users.indexOf(low(a.username)) === -1; });
-    usage = usage.filter(function(x){ return t.companies.indexOf(low(x.company_id)) === -1 && t.users.indexOf(low(x.user_key)) === -1; });
+    accts = accts.filter(function(a){ var cc = low(a.company_id) + '|'; return t.companies.indexOf(low(a.company_id)) === -1 && t.users.indexOf(low(a.login_id)) === -1 && t.users.indexOf(low(a.username)) === -1 && t.users.indexOf(cc + low(a.login_id)) === -1 && t.users.indexOf(cc + low(a.username)) === -1; });
+    usage = usage.filter(function(x){ return t.companies.indexOf(low(x.company_id)) === -1 && t.users.indexOf(low(x.user_key)) === -1 && t.users.indexOf(low(x.company_id) + '|' + low(x.user_key)) === -1; });
     tix   = tix.filter(function(x){ return t.companies.indexOf(low(x.company_id)) === -1; });
     scrubLocalStores();
   }
@@ -5728,12 +5728,14 @@ function devAutoRefresh(){
     scrubLocalStores();
     return errs;
   }
-  async function purgeUser(login){
+  async function purgeUser(login, companyId){
     login = String(login || '').toLowerCase(); if (!login) return [];
-    var errs = [];
-    addTomb('users', login);
-    await delRows(sb.from('app_accounts').delete().or('login_id.eq.' + login + ',username.eq.' + login), 'user account', errs);
-    await delRows(sb.from('acacia_app_usage').delete().eq('user_key', login), 'user usage', errs);
+    var errs = [], cid = String(companyId || '').toLowerCase();
+    addTomb('users', cid ? cid + '|' + login : login);
+    var qa = sb.from('app_accounts').delete(); if (companyId) qa = qa.eq('company_id', companyId);
+    await delRows(qa.or('login_id.eq.' + login + ',username.eq.' + login), 'user account', errs);
+    var qu = sb.from('acacia_app_usage').delete().eq('user_key', login); if (companyId) qu = qu.eq('company_id', companyId);
+    await delRows(qu, 'user usage', errs);
     scrubLocalStores();
     return errs;
   }
@@ -5772,7 +5774,7 @@ function devAutoRefresh(){
     if (!u){ return _origDeleteUser ? _origDeleteUser.apply(this, arguments) : undefined; }
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     if (!confirm('Permanently delete "' + (u.username || u.email) + '"? They will lose access immediately and this cannot be undone.')) return;
-    var ue = await purgeUser(u.email || u.username);
+    var ue = await purgeUser(u.email || u.username, u.companyId);
     if (ue.length) failNote('"' + (u.username || u.email) + '"', ue);
     try { addLog('Error', who(), 'Permanently deleted user: ' + (u.email || u.username), 'Users'); } catch(e){}
     await refresh();
@@ -5785,7 +5787,7 @@ function devAutoRefresh(){
       if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
       if (!confirm('Permanently delete ' + cloud.length + ' user(s)? They will lose access immediately.')) return;
       var uErrs = [];
-      for (var i = 0; i < cloud.length; i++){ var e2 = await purgeUser(cloud[i].email || cloud[i].username); if (e2.length) uErrs.push((cloud[i].email || cloud[i].username) + ' - ' + e2[0]); }
+      for (var i = 0; i < cloud.length; i++){ var e2 = await purgeUser(cloud[i].email || cloud[i].username, cloud[i].companyId); if (e2.length) uErrs.push((cloud[i].email || cloud[i].username) + ' - ' + e2[0]); }
       if (uErrs.length) failNote('some users', uErrs);
       try { addLog('Error', who(), 'Bulk permanently deleted ' + cloud.length + ' users', 'Users'); } catch(e){}
     }
@@ -5959,8 +5961,10 @@ function devAutoRefresh(){
     var buf = await crypto.subtle.digest('SHA-256', data);
     return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
   }
-  async function fetchAccountRow(loginId){
-    var r = await sb.from('app_accounts').select('login_id,username,company_id,data').eq('login_id', loginId).maybeSingle();
+  async function fetchAccountRow(loginId, companyId){
+    var q = sb.from('app_accounts').select('login_id,username,company_id,data').eq('login_id', loginId);
+    if (companyId) q = q.eq('company_id', companyId);
+    var r = await q.limit(1).maybeSingle();
     if (r.error || !r.data) return null;
     return r.data;
   }
@@ -5968,7 +5972,7 @@ function devAutoRefresh(){
     var u = users.find(function(x){ return x.id === id; }); if (!u || u.source !== 'cloud') return;
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     var loginId = (u.email || u.username || '').toLowerCase();
-    var row = await fetchAccountRow(loginId);
+    var row = await fetchAccountRow(loginId, u.companyId);
     if (!row){ alert('Could not find this account in app_accounts.'); return; }
     var pw = prompt('New password for ' + (u.username || loginId) + ' (tell them this - it cannot be shown again):');
     if (!pw) return;
@@ -5976,7 +5980,7 @@ function devAutoRefresh(){
     var salt = genSalt(), hash = await hashPw(pw, salt);
     var data = Object.assign({}, row.data, { passwordHash: hash, passwordSalt: salt });
     delete data.password;
-    var r = await sb.from('app_accounts').update({ data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId);
+    var r = await sb.from('app_accounts').update({ data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId).eq('company_id', row.company_id);
     if (r.error) { alert('Failed: ' + r.error.message); return; }
     try { addLog('Warning', who(), 'Reset password for ' + loginId, 'Security'); } catch(e){}
     alert('Password reset. Tell ' + (u.username || loginId) + ' their new password - it takes effect the moment they next sign in.');
@@ -5985,17 +5989,17 @@ function devAutoRefresh(){
     var u = users.find(function(x){ return x.id === id; }); if (!u || u.source !== 'cloud') return;
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     var loginId = (u.email || u.username || '').toLowerCase();
-    var row = await fetchAccountRow(loginId);
+    var row = await fetchAccountRow(loginId, u.companyId);
     if (!row){ alert('Could not find this account in app_accounts.'); return; }
     var newEmail = prompt('New login email for ' + (u.username || loginId) + ':', loginId);
     if (!newEmail) return;
     newEmail = newEmail.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) { alert('That does not look like an email address.'); return; }
     if (newEmail === loginId) return;
-    var exists = await fetchAccountRow(newEmail);
-    if (exists){ alert('That email is already in use by another account.'); return; }
+    var exists = await fetchAccountRow(newEmail, row.company_id);
+    if (exists){ alert('That email is already used by another user in this company.'); return; }
     var data = Object.assign({}, row.data, { email: newEmail });
-    var r = await sb.from('app_accounts').update({ login_id: newEmail, data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId);
+    var r = await sb.from('app_accounts').update({ login_id: newEmail, data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId).eq('company_id', row.company_id);
     if (r.error) { alert('Failed: ' + r.error.message); return; }
     try { addLog('Warning', who(), 'Changed login email for ' + loginId + ' \u2192 ' + newEmail, 'Security'); } catch(e){}
     alert('Done. They must sign in with ' + newEmail + ' from now on.');
@@ -6018,7 +6022,7 @@ function devAutoRefresh(){
         var row = acc.data[i], prev = Array.isArray(row.data && row.data.previousCompanyNames) ? row.data.previousCompanyNames.slice() : [];
         if (c.companyName && prev.indexOf(c.companyName) < 0) prev.push(c.companyName);
         var data = Object.assign({}, row.data, { companyName: newName, previousCompanyNames: prev });
-        await sb.from('app_accounts').update({ data: data }).eq('login_id', row.login_id);
+        await sb.from('app_accounts').update({ data: data }).eq('login_id', row.login_id).eq('company_id', c.companyId);
       }
     }
     try { addLog('Warning', who(), 'Renamed company "' + c.companyName + '" \u2192 "' + newName + '"', 'Companies'); } catch(e){}
