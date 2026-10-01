@@ -5527,7 +5527,7 @@ function devAutoRefresh(){
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
       return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
-        email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), status: title(eff(r)),
+        email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), status: title(eff(r)),
         registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
     });
     var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
@@ -5580,6 +5580,18 @@ function devAutoRefresh(){
     var r = await sb.from('acacia_company_status').insert({ company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' });
     if (r.error) alert('Failed: ' + r.error.message); await refresh(); };
 
+  /* Extra users a company has paid for on top of its plan's limit (Books: limit = plan limit + extra_users). */
+  window.hubSetExtraUsers = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = co(id), cur = Number((c._row || {}).extra_users || 0);
+    var v = prompt('Extra users for ' + (c.companyName || id) + ' on top of the ' + (c.plan || 'current') + ' plan limit.\nEnter the TOTAL extra users (0 = none). Currently: ' + cur, String(cur));
+    if (v === null) return;
+    var n = Math.floor(Number(String(v).trim()));
+    if (!isFinite(n) || n < 0 || n > 10000){ alert('Enter a whole number from 0 up.'); return; }
+    if (n === cur) return;
+    await patch(id, { extra_users: n }, 'Set extra users for ' + (c.companyName || id) + ': ' + cur + ' -> ' + n);
+  };
+
   var badge = { Pending: 'bg-amber-100 text-amber-800', Active: 'bg-green-100 text-green-800', Suspended: 'bg-red-100 text-red-800', Expired: 'bg-red-100 text-red-800', Rejected: 'bg-gray-200 text-gray-700', Untracked: 'bg-blue-100 text-blue-800' };
   function money(n){ n = Number(n || 0); return n > 0 ? 'KES ' + n.toLocaleString() : 'Free'; }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
@@ -5590,6 +5602,7 @@ function devAutoRefresh(){
     else if (s === 'Active') out += b('+30d', "hubExtend('" + id + "',30)", 'bg-blue-900') + b('+1y', "hubExtend('" + id + "',365)", 'bg-blue-900') + b('Deactivate', "hubSuspend('" + id + "')", 'bg-red-600');
     else if (s === 'Suspended' || s === 'Expired' || s === 'Rejected') out += b('Reactivate', "hubReactivate('" + id + "')", 'bg-green-600');
     else if (s === 'Untracked') out += b('Start tracking', "hubTrack('" + id + "')", 'bg-blue-900');
+    if (s !== 'Untracked') out += b('Users', "hubSetExtraUsers('" + id + "')", 'bg-indigo-600');
     if (s !== 'Untracked') out += b('Rename', "hubRenameCompany('" + id + "')", 'bg-slate-600');
     return out;
   }
@@ -5607,7 +5620,7 @@ function devAutoRefresh(){
     if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
     pg.pageItems.forEach(function(c){
       html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
-        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '<div class="text-xs text-gray-500 mt-1">' + money(c.price) + '</div></td>' +
+        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '<div class="text-xs text-gray-500 mt-1">' + money(c.price) + '</div>' + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
         '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
         (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
         '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';
@@ -5659,6 +5672,16 @@ function devAutoRefresh(){
     var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: true, p_paid_until: pu, p_note: null, p_price: price });
     if (r.error){ alert('Failed: ' + r.error.message); return; }
     try { addLog('Info', who(), 'Approved upgrade ' + (u.company_name || u.company_id) + ' -> ' + u.requested_plan, 'Companies'); } catch(e){}
+    /* While upgrading, also record any extra users the company paid for (skipped for Enterprise = unlimited). */
+    if (!/enterprise/i.test(u.requested_plan || '')){
+      var curExtra = Number((co(u.company_id)._row || {}).extra_users || 0);
+      var ev = prompt('Extra users to add on top of the ' + u.requested_plan + ' plan limit (0 = none).\nTotal extra users now: ' + curExtra, String(curExtra));
+      if (ev !== null){
+        var en = Math.floor(Number(String(ev).trim()));
+        if (isFinite(en) && en >= 0 && en <= 10000 && en !== curExtra) await patch(u.company_id, { extra_users: en }, 'Set extra users for ' + (u.company_name || u.company_id) + ': ' + curExtra + ' -> ' + en);
+        else if (!(isFinite(en) && en >= 0)) alert('Extra users not changed: enter a whole number from 0 up. Use the Users button on the company row.');
+      }
+    }
     await refresh();
   };
   window.hubRejectUpgrade = async function(id){
