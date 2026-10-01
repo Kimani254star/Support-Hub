@@ -914,18 +914,18 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     <div class="hp-subhead"><h3>Usage limits</h3><p>Every plan shares the same data &mdash; only the ceilings change.</p></div>
     <div class="hp-tablewrap">
       <table class="hp-table hp-limits">
-        <thead><tr><th>Limit</th><th>Free</th><th>Starter</th><th>Pro</th><th>Business</th><th>Enterprise</th></tr></thead>
+        <thead><tr><th>Limit</th><th>Free</th><th>Starter</th><th>Pro</th><th>Business</th><th>Enterprise</th><th>All Access</th></tr></thead>
         <tbody>
-          <tr><th>Users</th><td>1</td><td>3</td><td>10</td><td>25</td><td>Custom</td></tr>
-          <tr><th>Warehouses</th><td>1</td><td>2</td><td>5</td><td>15</td><td>Custom</td></tr>
-          <tr><th>Customers</th><td>100</td><td>500</td><td>2,500</td><td>10,000</td><td>Custom</td></tr>
-          <tr><th>Suppliers</th><td>50</td><td>250</td><td>1,000</td><td>5,000</td><td>Custom</td></tr>
-          <tr><th>Products</th><td>100</td><td>1,000</td><td>5,000</td><td>25,000</td><td>Custom</td></tr>
-          <tr><th>Invoices / month</th><td>25</td><td>200</td><td>1,000</td><td>5,000</td><td>Custom</td></tr>
-          <tr><th>Bills / month</th><td>25</td><td>200</td><td>1,000</td><td>5,000</td><td>Custom</td></tr>
-          <tr><th>Projects</th><td>0</td><td>0</td><td>10</td><td>50</td><td>Custom</td></tr>
-          <tr><th>Payroll employees</th><td>5</td><td>25</td><td>100</td><td>500</td><td>Custom</td></tr>
-          <tr><th>File storage</th><td>100 MB</td><td>1 GB</td><td>5 GB</td><td>25 GB</td><td>Custom</td></tr>
+          <tr><th>Users</th><td>1</td><td>3</td><td>10</td><td>25</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Warehouses</th><td>1</td><td>2</td><td>5</td><td>15</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Customers</th><td>100</td><td>500</td><td>2,500</td><td>10,000</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Suppliers</th><td>50</td><td>250</td><td>1,000</td><td>5,000</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Products</th><td>100</td><td>1,000</td><td>5,000</td><td>25,000</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Invoices / month</th><td>25</td><td>200</td><td>1,000</td><td>5,000</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Bills / month</th><td>25</td><td>200</td><td>1,000</td><td>5,000</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Projects</th><td>0</td><td>0</td><td>10</td><td>50</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>Payroll employees</th><td>5</td><td>25</td><td>100</td><td>500</td><td>Custom</td><td>Custom</td></tr>
+          <tr><th>File storage</th><td>100 MB</td><td>1 GB</td><td>5 GB</td><td>25 GB</td><td>Custom</td><td>Custom</td></tr>
         </tbody>
       </table>
     </div>
@@ -2918,8 +2918,11 @@ function loadUsersFromStores(){ return normalizeUsers(devCollect(USER_STORE_KEYS
    priced from the chosen plan. Only invoices created here in the panel are
    read back from storage; app-side activity stores are ignored. */
 const PAYMENT_STORE_KEYS = ["acacia_payments"];
-const SIGNUP_PLAN_PRICES = { free:0, starter:2000, pro:5000, business:8000, enterprise:12000, allaccess:20000 };
+const SIGNUP_PLAN_PRICES = { free:0, starter:1500, pro:3500, business:7500, enterprise:0, allaccess:15000 };
 function planKeyOf(plan){ return String(plan || "free").toLowerCase().replace(/[^a-z]/g, ""); }
+/* Full-year price = 12 months less 10%. Accepts "Yearly" or "yearly" (the app saves it lower-case). */
+function isYearly(b){ return /^y/i.test(String(b || "")); }
+function yearlyTotal(monthly){ return Math.round(Number(monthly || 0) * 12 * 0.9); }
 function signupPlanPrice(plan){
     const k = planKeyOf(plan);
     return SIGNUP_PLAN_PRICES[k] != null ? SIGNUP_PLAN_PRICES[k] : 0;
@@ -2938,7 +2941,7 @@ function normalizePayments(list){
         let amount = Number(p.amount || p.total || 0);
         if (!amount) {
             amount = signupPlanPrice(plan) + addons * 1500;
-            if (billing === "Yearly") amount = amount * 0.9;
+            if (isYearly(billing)) amount = yearlyTotal(amount);
         }
         const rec = Object.assign({}, map.get(key) || {}, p, {
             id: p.id || devHashId(key),
@@ -2964,10 +2967,10 @@ function buildSignupPayments(companyList){
     return (companyList || []).map(c => {
         const plan = devTitle(c.plan, "Free");
         const billing = c.billing || c.cycle || "Monthly";
-        let amount = Number(c.price || 0);
+        let amount = Number(c.amountDue || 0);
         if (!amount) {
-            amount = signupPlanPrice(plan);
-            if (billing === "Yearly") amount = amount * 0.9;
+            amount = Number(c.price || 0) || signupPlanPrice(plan);
+            if (isYearly(billing)) amount = yearlyTotal(amount);
         }
         const paid = /paid|active|completed/i.test(String(c.paymentStatus || c.status || ""));
         const isFree = signupPlanPrice(plan) === 0 && !amount;
@@ -3013,7 +3016,11 @@ function populateFilterOptionsLabeled(selectId, values, allLabel){
     const select = document.getElementById(selectId);
     if (!select) return;
     const current = select.value;
-    const unique = Array.from(new Set(values.filter(Boolean))).sort();
+    let unique = Array.from(new Set(values.filter(Boolean))).sort();
+    if (selectId === "companyPlanFilter") {
+        const ALL_PLANS = ["Free", "Starter", "Pro", "Business", "Enterprise", "All Access"];
+        unique = ALL_PLANS.concat(unique.filter(v => ALL_PLANS.indexOf(v) < 0));
+    }
     select.innerHTML = `<option value="">${allLabel}</option>` + unique.map(v => `<option value="${v}">${v}</option>`).join("");
     select.value = unique.includes(current) ? current : "";
 }
@@ -3262,21 +3269,25 @@ function exportUsers() {
 
 const PRICING_PLANS = {
     free: { base: 0, label: "Free" },
-    starter: { base: 2000, label: "Starter" },
-    pro: { base: 5000, label: "Pro" },
-    business: { base: 8000, label: "Business" },
-    enterprise: { base: 12000, label: "Enterprise" },
-    allaccess: { base: 20000, label: "All Access" }
+    starter: { base: 1500, label: "Starter" },
+    pro: { base: 3500, label: "Pro" },
+    business: { base: 7500, label: "Business" },
+    enterprise: { base: 0, label: "Enterprise", custom: true },
+    allaccess: { base: 15000, label: "All Access" }
 };
 
 function calculateInvoiceAmount(p) {
     /* Amount always comes from the plan picked at account creation. */
     if (p && p.source === "signup") return Number(p.amount) || 0;
-    const planKey = planKeyOf(p.plan || 'free');
+    /* An invoice that is already saved keeps its saved amount, so changing plan prices never rewrites past revenue. */
+    if (p && p.id && Number(p.amount) > 0) return Number(p.amount);
+    const planKey = planKeyOf((p && p.plan) || 'free');
     const planConfig = PRICING_PLANS[planKey] || { base: signupPlanPrice(planKey) };
-    let cost = planConfig.base + ((Number(p.addonsCount) || 0) * 1500);
-    if (p.billing === "Yearly") {
-        cost = cost * 0.9;
+    /* Enterprise is custom-priced: use the agreed monthly price typed in the invoice form. */
+    const base = planConfig.custom ? (Number(p && p.customAmount) || 0) : planConfig.base;
+    let cost = base + ((Number(p && p.addonsCount) || 0) * 1500);
+    if (p && isYearly(p.billing)) {
+        cost = yearlyTotal(cost);
     }
     return cost;
 }
@@ -3296,14 +3307,15 @@ function openPaymentModal(payId = null) {
             
             <select id="modalPay_plan" class="w-full p-2 border rounded text-sm">
                 <option value="free" ${currentPlan === 'free' ? 'selected' : ''}>Free (KES 0)</option>
-                <option value="starter" ${currentPlan === 'starter' ? 'selected' : ''}>Starter (KES 2,000)</option>
-                <option value="pro" ${currentPlan === 'pro' ? 'selected' : ''}>Pro (KES 5,000)</option>
-                <option value="business" ${currentPlan === 'business' ? 'selected' : ''}>Business (KES 8,000)</option>
-                <option value="enterprise" ${currentPlan === 'enterprise' ? 'selected' : ''}>Enterprise (KES 12,000)</option>
-                <option value="allaccess" ${currentPlan === 'allaccess' ? 'selected' : ''}>All Access (KES 20,000)</option>
+                <option value="starter" ${currentPlan === 'starter' ? 'selected' : ''}>Starter (KES 1,500)</option>
+                <option value="pro" ${currentPlan === 'pro' ? 'selected' : ''}>Pro (KES 3,500)</option>
+                <option value="business" ${currentPlan === 'business' ? 'selected' : ''}>Business (KES 7,500)</option>
+                <option value="enterprise" ${currentPlan === 'enterprise' ? 'selected' : ''}>Enterprise (Custom pricing)</option>
+                <option value="allaccess" ${currentPlan === 'allaccess' ? 'selected' : ''}>All Access (KES 15,000)</option>
             </select>
 
             <input id="modalPay_addons" type="number" min="0" placeholder="Number of Premium Add-ons (+ KES 1,500/mo)" value="${payment ? (payment.addonsCount || 0) : 0}" class="w-full p-2 border rounded text-sm">
+            <input id="modalPay_custom" type="number" min="0" placeholder="Agreed monthly price in KES (Enterprise only)" value="${payment && payment.customAmount ? payment.customAmount : ''}" class="w-full p-2 border rounded text-sm">
             
             <select id="modalPay_billing" class="w-full p-2 border rounded text-sm">
                 <option value="Monthly" ${currentBilling === 'Monthly' ? 'selected' : ''}>Monthly Billing</option>
@@ -3329,13 +3341,14 @@ function openPaymentModal(payId = null) {
         const email = document.getElementById("modalPay_email").value.trim();
         const plan = document.getElementById("modalPay_plan").value;
         const addonsCount = parseInt(document.getElementById("modalPay_addons").value) || 0;
+        const customAmount = parseFloat((document.getElementById("modalPay_custom") || {}).value) || 0;
         const billing = document.getElementById("modalPay_billing").value;
         const method = document.getElementById("modalPay_method").value;
         const status = document.getElementById("modalPay_status").value;
 
         if (!invoice || !customer) return alert("Fill in all parameters!");
 
-        let calculatedValue = calculateInvoiceAmount({ plan, addonsCount, billing });
+        let calculatedValue = calculateInvoiceAmount({ plan, addonsCount, billing, customAmount });
 
         if (payment) {
             payment.invoice = invoice;
@@ -3343,6 +3356,7 @@ function openPaymentModal(payId = null) {
             payment.email = email;
             payment.plan = plan;
             payment.addonsCount = addonsCount;
+            payment.customAmount = customAmount;
             payment.billing = billing;
             payment.amount = calculatedValue;
             payment.method = method;
@@ -3355,6 +3369,7 @@ function openPaymentModal(payId = null) {
                 email,
                 plan,
                 addonsCount,
+                customAmount,
                 billing,
                 amount: calculatedValue,
                 method,
@@ -3514,7 +3529,7 @@ function nextPeriodDate(from, billing){
     const d = new Date(from && from !== "-" ? from : Date.now());
     const base = isNaN(d.getTime()) ? new Date() : d;
     const out = new Date(base.getTime());
-    if (String(billing) === "Yearly") out.setFullYear(out.getFullYear() + 1);
+    if (isYearly(billing)) out.setFullYear(out.getFullYear() + 1);
     else out.setMonth(out.getMonth() + 1);
     return out;
 }
@@ -3527,7 +3542,7 @@ function previewPayment(id) {
     const amount = calculateInvoiceAmount(p);
     const planMeta = planLabelOf(p.plan);
     const addons = Number(p.addonsCount) || 0;
-    const addonTotal = addons * 1500;
+    const addonTotal = isYearly(p.billing) ? yearlyTotal(addons * 1500) : addons * 1500;
     const paid = p.status === "Completed";
     const html = `
     <div id="invoicePreviewSheet" class="text-sm">
@@ -5527,7 +5542,7 @@ function devAutoRefresh(){
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
       return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
-        email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), status: title(eff(r)),
+        email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
         registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
     });
     var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
@@ -5594,6 +5609,16 @@ function devAutoRefresh(){
 
   var badge = { Pending: 'bg-amber-100 text-amber-800', Active: 'bg-green-100 text-green-800', Suspended: 'bg-red-100 text-red-800', Expired: 'bg-red-100 text-red-800', Rejected: 'bg-gray-200 text-gray-700', Untracked: 'bg-blue-100 text-blue-800' };
   function money(n){ n = Number(n || 0); return n > 0 ? 'KES ' + n.toLocaleString() : 'Free'; }
+  /* Price shown for a company: the full-year total for yearly customers, the monthly price otherwise. */
+  function dueOf(c){ var m = Number(c.price || 0); if (Number(c.amountDue) > 0) return Number(c.amountDue); return c.billing === 'Yearly' ? Math.round(m * 12 * 0.9) : m; }
+  function planLine(c){
+    var due = dueOf(c), yr = c.billing === 'Yearly';
+    var h = '<div class="text-xs text-gray-500 mt-1">' + money(due) + (due > 0 ? (yr ? ' / year \u00b7 Full year (10% off)' : ' / month \u00b7 Monthly') : '') + '</div>';
+    var names = { mail: 'Mail', crm: 'CRM', projects: 'Projects', payroll: 'Payroll', sell: 'Sell' };
+    if (c.allApps) h += '<div class="text-xs text-emerald-700 font-semibold mt-1">\u2713 All apps</div>';
+    else if (c.appList) h += '<div class="text-xs text-gray-500 mt-1">Apps: ' + String(c.appList).split(',').filter(Boolean).map(function(k){ return esc(names[k] || k); }).join(', ') + '</div>';
+    return h;
+  }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
   function actions(c){
     var id = String(c.companyId).replace(/\\/g, '\\\\').replace(/'/g, "\\'"), b = function(l, fn, cls){ return '<button class="' + cls + ' text-white px-2 py-1 text-xs rounded mr-1 mb-1" onclick="' + fn + '">' + l + '</button>'; };
@@ -5620,7 +5645,7 @@ function devAutoRefresh(){
     if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
     pg.pageItems.forEach(function(c){
       html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
-        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + '<div class="text-xs text-gray-500 mt-1">' + money(c.price) + '</div>' + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
+        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + planLine(c) + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
         '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
         (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
         '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';
