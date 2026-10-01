@@ -1119,6 +1119,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
     <li><button onclick="openPage('dashboard')">Dashboard</button></li>
     <li><button onclick="openPage('users')">Users</button></li>
     <li><button onclick="openPage('companies')">Companies</button></li>
+    <li><button onclick="openPage('apps')">Apps</button></li>
     <li><button onclick="openPage('payments')">Payments</button></li>
     <li><button onclick="openPage('analytics')">Analytics</button></li>
     <li><button onclick="openPage('reports')">Reports</button></li>
@@ -1719,6 +1720,51 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
   </div>
   <iframe id="editorIframe" class="w-full flex-grow border-none" src="about:blank"></iframe>
 </div>
+
+<div class="page p-4 sm:p-6 w-full bg-gray-50 min-h-screen" id="apps">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-5 mb-6">
+        <div>
+            <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">App Usage</h1>
+            <p class="mt-2 text-sm text-gray-500">Every user across all Acacia apps. Pick an app from the dropdown to filter, e.g. Books, then see which other apps the same people use.</p>
+        </div>
+        <div class="flex flex-wrap gap-2.5 mt-4 md:mt-0">
+            <button class="inline-flex items-center justify-center bg-white text-gray-700 font-medium text-sm px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-all cursor-pointer" onclick="exportAppsTable()"><span class="mr-2">⬇️</span> Export CSV</button>
+            <button class="inline-flex items-center justify-center bg-white text-gray-700 font-medium text-sm px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 transition-all cursor-pointer" onclick="renderAppsPage()"><span class="mr-2">🔄</span> Refresh</button>
+        </div>
+    </div>
+    <div id="appChips" class="flex flex-wrap gap-2 mb-5"></div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4 flex flex-col lg:flex-row gap-3 lg:items-center">
+        <div class="relative flex-1">
+            <span class="absolute left-3 top-2.5 text-gray-400 text-sm">🔍</span>
+            <input type="text" id="appSearch" placeholder="Search user, company, role..." onkeyup="renderAppsPage()" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <select id="appFilter" onchange="renderAppsPage()" class="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500"><option value="">All Apps</option></select>
+            <select id="appCompanyFilter" onchange="renderAppsPage()" class="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm focus:bg-white focus:ring-2 focus:ring-blue-500"><option value="">All Companies</option></select>
+            <button onclick="resetAppFilters()" class="px-3 py-2 border border-gray-300 text-gray-600 rounded-lg bg-gray-100 text-sm hover:bg-gray-200 transition">Reset</button>
+        </div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[900px]">
+            <thead>
+                <tr class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    <th class="p-4 pl-6">App</th>
+                    <th class="p-4">User</th>
+                    <th class="p-4">Company</th>
+                    <th class="p-4">Role</th>
+                    <th class="p-4">Also uses</th>
+                    <th class="p-4">Company Status</th>
+                    <th class="p-4 pr-6">Last Active</th>
+                </tr>
+            </thead>
+            <tbody id="appsTable" class="divide-y divide-gray-100 text-sm text-gray-700 font-normal">
+                <tr><td colspan="7" class="text-center p-8 text-gray-500">No app activity yet.</td></tr>
+            </tbody>
+        </table>
+        <div class="p-4 border-t border-gray-200 text-xs text-gray-500">Showing <span id="appShowingCount" class="font-semibold text-gray-700">0</span> entries</div>
+    </div>
+</div>
+
 <div class="page p-4 sm:p-6 w-full bg-gray-50 min-h-screen" id="payments">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-5 mb-6">
         <div>
@@ -3114,6 +3160,7 @@ function openPage(id){
     if(id === 'dashboard') loadDashboard();
     if(id === 'users') renderUsers();
     if(id === 'companies') renderCompanies();
+    if(id === 'apps' && window.renderAppsPage) window.renderAppsPage();
     if(id === 'payments') renderPayments();
     if(id === 'analytics') refreshAnalytics();
     if(id === 'reports') renderReports();
@@ -5454,7 +5501,7 @@ function devAutoRefresh(){
     }
     applyTombstones();
     window.__acxCloudReady = true;
-    merge(); mergeTickets(); mergePayments(); renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
+    merge(); mergeTickets(); mergePayments(); try { var __ap = document.getElementById('apps'); if (__ap && __ap.classList.contains('active')) window.renderAppsPage(); } catch(e){} renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
   }
 
   function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
@@ -5465,6 +5512,70 @@ function devAutoRefresh(){
     var parts = Object.keys(by).map(function(k){ return k + ' ' + by[k].n; });
     return parts.length ? parts.join(' \u00b7 ') + ' \u00b7 active ' + ago(last) : 'No app activity yet';
   }
+
+  /* ---- Apps page: all app usage in one table, filterable by app ---- */
+  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell' };
+  function appName(k){ k = String(k || ''); return APP_NAMES[k.toLowerCase()] || (k ? title(k) : 'Unknown'); }
+  var appsView = [];
+  window.renderAppsPage = function(){
+    var tb = document.getElementById('appsTable'); if (!tb) return;
+    var byCo = {}; rows.forEach(function(r){ byCo[String(r.company_id)] = r; });
+    var userApps = {};
+    usage.forEach(function(x){ var k = low(x.company_id) + '|' + low(x.user_key); (userApps[k] = userApps[k] || {})[low(x.app)] = 1; });
+    var present = {}; Object.keys(APP_NAMES).forEach(function(k){ present[k] = 1; });
+    usage.forEach(function(x){ if (x.app) present[low(x.app)] = 1; });
+
+    var sel = document.getElementById('appFilter'), selCo = document.getElementById('appCompanyFilter');
+    var curApp = sel.value, curCo = selCo.value;
+    var counts = {}; usage.forEach(function(x){ var a = low(x.app); counts[a] = (counts[a] || 0) + 1; });
+    sel.innerHTML = '<option value="">All Apps (' + usage.length + ')</option>' + Object.keys(present).sort().map(function(k){
+      return '<option value="' + esc(k) + '">' + esc(appName(k)) + ' (' + (counts[k] || 0) + ')</option>'; }).join('');
+    sel.value = curApp;
+    selCo.innerHTML = '<option value="">All Companies</option>' + rows.map(function(r){
+      return '<option value="' + esc(r.company_id) + '">' + esc(r.company_name || r.company_id) + '</option>'; }).join('');
+    selCo.value = curCo;
+
+    var chips = document.getElementById('appChips');
+    if (chips) chips.innerHTML = Object.keys(present).sort().map(function(k){
+      var on = curApp === k;
+      return '<button onclick="document.getElementById(\'appFilter\').value=\'' + esc(k) + '\';renderAppsPage()" class="px-3 py-1.5 rounded-full text-xs font-semibold border ' + (on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100') + '">' + esc(appName(k)) + ' <span class="opacity-70">' + (counts[k] || 0) + '</span></button>'; }).join('');
+
+    var q = low(document.getElementById('appSearch').value);
+    appsView = usage.filter(function(x){
+      if (curApp && low(x.app) !== curApp) return false;
+      if (curCo && String(x.company_id) !== curCo) return false;
+      if (!q) return true;
+      var r = byCo[String(x.company_id)];
+      return [x.user_key, x.role, x.app, appName(x.app), x.company_id, r && r.company_name].some(function(v){ return low(v).indexOf(q) > -1; });
+    }).sort(function(a, b){ return new Date(b.last_seen || 0) - new Date(a.last_seen || 0); });
+
+    tb.innerHTML = appsView.length ? appsView.map(function(x){
+      var r = byCo[String(x.company_id)], e = r ? eff(r) : 'active';
+      var stCls = e === 'active' ? 'bg-emerald-50 text-emerald-700' : (e === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700');
+      var others = Object.keys(userApps[low(x.company_id) + '|' + low(x.user_key)] || {}).filter(function(k){ return k !== low(x.app); });
+      return '<tr class="hover:bg-gray-50">' +
+        '<td class="p-4 pl-6"><span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">' + esc(appName(x.app)) + '</span></td>' +
+        '<td class="p-4 font-medium text-gray-900">' + esc(x.user_key) + '</td>' +
+        '<td class="p-4">' + esc((r && r.company_name) || x.company_id) + '</td>' +
+        '<td class="p-4">' + esc(x.role || 'User') + '</td>' +
+        '<td class="p-4 text-xs text-gray-600">' + (others.length ? others.map(function(k){ return esc(appName(k)); }).join(', ') : '<span class="text-gray-400">Only this app</span>') + '</td>' +
+        '<td class="p-4"><span class="px-2 py-1 rounded-full text-xs font-semibold ' + stCls + '">' + esc(title(e)) + '</span></td>' +
+        '<td class="p-4 pr-6 text-xs text-gray-500">' + (x.last_seen ? ago(x.last_seen) : '-') + '</td></tr>';
+    }).join('') : '<tr><td colspan="7" class="text-center p-8 text-gray-500">No app activity matches these filters.</td></tr>';
+    document.getElementById('appShowingCount').textContent = appsView.length;
+  };
+  window.resetAppFilters = function(){
+    ['appSearch', 'appFilter', 'appCompanyFilter'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+    window.renderAppsPage();
+  };
+  window.exportAppsTable = function(){
+    var byCo = {}; rows.forEach(function(r){ byCo[String(r.company_id)] = r; });
+    var q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    var csv = ['App,User,Company,Role,Last Active'].concat(appsView.map(function(x){
+      var r = byCo[String(x.company_id)]; return [appName(x.app), x.user_key, (r && r.company_name) || x.company_id, x.role || 'User', x.last_seen || ''].map(q).join(','); })).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'app-usage.csv'; a.click();
+  };
 
   function mergeTickets(){
     if (typeof supportTickets === 'undefined') return;
@@ -5615,7 +5726,7 @@ function devAutoRefresh(){
   function planLine(c){
     var due = dueOf(c), yr = c.billing === 'Yearly';
     var h = '<div class="text-xs text-gray-500 mt-1">' + money(due) + (due > 0 ? (yr ? ' / year \u00b7 Full year (10% off)' : ' / month \u00b7 Monthly') : '') + '</div>';
-    var names = { mail: 'Mail', crm: 'CRM', projects: 'Projects', payroll: 'Payroll', sell: 'Sell' };
+    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell' };
     if (c.allApps) h += '<div class="text-xs text-emerald-700 font-semibold mt-1">\u2713 All apps</div>';
     else if (c.appList) h += '<div class="text-xs text-gray-500 mt-1">Apps: ' + String(c.appList).split(',').filter(Boolean).map(function(k){ return esc(names[k] || k); }).join(', ') + '</div>';
     return h;
