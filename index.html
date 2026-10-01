@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <style id="hubUniformText">
-/* Whole Support Hub: Cambria, and every heading/paragraph/button/label at one uniform size (Tailwind text-sm) */
+
 *{font-family:Cambria,Georgia,'Times New Roman',serif !important;}
 body, body :not(i):not(svg):not(svg *){font-size:.875rem !important;line-height:1.25rem !important;}
 </style>
@@ -241,7 +241,7 @@ align-items:center;
 z-index:1000;
 }
 
-/* ==== Dark mode ==================================================== */
+
 body.dark-mode{background:#0A1615;color:#e5e7eb;}
 body.dark-mode .topbar{background:#0F201F;color:#e5e7eb;box-shadow:none;border-bottom:1px solid #1c2f2d;}
 body.dark-mode .card{background:#0F201F;color:#e5e7eb;border-color:#1c2f2d;box-shadow:none;}
@@ -270,7 +270,7 @@ body.home-mode{overflow:auto;}
 .project-card{transition:border-color .15s,transform .15s;}
 .project-card:hover{border-color:#357D79;transform:translateY(-2px);}
 
-/* ==== Home page (Books-style) ======================================= */
+
 body.home-mode{background:#fff;}
 html.dark body.home-mode{background:#0b1220;}
 #homePage{--hp-bg:#fff;--hp-alt:#f8fafc;--hp-card:#fff;--hp-line:#e2e8f0;--hp-soft:#f1f5f9;--hp-ink:#0f172a;--hp-text:#475569;--hp-muted:#64748b;--hp-accent:#2563eb;--hp-accent-d:#1d4ed8;--hp-accent-soft:#dbeafe;--hp-accent-faint:#eff6ff;--hp-accent-light:#60a5fa;--hp-head:rgba(255,255,255,.9);--hp-input:#f8fafc;background:var(--hp-bg);color:var(--hp-text);line-height:1.5;overflow-x:hidden;}
@@ -281,12 +281,12 @@ html.dark #homePage{--hp-bg:#0b1220;--hp-alt:#0f172a;--hp-card:#111a2e;--hp-line
 #homePage h1,#homePage h2,#homePage h3,#homePage h4,#homePage p{margin:0;}
 #homePage button{cursor:pointer;font:inherit;}
 #homePage :focus-visible{outline:3px solid var(--hp-accent-light);outline-offset:3px;border-radius:6px;}
-/* Font Awesome needs its own font-family; the hub forces Cambria on everything */
+
 #homePage i.fa-solid,#homePage i.fa-regular{font-family:"Font Awesome 6 Free" !important;}
 #homePage i.fa-solid{font-weight:900;}
 #homePage i.fa-regular{font-weight:400;}
 
-/* Header */
+
 #homePage .hp-header{position:fixed;top:0;left:0;width:100%;height:80px;background:var(--hp-head);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:space-between;padding:0 5%;z-index:1000;border-bottom:1px solid var(--hp-soft);}
 #homePage .hp-logo{display:flex;align-items:center;gap:12px;}
 #homePage .hp-logo-mark{width:44px;height:44px;border-radius:10px;background:var(--hp-accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;}
@@ -307,7 +307,7 @@ html.dark #homePage .hp-theme .hp-moon{display:none;}
 #homePage .hp-getstarted:hover{background:var(--hp-accent-d);transform:translateY(-1px);}
 #homePage .hp-burger{display:none;background:none;border:1px solid var(--hp-line);color:var(--hp-ink);width:36px;height:36px;border-radius:8px;align-items:center;justify-content:center;}
 
-/* Hero */
+
 #homePage .hp-hero{margin-top:80px;min-height:85vh;display:flex;align-items:center;justify-content:space-between;padding:80px 5%;position:relative;overflow:hidden;background:#0f172a;}
 #homePage .hp-slides{position:absolute;inset:0;z-index:1;}
 #homePage .hp-slide{position:absolute;inset:0;background-size:cover;background-position:center;background-repeat:no-repeat;opacity:0;transition:opacity 1.2s ease-in-out;}
@@ -334,7 +334,7 @@ html.dark #homePage .hp-theme .hp-moon{display:none;}
 #homePage .hp-float1{left:-20px;top:60px;}
 #homePage .hp-float2{right:-20px;bottom:60px;}
 
-/* Sections */
+
 #homePage .hp-section{padding:100px 5%;scroll-margin-top:80px;}
 #homePage .hp-section-alt{padding:100px 5%;background:var(--hp-alt);border-top:1px solid var(--hp-soft);border-bottom:1px solid var(--hp-soft);scroll-margin-top:80px;}
 #homePage .hp-title{text-align:center;margin-bottom:60px;}
@@ -351,7 +351,7 @@ html.dark #homePage .hp-title span,html.dark #homePage .hp-pill{color:#93c5fd;}
 #homePage .hp-card p{font-size:15px;line-height:1.6;color:var(--hp-muted);}
 #homePage .hp-icon{width:48px;height:48px;background:var(--hp-accent-faint);color:var(--hp-accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:20px;}
 
-/* Two-column text blocks */
+
 #homePage .hp-two{max-width:1200px;margin:auto;display:grid;grid-template-columns:1.15fr 1fr;gap:64px;align-items:center;}
 #homePage .hp-text p{font-size:16px;line-height:1.7;color:var(--hp-muted);margin-bottom:20px;}
 #homePage .hp-actions-row{display:flex;gap:14px;margin-top:26px;flex-wrap:wrap;}
@@ -368,7 +368,7 @@ html.dark #homePage .hp-quote{background:#111a2e;border:1px solid var(--hp-line)
 #homePage .hp-quote i{color:#60a5fa;font-size:20px;margin-bottom:10px;display:block;}
 #homePage .hp-quote p{font-size:16px;line-height:1.7;}
 
-/* Steps */
+
 #homePage .hp-steps{max-width:1200px;margin:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:28px;}
 #homePage .hp-step{background:var(--hp-card);border:1px solid var(--hp-line);border-radius:12px;padding:32px 26px;transition:.3s;}
 #homePage .hp-step:hover{border-color:var(--hp-accent);transform:translateY(-3px);box-shadow:0 14px 30px rgba(0,0,0,.05);}
@@ -376,7 +376,7 @@ html.dark #homePage .hp-quote{background:#111a2e;border:1px solid var(--hp-line)
 #homePage .hp-step h3{font-size:20px;font-weight:700;color:var(--hp-ink);margin-bottom:10px;}
 #homePage .hp-step p{font-size:15px;line-height:1.6;color:var(--hp-muted);}
 
-/* Work / modules */
+
 #homePage .hp-feature{max-width:1200px;margin:0 auto 30px;display:grid;grid-template-columns:1fr 1.4fr;gap:0;border-radius:16px;overflow:hidden;background:#0f172a;color:#cbd5e1;}
 #homePage .hp-feature-main{padding:40px;display:flex;flex-direction:column;justify-content:center;}
 #homePage .hp-feature-main h3{font-size:30px;font-weight:800;color:#fff;margin-bottom:14px;}
@@ -406,7 +406,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 #homePage .hp-learn i{font-size:14px;color:var(--hp-muted);transition:transform .2s;}
 #homePage .hp-module:hover .hp-learn i{transform:translateX(4px);color:var(--hp-accent);}
 
-/* Pricing */
+
 #homePage .hp-tiers{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:30px;}
 #homePage .hp-tier{background:var(--hp-card);border-radius:16px;padding:40px 32px;border:1px solid var(--hp-line);position:relative;transition:all .3s;}
 #homePage .hp-tier:hover{transform:translateY(-4px);box-shadow:0 20px 30px rgba(0,0,0,.04);}
@@ -419,14 +419,14 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 #homePage .hp-tier-note{text-align:center;margin-top:28px;font-size:14px;color:var(--hp-muted);}
 #homePage .hp-tier-cta{text-align:center;margin-top:20px;}
 
-/* FAQ */
+
 #homePage .hp-faq{max-width:860px;margin:auto;display:flex;flex-direction:column;gap:14px;}
 #homePage .hp-faq details{background:var(--hp-card);border:1px solid var(--hp-line);border-radius:10px;padding:18px 24px;}
 #homePage .hp-faq summary{cursor:pointer;font-weight:700;color:var(--hp-ink);font-size:16px;}
 #homePage .hp-faq details[open]{border-color:var(--hp-accent);}
 #homePage .hp-faq details p{margin-top:12px;font-size:15px;line-height:1.6;color:var(--hp-muted);}
 
-/* Contact form */
+
 #homePage .hp-form-card{background:var(--hp-card);border:1px solid var(--hp-line);border-radius:16px;padding:32px;box-shadow:0 4px 6px -1px rgba(0,0,0,.02);}
 #homePage .hp-form{display:grid;gap:16px;}
 #homePage .hp-form label{font-size:14px;font-weight:600;color:var(--hp-ink);display:grid;gap:6px;}
@@ -439,7 +439,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 #homePage .hp-contact-list div{display:flex;align-items:center;gap:12px;font-size:15px;color:var(--hp-text);}
 #homePage .hp-contact-list i{width:36px;height:36px;border-radius:8px;background:var(--hp-accent-faint);color:var(--hp-accent);display:inline-flex;align-items:center;justify-content:center;font-size:14px;}
 
-/* CTA band */
+
 #homePage .hp-cta{padding:100px 5%;background:#0f172a;color:#fff;position:relative;overflow:hidden;}
 #homePage .hp-ctabox{max-width:1200px;margin:auto;display:grid;grid-template-columns:1.5fr 1fr;gap:80px;align-items:center;}
 #homePage .hp-cta h2{font-size:42px;font-weight:800;letter-spacing:-1px;margin-bottom:20px;color:#fff;line-height:1.15;}
@@ -452,7 +452,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 #homePage .hp-cta-item{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.08);font-size:14px;color:#cbd5e1;}
 #homePage .hp-cta-item:last-child{border:none;}
 
-/* Footer */
+
 #homePage .hp-footer{background:#020617;color:#94a3b8;padding:80px 5% 30px;border-top:1px solid #0f172a;}
 #homePage .hp-footgrid{max-width:1200px;margin:0 auto 60px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;}
 #homePage .hp-footlogo h2{font-size:24px;font-weight:800;color:#fff;margin-bottom:16px;}
@@ -463,7 +463,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 #homePage .hp-footcol a:hover,#homePage .hp-footcol button:hover{color:#fff;}
 #homePage .hp-bottom{max-width:1200px;margin:0 auto;border-top:1px solid #0f172a;padding-top:30px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:13px;}
 
-/* Responsive */
+
 @media(max-width:1100px){
 #homePage .hp-nav ul{gap:20px;}
 }
@@ -496,7 +496,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 #homePage .hp-preview,#homePage .hp-form-card,#homePage .hp-feature-main,#homePage .hp-feature-side{padding:24px;}
 }
 
-/* single-view navigation: only the chosen page shows */
+
 #homePage .hp-page{display:none;}
 #homePage .hp-page.hp-active{display:block;animation:hpFade .35s ease;}
 #homePage .hp-hero.hp-active{display:flex;}
@@ -547,7 +547,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 </head>
 <body class="home-mode">
 
-<!-- ============== PUBLIC HOME PAGE ============== -->
+
 <div id="homePage">
 
   <header class="hp-header" id="top">
@@ -1056,7 +1056,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
   }
   (function(){
     var root=document.getElementById('homePage');
-    // hero background slider
+    
     var slides=root.querySelectorAll('.hp-slide'),i=0;
     setInterval(function(){
       if(root.classList.contains('hidden')||slides.length<2) return;
@@ -1064,13 +1064,13 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
       i=(i+1)%slides.length;
       slides[i].classList.add('active');
     },5000);
-    // mobile menu
+    
     var nav=document.getElementById('hpNav'),burger=document.getElementById('hpBurger');
     burger.addEventListener('click',function(){
       var open=nav.classList.toggle('open');
       burger.setAttribute('aria-expanded',open?'true':'false');
     });
-    // single-view navigation: each nav link shows only its own page
+    
     var pages=root.querySelectorAll('.hp-page');
     var valid={top:1,about:1,services:1,process:1,work:1,pricing:1,faq:1,contact:1};
     function show(id,push){
@@ -1096,7 +1096,7 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
   </script>
 
 </div>
-<!-- ============== END PUBLIC HOME PAGE ============== -->
+
 
 <div class="login-page hidden" id="loginPage">
 <div class="login-card">
@@ -2852,15 +2852,15 @@ const SUPPORT_KEY = "acacia_support";
 const SETTINGS_KEY = "acacia_settings";
 const LOG_KEY = "acacia_logs";
 
-/* ==== Cross-app data adapter =========================================
-   The customer app (index.html) writes:
-     users     -> "users"      (may be company-namespaced: "users::comp_x")
-     companies -> "companies"  (fields: companyId, companyName, ownerName,
-                                email, plan, price, status, registered)
-     plan      -> "selectedPlan"
-   This panel previously only read "acacia_companies", so companies and the
-   chosen plan never rendered. We now read every matching store (including
-   company-namespaced copies) and normalise the records. =============== */
+
+
+
+
+
+
+
+
+
 const NS_SEP = "::";
 const COMPANY_STORE_KEYS = ["companies", "acacia_companies"];
 const USER_STORE_KEYS = ["users", "acacia_users"];
@@ -2938,8 +2938,8 @@ function normalizeUsers(list){
     });
     return Array.from(map.values());
 }
-/* Users registered by the app always carry their company + chosen plan, so
-   they double as a company source if the "companies" store is missing one. */
+
+
 function companiesFromUsers(userList){
     return (userList || []).filter(u => u.companyName || u.companyId).map(u => ({
         companyId: u.companyId || u.companyName,
@@ -2955,18 +2955,18 @@ function companiesFromUsers(userList){
 }
 function loadUsersFromStores(){ return normalizeUsers(devCollect(USER_STORE_KEYS)); }
 
-/* The customer app records money in "payments" / "customerPayments" /
-   "invoices" (optionally company-namespaced). The panel used to read only
-   "acacia_payments", so nothing rendered. Collect + normalise them all. */
-/* Billing is driven by the SUBSCRIPTION PLAN the customer picked when the
-   account/company was created - not by whatever activity happens inside the
-   website. So each company registration produces one subscription invoice
-   priced from the chosen plan. Only invoices created here in the panel are
-   read back from storage; app-side activity stores are ignored. */
+
+
+
+
+
+
+
+
 const PAYMENT_STORE_KEYS = ["acacia_payments"];
 const SIGNUP_PLAN_PRICES = { free:0, starter:1500, pro:3500, business:7500, enterprise:0, allaccess:15000 };
 function planKeyOf(plan){ return String(plan || "free").toLowerCase().replace(/[^a-z]/g, ""); }
-/* Full-year price = 12 months less 10%. Accepts "Yearly" or "yearly" (the app saves it lower-case). */
+
 function isYearly(b){ return /^y/i.test(String(b || "")); }
 function yearlyTotal(monthly){ return Math.round(Number(monthly || 0) * 12 * 0.9); }
 function signupPlanPrice(plan){
@@ -3007,8 +3007,8 @@ function normalizePayments(list){
     });
     return Array.from(map.values());
 }
-/* One subscription invoice per registered company, priced from the plan that
-   was picked at sign-up (company.price wins when the app stored one). */
+
+
 function buildSignupPayments(companyList){
     return (companyList || []).map(c => {
         const plan = devTitle(c.plan, "Free");
@@ -3046,7 +3046,7 @@ function loadPaymentsFromStores(){
 }
 function persistPayments(){
     try {
-        /* signup subscription invoices are derived from companies, never stored */
+        
         localStorage.setItem(PAYMENT_KEY, JSON.stringify((payments || []).filter(p => p.source !== "signup")));
     } catch(e){ console.warn("persistPayments", e); }
 }
@@ -3079,7 +3079,7 @@ let supportTickets = JSON.parse(localStorage.getItem(SUPPORT_KEY) || "[]");
 let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
 let logs = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
 
-/* No demo data: websites are only what you attach/upload. */
+
 const DEFAULT_WEBSITES = [];
 let websites = JSON.parse(localStorage.getItem(WEBSITE_KEY) || "null") || [];
 function saveWebsites(){ localStorage.setItem(WEBSITE_KEY, JSON.stringify(websites)); }
@@ -3324,13 +3324,13 @@ const PRICING_PLANS = {
 };
 
 function calculateInvoiceAmount(p) {
-    /* Amount always comes from the plan picked at account creation. */
+    
     if (p && p.source === "signup") return Number(p.amount) || 0;
-    /* An invoice that is already saved keeps its saved amount, so changing plan prices never rewrites past revenue. */
+    
     if (p && p.id && Number(p.amount) > 0) return Number(p.amount);
     const planKey = planKeyOf((p && p.plan) || 'free');
     const planConfig = PRICING_PLANS[planKey] || { base: signupPlanPrice(planKey) };
-    /* Enterprise is custom-priced: use the agreed monthly price typed in the invoice form. */
+    
     const base = planConfig.custom ? (Number(p && p.customAmount) || 0) : planConfig.base;
     let cost = base + ((Number(p && p.addonsCount) || 0) * 1500);
     if (p && isYearly(p.billing)) {
@@ -3457,7 +3457,7 @@ function renderPayments() {
     if (startDate) filtered = filtered.filter(p => !p.date || new Date(p.date) >= new Date(startDate));
     if (endDate) filtered = filtered.filter(p => !p.date || new Date(p.date) <= new Date(endDate));
 
-    // Totals reflect the full (unfiltered by pagination) filtered set
+    
     filtered.forEach(p => {
         const amt = calculateInvoiceAmount(p);
         if (p.status === "Completed") { revenue += amt; completed++; }
@@ -3581,8 +3581,8 @@ function nextPeriodDate(from, billing){
     return out;
 }
 
-/* Proper invoice preview (was a plain alert that also crashed on
-   subscription rows because their ids are strings). */
+
+
 function previewPayment(id) {
     const p = payments.find(x => String(x.id) === String(id));
     if (!p) return alert("Payment not found.");
@@ -3640,7 +3640,7 @@ function printInvoice(id) {
     setTimeout(() => { try { w.print(); } catch(e){} }, 600);
 }
 
-/* Renew = charge the SAME plan chosen at sign-up for the next period. */
+
 function renewPayment(id) {
     const p = payments.find(x => String(x.id) === String(id));
     if (!p) return alert("Payment not found.");
@@ -3665,7 +3665,7 @@ function renewPayment(id) {
     });
     persistPayments();
 
-    // Push the new expiry back onto the company record so the app sees it too.
+    
     const company = companies.find(c => String(c.companyName) === String(p.company || p.customer) || String(c.email) === String(p.email));
     if (company) {
         company.expiry = nextPeriodDate(nextDate, p.billing).toLocaleDateString();
@@ -3893,11 +3893,11 @@ ${t.source === 'cloud' ? `
     updateBulkBar('support');
 }
 
-// Pulls in tickets created via the customer-facing "Acacia AI Support" chat
-// widget (stored per-user under axSupport_tickets_<userKey>) and merges any
-// new ones into this admin's supportTickets list. Existing entries (and any
-// status changes already made here) are left alone — this only adds tickets
-// that haven't been seen before, matched by their original chat ticket id.
+
+
+
+
+
 function syncChatWidgetTickets(){
     try {
         const seen = new Set(supportTickets.map(t => String(t.id)));
@@ -3931,8 +3931,8 @@ function syncChatWidgetTickets(){
     } catch(e) { console.error('syncChatWidgetTickets failed', e); }
 }
 
-// Every AI Chat conversation (axSupport_history_<user>) shows up here as a
-// live chat entry, even when the customer never formally raised a ticket.
+
+
 function syncChatConversations(seen){
     let changed = 0;
     for (let i = 0; i < localStorage.length; i++){
@@ -4034,7 +4034,7 @@ function applyTheme(mode, persist){
         settings.theme = mode;
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     }
-    // repaint graphs so their gradients match the new surface
+    
     if (document.querySelector(".page.active")?.id === "analytics") refreshAnalytics();
 }
 function toggleDarkMode(){
@@ -4322,7 +4322,7 @@ function closeCodeEditor() {
     }
 }
 
-/* ---- Attach / preview / source viewing --------------------------- */
+
 const SITE_SRC_PREFIX = "acacia_site_src_";
 let previewSiteId = null;
 
@@ -4591,8 +4591,8 @@ function refreshAnalytics(){
 
 let revenueChart, usersChart, websiteChart, dashboardChartRef;
 
-/* Monthly buckets so every panel renders a real time-series graph
-   (line / area / smooth curves) instead of single-value bar+pie charts. */
+
+
 function devMonthBuckets(months){
     const out = [];
     const now = new Date();
@@ -4659,7 +4659,7 @@ function drawAnalyticsCharts(users, companies, payments, websites){
     const pendSeries = devSeries((payments || []).filter(p => p.status !== "Completed"), months, "date", p => calculateInvoiceAmount(p));
     const labels = revSeries.map(b => b.label);
 
-    // Fall back to spreading current totals so the graph is never a flat blank
+    
     const revTotal = revSeries.reduce((a, b) => a + b.value, 0);
     if (revTotal === 0 && completed.length){
         const each = completed.reduce((a, p) => a + calculateInvoiceAmount(p), 0);
@@ -4807,7 +4807,7 @@ function emailReport(key) {
         alert("Please generate the report first before dispatching via email.");
         return;
     }
-    // Open the report email as a DRAFT in Acacia Mail; review and send from there.
+    
     const __when = (r.generated && r.generated !== "-") ? r.generated : new Date().toLocaleString();
     const __body = [
         "Hello,",
@@ -4857,7 +4857,7 @@ function loadDashboard(){
         });
     }
 
-    // Trend graph (destroy first: re-rendering the same canvas otherwise throws)
+    
     if (typeof Chart !== "undefined") {
         if (dashboardChartRef) { dashboardChartRef.destroy(); dashboardChartRef = null; }
         const rangeVal = document.getElementById("dashboardChartRange")?.value || "";
@@ -4899,7 +4899,7 @@ document.addEventListener('click', function(e) {
     }
 });
 
-/* ===================== Pagination Framework ===================== */
+
 const paginationState = {
     users: { page: 1, size: 25 },
     companies: { page: 1, size: 25 },
@@ -4966,7 +4966,7 @@ function prevLogPage(){ if(paginationState.logs.page>1){ paginationState.logs.pa
 function nextLogPage(){ paginationState.logs.page++; renderLogs(); }
 function changeLogPageSize(){ paginationState.logs.size = parseInt(document.getElementById('logPageSize').value); paginationState.logs.page = 1; renderLogs(); }
 
-/* ===================== Sorting Framework ===================== */
+
 const sortState = {};
 function genericSort(arr, key, stateKey, valueFn) {
     if (!sortState[stateKey]) sortState[stateKey] = {};
@@ -5019,7 +5019,7 @@ function sortSupportTickets(field){
     renderSupportTickets();
 }
 
-/* ===================== Bulk Selection Framework ===================== */
+
 const bulkSelections = { users: new Set(), companies: new Set(), payments: new Set(), notifications: new Set(), support: new Set(), logs: new Set() };
 const bulkConfig = {
     users: { rowClass: 'user-row-checkbox', barId: 'userBulkBar', countId: 'selectedUserCount', selectAllId: 'selectAllUsers' },
@@ -5066,7 +5066,7 @@ function toggleSelectAllNotifications(cb){ toggleSelectAllGeneric('notifications
 function toggleSelectAllSupport(cb){ toggleSelectAllGeneric('support', cb.checked); }
 function toggleSelectAllLogs(cb){ toggleSelectAllGeneric('logs', cb.checked); }
 
-// Users bulk actions
+
 function bulkActivateUsers(){
     const ids = Array.from(bulkSelections.users).map(Number);
     users.forEach(u => { if (ids.includes(u.id)) u.status = 'Active'; });
@@ -5093,7 +5093,7 @@ function bulkDeleteUsers(){
     renderUsers();
 }
 
-// Companies bulk actions
+
 function bulkExportCompanies(){
     const ids = Array.from(bulkSelections.companies);
     const selected = companies.filter(c => ids.includes(String(c.id || c.companyName)));
@@ -5113,7 +5113,7 @@ function bulkDeleteCompanies(){
     renderCompanies();
 }
 
-// Payments bulk actions
+
 function bulkMarkAsPaid(){
     const ids = Array.from(bulkSelections.payments).map(Number);
     payments.forEach(p => { if (ids.includes(p.id)) p.status = 'Completed'; });
@@ -5138,7 +5138,7 @@ function bulkDelete(){
     renderPayments();
 }
 
-// Notifications bulk actions
+
 function bulkMarkAsRead(){
     const ids = Array.from(bulkSelections.notifications).map(Number);
     notifications.forEach(n => { if (ids.includes(n.id)) n.status = 'Read'; });
@@ -5163,7 +5163,7 @@ function bulkDeleteNotifications(){
     renderNotifications();
 }
 
-// Support bulk actions
+
 function bulkAssignTickets(){
     const ids = Array.from(bulkSelections.support);
     alert(`${ids.length} tickets assigned to the current developer queue.`);
@@ -5186,7 +5186,7 @@ function bulkDeleteTickets(){
     renderSupportTickets();
 }
 
-// Logs bulk actions
+
 function bulkExportSelectedLogs(){
     const ids = Array.from(bulkSelections.logs).map(Number);
     const selected = logs.filter(l => ids.includes(l.id));
@@ -5205,7 +5205,7 @@ function bulkDeleteSelectedLogs(){
     renderLogs();
 }
 
-/* ===================== Filter helpers ===================== */
+
 function populateFilterOptions(selectId, values){
     const select = document.getElementById(selectId);
     if (!select) return;
@@ -5232,7 +5232,7 @@ function resetCompanyFilters(){
     renderCompanies();
 }
 
-/* ===================== Misc missing functions ===================== */
+
 function triggerFileInput(){
     const input = document.createElement('input');
     input.type = 'file';
@@ -5304,7 +5304,7 @@ function openBulkImportUsersModal(){
         lines.forEach(line => {
             if (!line.trim()) return;
             const parts = line.split(',').map(s => s.trim());
-            if (parts[0].toLowerCase() === 'username') return; // skip header row
+            if (parts[0].toLowerCase() === 'username') return; 
             const [username, email, company, role, status] = parts;
             if (!username) return;
             users.push({ id: Date.now() + imported, username, email: email || '', company: company || '', role: role || 'Viewer', status: status || 'Active' });
@@ -5339,17 +5339,17 @@ window.onload = function () {
     loadSettings();
     loadDashboard();
 
-    // Keep the panel in sync with the customer app (same browser storage).
+    
     window.addEventListener("storage", devAutoRefresh);
     setInterval(devAutoRefresh, 4000);
 };
 
 function devAutoRefresh(){
     try {
-        // Companies and Users are owned by the cloud sync (hubCloud script) once it is
-        // active, so this local-storage refresh must never touch them - even for a
-        // moment - or it repeatedly wipes the cloud list back down to whatever is
-        // saved in this one browser.
+        
+        
+        
+        
         var cloudOwns = !!window.__acxCloudActive;
         if (!cloudOwns){
           users = loadUsersFromStores();
@@ -5370,7 +5370,7 @@ function devAutoRefresh(){
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script id="hubCloud">
-/* Support Hub cloud control: approve new accounts, deactivate on expiry, live user counts. */
+
 (function(){
   var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
   window.__SUPA_URL__ = URL_; window.__SUPA_KEY__ = KEY_;
@@ -5386,9 +5386,9 @@ function devAutoRefresh(){
   function who(){ try { return (JSON.parse(localStorage.getItem('developerSession') || '{}').fullName) || 'Developer'; } catch(e){ return 'Developer'; } }
 
 
-  /* ---- Permanent-delete memory ("tombstones") ----
-     Deleted companies/users are remembered so they can never be rebuilt from
-     leftover usage rows, cached accounts or this browser's local copies. */
+  
+
+
   var TOMB_KEY = 'acacia_hub_deleted';
   function tombs(){ try { var t = JSON.parse(localStorage.getItem(TOMB_KEY) || '{}'); return { companies: t.companies || [], users: t.users || [] }; } catch(e){ return { companies: [], users: [] }; } }
   function saveTombs(t){ try { localStorage.setItem(TOMB_KEY, JSON.stringify(t)); } catch(e){} }
@@ -5427,7 +5427,7 @@ function devAutoRefresh(){
   }
 
 
-  /* ---- Role-based access: Accounts (payments) and Customer Care (inquiries) ---- */
+  
   var hubRole = '';
   var ROLE_PAGES = { hub_accounts: ['payments', 'companies'], hub_support: ['support'] };
   var ROLE_NAME = { hub_admin: 'Admin', hub_viewer: 'Viewer (read-only)', hub_accounts: 'Accounts', hub_support: 'Customer Care' };
@@ -5513,7 +5513,7 @@ function devAutoRefresh(){
     return parts.length ? parts.join(' \u00b7 ') + ' \u00b7 active ' + ago(last) : 'No app activity yet';
   }
 
-  /* ---- Apps page: all app usage in one table, filterable by app ---- */
+  
   var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell' };
   function appName(k){ k = String(k || ''); return APP_NAMES[k.toLowerCase()] || (k ? title(k) : 'Unknown'); }
   var appsView = [];
@@ -5646,8 +5646,8 @@ function devAutoRefresh(){
       d.source = 'cloud';
       return d;
     });
-    /* App-usage rows only carry a login key (often the email) and a generic role. They must never overwrite the real
-       username/role of an account that already exists, so keep them only for logins with no account record. */
+    
+
     var __have = {}; cu.forEach(function(d){ [d.email, d.username].forEach(function(v){ if (v) __have[String(v).toLowerCase()] = 1; }); });
     var uu = usage.filter(function(x){ return !__have[String(x.user_key || '').toLowerCase()]; }).map(function(x){ var r = byId[x.company_id], e = r ? eff(r) : 'active';
       return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'), source: 'cloud' }; });
@@ -5707,7 +5707,7 @@ function devAutoRefresh(){
     var r = await sb.from('acacia_company_status').insert({ company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' });
     if (r.error) alert('Failed: ' + r.error.message); await refresh(); };
 
-  /* Extra users a company has paid for on top of its plan's limit (Books: limit = plan limit + extra_users). */
+  
   window.hubSetExtraUsers = async function(id){
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     var c = co(id), cur = Number((c._row || {}).extra_users || 0);
@@ -5721,7 +5721,7 @@ function devAutoRefresh(){
 
   var badge = { Pending: 'bg-amber-100 text-amber-800', Active: 'bg-green-100 text-green-800', Suspended: 'bg-red-100 text-red-800', Expired: 'bg-red-100 text-red-800', Rejected: 'bg-gray-200 text-gray-700', Untracked: 'bg-blue-100 text-blue-800' };
   function money(n){ n = Number(n || 0); return n > 0 ? 'KES ' + n.toLocaleString() : 'Free'; }
-  /* Price shown for a company: the full-year total for yearly customers, the monthly price otherwise. */
+  
   function dueOf(c){ var m = Number(c.price || 0); if (Number(c.amountDue) > 0) return Number(c.amountDue); return c.billing === 'Yearly' ? Math.round(m * 12 * 0.9) : m; }
   function planLine(c){
     var due = dueOf(c), yr = c.billing === 'Yearly';
@@ -5772,7 +5772,7 @@ function devAutoRefresh(){
     renderPageNumbers('companyPageNumbers', 'companies', pg.totalPages, gotoCompanyPage);
     updateBulkBar('companies');
   };
-  // ---- Plan upgrade requests (Support page) ----
+  
   function upMoney(u){ return (/enterprise/i.test(u.requested_plan || '') && !Number(u.amount)) ? 'Custom price' : money(u.amount); }
   function renderUpgrades(){
     var tb = document.getElementById('upgradeReqTable'); if (!tb) return;
@@ -5809,7 +5809,7 @@ function devAutoRefresh(){
     var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: true, p_paid_until: pu, p_note: null, p_price: price });
     if (r.error){ alert('Failed: ' + r.error.message); return; }
     try { addLog('Info', who(), 'Approved upgrade ' + (u.company_name || u.company_id) + ' -> ' + u.requested_plan, 'Companies'); } catch(e){}
-    /* While upgrading, also record any extra users the company paid for (skipped for Enterprise = unlimited). */
+    
     if (!/enterprise/i.test(u.requested_plan || '')){
       var curExtra = Number((co(u.company_id)._row || {}).extra_users || 0);
       var ev = prompt('Extra users to add on top of the ' + u.requested_plan + ' plan limit (0 = none).\nTotal extra users now: ' + curExtra, String(curExtra));
@@ -5985,7 +5985,7 @@ function devAutoRefresh(){
   };
 
 
-  // ---- Hub Access (Settings page) --------------------------------------
+  
   function renderHubAccess(){
     var box = document.getElementById('hubAccessCard'); if (!box) return;
     var me0 = (JSON.parse(localStorage.getItem('developerSession') || '{}').email || '').toLowerCase();
@@ -6025,7 +6025,7 @@ function devAutoRefresh(){
   var _origLoadSettings = window.loadSettings;
   window.loadSettings = function(){ var r = _origLoadSettings ? _origLoadSettings.apply(this, arguments) : undefined; renderHubAccess(); return r; };
 
-  // ---- Alerts: new pending company or new open ticket, while this tab is open ----
+  
   var seenPending = null, seenTickets = null, notifyAsked = false;
   function beep(){
     try {
@@ -6059,7 +6059,7 @@ function devAutoRefresh(){
   }
 
 
-  // ---- Revenue / growth dashboard card ----------------------------------
+  
   function monthKey(d){ d = new Date(d); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
   function monthLabel(k){ var p = k.split('-'); var names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[Number(p[1]) - 1] + ' ' + p[0]; }
   function renderRevenueCard(){
@@ -6098,11 +6098,11 @@ function devAutoRefresh(){
   }
 
 
-  // ---- Reset password / change email for a real (cloud) user account -----
-  // Matches Books' own scheme exactly: SHA-256(salt + ":" + password), hex.
-  // We can never see or recover someone's existing password - only Books,
-  // where it's typed, ever handles the plain text - but we can set a brand
-  // new one, or point the same account at a different email address.
+  
+  
+  
+  
+  
   function genSalt(){
     var a = new Uint8Array(16); crypto.getRandomValues(a);
     return Array.from(a).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
@@ -6166,7 +6166,7 @@ function devAutoRefresh(){
     newName = newName.trim();
     var r1 = await sb.from('acacia_company_status').update({ company_name: newName, updated_at: new Date().toISOString() }).eq('company_id', c.companyId);
     if (r1.error) { alert('Failed: ' + r1.error.message); return; }
-    // Keep every login under this company showing the new name too.
+    
     var acc = await sb.from('app_accounts').select('login_id,data').eq('company_id', c.companyId);
     if (!acc.error && acc.data){
       for (var i = 0; i < acc.data.length; i++){
@@ -6187,7 +6187,7 @@ function devAutoRefresh(){
 })();
 </script>
 <script id="hubSites">
-/* Website Manager: cloud sync (Supabase) + folders. Local copy is only a cache. */
+
 (function(){
   var sb = window.__acxSb; if (!sb) return;
   var folders = [], snap = {}, pendingSrc = {}, memSrc = {}, collapsed = {}, pushing = false, pulling = false, inited = false, pt = null, MIG = 'acacia_sites_migrated';
@@ -6242,7 +6242,7 @@ function devAutoRefresh(){
     if (!canW()){ ro(); return pull(); }
     pushing = true;
     try {
-      /* separate batches so a status/folder change never overwrites the stored source */
+      
       if (withSrc.length){ var r1 = await sb.from('acacia_hub_sites').upsert(withSrc); if (r1.error) throw r1.error; }
       if (plain.length){ var r2 = await sb.from('acacia_hub_sites').upsert(plain); if (r2.error) throw r2.error; }
       if (del.length){ var r3 = await sb.from('acacia_hub_sites').delete().in('id', del); if (r3.error) throw r3.error; }
