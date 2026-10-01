@@ -1605,11 +1605,11 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
   <p class="my-2 text-gray-500">Manage all Acacia Books applications from one dashboard.</p>
 
   <div class="flex flex-wrap gap-2 mb-4">
-    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex items-center gap-1.5 font-medium" onclick="renderWebsites()">
+    <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex items-center gap-1.5 font-medium" onclick="hubRefreshSites()">
       <span>🔄</span> Refresh
     </button>
 
-    <button class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-1.5 font-medium shadow-sm" onclick="attachWebsiteModal()">
+    <div class="flex items-center gap-1.5 bg-white border border-gray-200 rounded px-2"><span class="text-xs text-gray-500">Save into</span><select id="importFolder" class="text-sm border-0 py-2" onchange="hubFolderSelChange(this)"><option value="">No folder</option></select></div><button class="bg-amber-500 text-white px-4 py-2 rounded hover:bg-amber-600 transition flex items-center gap-1.5 font-medium shadow-sm" onclick="hubNewFolder()"><span>📁</span> New Folder</button><button class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center gap-1.5 font-medium shadow-sm" onclick="attachWebsiteModal()">
       <span>🔗</span> Attach Website
     </button>
 
@@ -5329,6 +5329,7 @@ function devAutoRefresh(){
   window.__SUPA_URL__ = URL_; window.__SUPA_KEY__ = KEY_;
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
+  window.__acxSb = sb;
   var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], upgrades = [], busy = false;
 
   function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
@@ -5729,10 +5730,24 @@ function devAutoRefresh(){
     }
   };
 
-  window.__acxHubBoot = function(){ roleCheck().then(refresh); };
+  window.__acxHubBoot = function(){ roleCheck().then(refresh).then(live); };
   window.__acxHubSignOut = function(){ try { sb.auth.signOut(); } catch(e){} };
 
   window.__acxCloudActive = true;
+  window.__acxCanWrite = function(){ return canWrite; };
+  var rt = null, kt = null;
+  function kick(){ clearTimeout(kt); kt = setTimeout(function(){ if (!localStorage.getItem('developerSession')) return; if (busy) return kick(); refresh(); }, 400); }
+  window.__acxKick = kick;
+  function live(){
+    if (rt || !sb.channel || !localStorage.getItem('developerSession')) return;
+    try {
+      rt = sb.channel('hub-live');
+      ['acacia_company_status','app_accounts','acacia_app_usage','acacia_tickets','acacia_ticket_messages','acacia_payments','acacia_hub_users','acacia_upgrade_requests'].forEach(function(t){ rt = rt.on('postgres_changes', { event: '*', schema: 'public', table: t }, kick); });
+      rt.subscribe();
+    } catch(e){ rt = null; console.warn('[hub cloud] realtime unavailable, polling only', e); }
+  }
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) kick(); });
+  window.addEventListener('focus', kick); window.addEventListener('online', kick);
 
   var _origDeleteCompany = window.deleteCompany, _origDeleteUser = window.deleteUser;
   var _origBulkDeleteCompanies = window.bulkDeleteCompanies, _origBulkDeleteUsers = window.bulkDeleteUsers;
@@ -6055,9 +6070,187 @@ function devAutoRefresh(){
     await refresh();
   };
 
-  function start(){ if (!localStorage.getItem('developerSession')) { pill(); return; } roleCheck().then(refresh); }
+  function start(){ if (!localStorage.getItem('developerSession')) { pill(); return; } roleCheck().then(refresh).then(live); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
-  setInterval(function(){ if (localStorage.getItem('developerSession')) refresh(); }, 60000);
+  setInterval(function(){ if (localStorage.getItem('developerSession')) refresh(); }, 15000);
+})();
+</script>
+<script id="hubSites">
+/* Website Manager: cloud sync (Supabase) + folders. Local copy is only a cache. */
+(function(){
+  var sb = window.__acxSb; if (!sb) return;
+  var folders = [], snap = {}, pendingSrc = {}, memSrc = {}, collapsed = {}, pushing = false, pulling = false, inited = false, pt = null, MIG = 'acacia_sites_migrated';
+  function e(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){ return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]; }); }
+  function js(s){ return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  function canW(){ return window.__acxCanWrite && window.__acxCanWrite(); }
+  function ro(){ alert('Read-only: hub admin sign-in missing.'); }
+  function toRow(s){ return { id: s.id, folder_id: s.folderId || null, name: s.name, url: s.url || (s.file && s.file !== '#' ? s.file : null), version: s.version || '1.0', size: s.size || '', status: s.status || 'Active', uploaded: s.uploaded || '', attached: !!s.attached, has_source: !!s.hasSource }; }
+  function fromRow(r){ var s = { id: Number(r.id), folderId: r.folder_id == null ? null : Number(r.folder_id), name: r.name, file: r.url || '#', version: r.version, size: r.size, status: r.status, uploaded: r.uploaded, attached: !!r.attached, hasSource: !!r.has_source, _u: r.updated_at }; if (r.url) s.url = r.url; return s; }
+  function sig(s){ return JSON.stringify(toRow(s)); }
+  function takeSnap(){ snap = {}; websites.forEach(function(s){ snap[s.id] = sig(s); }); }
+  function cache(){ try { localStorage.setItem(WEBSITE_KEY, JSON.stringify(websites)); } catch(x){} }
+
+  async function pull(){
+    if (!localStorage.getItem('developerSession')) return;
+    if (pulling || pushing){ sched(); return; }
+    pulling = true;
+    try {
+      var a = await sb.from('acacia_hub_sites').select('id,folder_id,name,url,version,size,status,uploaded,attached,has_source,updated_at').order('id');
+      var f = await sb.from('acacia_hub_folders').select('id,name').order('name');
+      if (a.error || f.error){ console.warn('[hub sites] ' + (a.error || f.error).message + ' - run the website sync SQL in Supabase'); return; }
+      var cloud = (a.data || []).map(fromRow);
+      if (!localStorage.getItem(MIG) && canW()){
+        var have = {}; cloud.forEach(function(s){ have[s.id] = 1; });
+        var up = websites.filter(function(s){ return !have[s.id]; }).map(function(s){
+          var r = toRow(s); r.updated_at = new Date().toISOString();
+          if (s.hasSource){ var src = localStorage.getItem(SITE_SRC_PREFIX + s.id); if (src) r.source = src; else r.has_source = false; }
+          return r; });
+        if (up.length){ var u = await sb.from('acacia_hub_sites').upsert(up); if (u.error){ console.warn('[hub sites] migrate failed', u.error.message); return; } }
+        localStorage.setItem(MIG, '1');
+        if (up.length){ pulling = false; return pull(); }
+      }
+      folders = (f.data || []).map(function(x){ return { id: Number(x.id), name: x.name }; });
+      websites = cloud; takeSnap(); cache(); renderWebsites(); fillSel();
+    } catch(x){ console.warn('[hub sites] pull failed', x); }
+    finally { pulling = false; }
+  }
+  function sched(){ clearTimeout(pt); pt = setTimeout(pull, 400); }
+
+  async function pushDiff(){
+    var sel = document.getElementById('importFolder'), fid = sel && /^\d+$/.test(sel.value) ? Number(sel.value) : null;
+    var cur = {}, withSrc = [], plain = [], del = [];
+    websites.forEach(function(s){
+      if (!(s.id in snap) && !s.folderId && fid) s.folderId = fid;
+      cur[s.id] = 1;
+      if (snap[s.id] === sig(s)) return;
+      var r = toRow(s); r.updated_at = new Date().toISOString();
+      if (s.hasSource && pendingSrc[s.id] != null){ r.source = pendingSrc[s.id]; withSrc.push(r); } else plain.push(r);
+    });
+    Object.keys(snap).forEach(function(k){ if (!cur[k]) del.push(Number(k)); });
+    if (!withSrc.length && !plain.length && !del.length) return;
+    if (!canW()){ ro(); return pull(); }
+    pushing = true;
+    try {
+      /* separate batches so a status/folder change never overwrites the stored source */
+      if (withSrc.length){ var r1 = await sb.from('acacia_hub_sites').upsert(withSrc); if (r1.error) throw r1.error; }
+      if (plain.length){ var r2 = await sb.from('acacia_hub_sites').upsert(plain); if (r2.error) throw r2.error; }
+      if (del.length){ var r3 = await sb.from('acacia_hub_sites').delete().in('id', del); if (r3.error) throw r3.error; }
+      withSrc.forEach(function(r){ delete pendingSrc[r.id]; });
+      takeSnap();
+    } catch(x){ alert('Website sync failed: ' + (x.message || x) + '\n\nHave you run the website sync SQL in Supabase?'); pushing = false; return pull(); }
+    pushing = false; renderWebsites(); fillSel();
+  }
+
+  var _save = window.saveWebsites, _ssrc = window.saveSiteSource, _gsrc = window.getSiteSource;
+  window.saveWebsites = function(){ try { _save(); } catch(x){} pushDiff(); };
+  window.saveSiteSource = function(id, c){ memSrc[id] = c; pendingSrc[id] = c; try { _ssrc(id, c); } catch(x){} };
+  window.getSiteSource = function(id){ return memSrc[id] != null ? memSrc[id] : _gsrc(id); };
+
+  async function ensureSrc(id){
+    try {
+      var s = websites.find(function(w){ return Number(w.id) === Number(id); });
+      if (!s || !s.hasSource || memSrc[s.id] != null) return;
+      var k = 'acacia_site_stamp_' + s.id;
+      if (_gsrc(s.id) && localStorage.getItem(k) === String(s._u)) return;
+      var r = await sb.from('acacia_hub_sites').select('source').eq('id', s.id).maybeSingle();
+      if (r.data && r.data.source != null){ memSrc[s.id] = r.data.source; try { localStorage.setItem(SITE_SRC_PREFIX + s.id, r.data.source); localStorage.setItem(k, String(s._u)); } catch(x){} }
+    } catch(x){ console.warn('[hub sites] source fetch failed', x); }
+  }
+  var _l = window.launchWebsite, _v = window.viewWebsiteCode, _o = window.openWebsite;
+  window.launchWebsite = async function(id){ await ensureSrc(id); return _l(id); };
+  window.viewWebsiteCode = async function(id){ await ensureSrc(id); return _v(id); };
+  window.openWebsite = async function(id){ await ensureSrc(id); return _o(id); };
+
+  function fillSel(val){
+    var el = document.getElementById('importFolder'); if (!el) return;
+    var cur = val != null ? val : el.value;
+    el.innerHTML = '<option value="">No folder</option>' + folders.map(function(f){ return '<option value="' + f.id + '">\uD83D\uDCC1 ' + e(f.name) + '</option>'; }).join('') + '<option value="__new">+ New folder\u2026</option>';
+    el.value = cur; if (el.value !== cur) el.value = '';
+  }
+  window.hubFolderSelChange = function(el){ if (el.value === '__new'){ el.value = ''; window.hubNewFolder(true); } };
+
+  window.hubNewFolder = function(selectIt){
+    if (!canW()) return ro();
+    var list = websites.map(function(s){ return '<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="hubFolderPick" value="' + s.id + '"> ' + e(s.name) + '</label>'; }).join('') || '<p class="text-xs text-gray-500">No websites yet - choose this folder in "Save into" before your next upload.</p>';
+    openModal('New Folder', '<input id="hubFolderName" type="text" placeholder="Folder name (e.g. Client sites)" class="w-full p-2 border rounded text-sm"><p class="text-xs text-gray-500">Tick the websites to put in this folder:</p><div class="max-h-60 overflow-auto space-y-1 border rounded p-2">' + list + '</div>', function(){
+      var name = (document.getElementById('hubFolderName').value || '').trim();
+      var picks = Array.from(document.querySelectorAll('.hubFolderPick:checked')).map(function(x){ return Number(x.value); });
+      if (!name){ alert('Give the folder a name.'); return; }
+      makeFolder(name, picks, selectIt === true);
+    });
+  };
+  async function makeFolder(name, picks, selectIt){
+    var id = Date.now(), r = await sb.from('acacia_hub_folders').insert({ id: id, name: name });
+    if (r.error){ alert('Could not create folder: ' + r.error.message + '\n\nRun the website sync SQL in Supabase first.'); return; }
+    folders.push({ id: id, name: name });
+    picks.forEach(function(pid){ var s = websites.find(function(w){ return Number(w.id) === pid; }); if (s) s.folderId = id; });
+    fillSel(selectIt ? String(id) : null);
+    window.saveWebsites(); renderWebsites();
+  }
+  window.hubRenameFolder = async function(id){
+    if (!canW()) return ro();
+    var f = folders.find(function(x){ return x.id === id; }); if (!f) return;
+    var n = prompt('Rename folder:', f.name); if (!n || !n.trim() || n.trim() === f.name) return;
+    var r = await sb.from('acacia_hub_folders').update({ name: n.trim() }).eq('id', id);
+    if (r.error) return alert('Failed: ' + r.error.message);
+    f.name = n.trim(); renderWebsites(); fillSel();
+  };
+  window.hubDeleteFolder = async function(id){
+    if (!canW()) return ro();
+    if (!confirm('Delete this folder? The websites inside are kept and move to "No folder".')) return;
+    var r = await sb.from('acacia_hub_folders').delete().eq('id', id);
+    if (r.error) return alert('Failed: ' + r.error.message);
+    folders = folders.filter(function(x){ return x.id !== id; });
+    websites.forEach(function(s){ if (s.folderId === id) s.folderId = null; });
+    takeSnap(); cache(); renderWebsites(); fillSel();
+  };
+  window.hubMoveSite = function(id, v){
+    var s = websites.find(function(w){ return Number(w.id) === Number(id); }); if (!s) return;
+    s.folderId = Number(v) || null; window.saveWebsites(); renderWebsites();
+  };
+  window.hubToggleFolder = function(id){ collapsed[id] = !collapsed[id]; renderWebsites(); };
+  window.hubRefreshSites = function(){ pull(); if (window.__acxKick) window.__acxKick(); };
+  window.syncApplications = async function(){ await pull(); if (window.__acxKick) window.__acxKick(); alert('Websites synced from the cloud.'); };
+
+  function row(s){
+    var on = s.status === 'Active', ind = s.folderId ? '<span class="inline-block w-4"></span>' : '';
+    var mv = '<select class="text-xs border rounded px-1 py-1" onchange="hubMoveSite(' + s.id + ',this.value);this.value=\'\'"><option value="">Move to\u2026</option><option value="0">No folder</option>' + folders.map(function(f){ return '<option value="' + f.id + '">' + e(f.name) + '</option>'; }).join('') + '</select>';
+    return '<tr><td>' + ind + e(s.name) + '</td><td>' + e(s.version) + '</td><td><span class="' + (on ? 'text-green-600' : 'text-red-500') + '">' + e(s.status) + '</span></td><td>' + e(s.uploaded) + '</td><td>' + e(s.size) + '</td><td>' +
+      '<button class="bg-emerald-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="launchWebsite(' + s.id + ')">\uD83D\uDE80 Launch</button>' +
+      '<button class="bg-slate-700 text-white px-2 py-1 text-xs rounded mr-1" onclick="viewWebsiteCode(' + s.id + ')">&lt;/&gt; Code</button>' +
+      '<button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openWebsite(' + s.id + ')">Open</button>' +
+      '<button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openInVSCode(\'' + e(js(s.path || s.name)) + '\')">VS Code</button>' +
+      '<button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="toggleWebsite(' + s.id + ')">' + (on ? 'Disable' : 'Enable') + '</button>' +
+      '<button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="deleteWebsite(' + s.id + ')">Delete</button>' + mv + '</td></tr>';
+  }
+  window.renderWebsites = function(){
+    var tb = document.getElementById('websiteTable'); if (!tb) return;
+    var running = 0, storage = 0, h = '';
+    websites.forEach(function(s){ if (s.status === 'Active') running++; storage += parseFloat(s.size) || 0; });
+    folders.forEach(function(f){
+      var items = websites.filter(function(s){ return s.folderId === f.id; });
+      h += '<tr class="bg-slate-100"><td colspan="6" class="px-3 py-2"><button class="mr-2 text-xs" onclick="hubToggleFolder(' + f.id + ')">' + (collapsed[f.id] ? '\u25B6' : '\u25BC') + '</button><b>\uD83D\uDCC1 ' + e(f.name) + '</b> <span class="text-xs text-gray-500">(' + items.length + ')</span>' +
+        '<button class="text-xs text-blue-700 underline ml-3" onclick="hubRenameFolder(' + f.id + ')">Rename</button><button class="text-xs text-red-600 underline ml-2" onclick="hubDeleteFolder(' + f.id + ')">Delete folder</button></td></tr>';
+      if (!collapsed[f.id]) h += items.map(row).join('');
+    });
+    var loose = websites.filter(function(s){ return !folders.some(function(f){ return f.id === s.folderId; }); });
+    if (loose.length && folders.length) h += '<tr class="bg-slate-100"><td colspan="6" class="px-3 py-2"><b>No folder</b> <span class="text-xs text-gray-500">(' + loose.length + ')</span></td></tr>';
+    h += loose.map(row).join('');
+    tb.innerHTML = h;
+    var set = function(id, v){ var x = document.getElementById(id); if (x) x.textContent = v; };
+    set('totalWebsitesCount', websites.length); set('runningWebsites', running); set('disabledWebsites', websites.length - running);
+    set('websiteStorage', storage.toFixed(2) + ' MB'); set('totalWebsites', websites.length); set('storageUsed', storage.toFixed(2) + ' MB');
+  };
+
+  function init(){
+    if (inited) return; inited = true; pull();
+    try { if (sb.channel) sb.channel('hub-sites').on('postgres_changes', { event: '*', schema: 'public', table: 'acacia_hub_sites' }, sched).on('postgres_changes', { event: '*', schema: 'public', table: 'acacia_hub_folders' }, sched).subscribe(); } catch(x){}
+  }
+  var iv = setInterval(function(){ if (window.__acxCloudReady){ clearInterval(iv); init(); } }, 500);
+  setInterval(function(){ if (inited) pull(); }, 15000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden && inited) sched(); });
+  window.addEventListener('focus', function(){ if (inited) sched(); });
+  fillSel();
 })();
 </script>
 
