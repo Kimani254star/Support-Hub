@@ -2876,7 +2876,7 @@ function normalizeUsers(list){
     const map = new Map();
     (list || []).forEach(u => {
         if (!u || typeof u !== "object" || !(u.username || u.email)) return;
-        const key = String(u.email || u.username).toLowerCase();
+        const key = u.email ? String(u.email).toLowerCase() : (String(u.username).toLowerCase() + '|' + String(u.companyId || u.companyName || u.company || '').toLowerCase());
         const prev = map.get(key) || {};
         const realName = (prev.username && !/@/.test(prev.username) && /@/.test(String(u.username || ""))) ? prev.username : u.username;
         const rec = Object.assign({}, prev, u, {
@@ -4745,7 +4745,28 @@ function emailReport(key) {
         alert("Please generate the report first before dispatching via email.");
         return;
     }
-    alert(`Report bundle [${r.name}] sent to ${r.email}`);
+    // Open the report email as a DRAFT in Acacia Mail; review and send from there.
+    const __when = (r.generated && r.generated !== "-") ? r.generated : new Date().toLocaleString();
+    const __body = [
+        "Hello,",
+        "",
+        "Please find the " + r.name + " report summary below.",
+        "",
+        "Report: " + r.name,
+        "Description: " + (r.desc || "-"),
+        "Format: " + (r.format || "-"),
+        "Generated: " + __when,
+        "",
+        "The report file is attached.",
+        "",
+        "Regards,",
+        (function(){ try { return (JSON.parse(localStorage.getItem("developerSession") || "{}").fullName) || "Acacia Books Support"; } catch (e) { return "Acacia Books Support"; } })()
+    ].join("\n");
+    const __q = new URLSearchParams({ to: r.email || "", subject: "Acacia Books \u2013 " + r.name + " Report (" + __when + ")", body: __body, uid: "sp_" + key + "_" + Date.now() });
+    const __mailUrl = (window.__ACX_MAIL_URL__ || "acacia-mail.html") + "?" + __q.toString();
+    const __w = window.open(__mailUrl, "acaciaMail");
+    if (!__w) alert("Your browser blocked the new tab. Allow pop-ups for this page, then click Email again.");
+    try { addLog("Info", "Developer", "Opened " + r.name + " report email draft in Acacia Mail", "Reports"); } catch (e) {}
 }
 
 function deleteReport(key) {
@@ -5493,7 +5514,7 @@ function devAutoRefresh(){
       ['password','passwordHash','pass','salt','hash'].forEach(function(k){ delete d[k]; });
       d.companyId = d.companyId || a.company_id; d.email = d.email || a.login_id; d.username = d.username || a.username;
       var r = byId[d.companyId];
-      if (r){ var e = eff(r); d.status = e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'); }
+      if (r){ var e = eff(r); d.status = e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'); if (r.company_name){ d.companyName = r.company_name; d.company = r.company_name; } }
       if (String(d.role || '').toLowerCase() === 'custom' && d.customRole) d.role = d.customRole;
       d.source = 'cloud';
       return d;
