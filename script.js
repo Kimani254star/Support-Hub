@@ -1052,31 +1052,103 @@ function sendAllNotifications(){
 }
 
 function openCreateTicketModal() { openSupportModal(); }
-function openSupportModal() {
+
+/* ---- Support channels: AI Chat, WhatsApp, Email ---- */
+const SUPPORT_CHANNELS = {
+    chat:     { label: "AI Chat",  badge: "💬 AI Chat",  cls: "text-blue-700 bg-blue-100" },
+    whatsapp: { label: "WhatsApp", badge: "🟢 WhatsApp", cls: "text-emerald-700 bg-emerald-100" },
+    email:    { label: "Email",    badge: "✉️ Email",    cls: "text-amber-700 bg-amber-100" },
+    cloud:    { label: "Live",     badge: "☁ Live",      cls: "text-white bg-emerald-600" }
+};
+
+function supportChannelOf(t){ return t.source || "manual"; }
+
+function supportChannelBadge(t){
+    const c = SUPPORT_CHANNELS[t.source];
+    if (!c) return "";
+    return ` <span class="ml-1 text-[10px] font-semibold ${c.cls} px-1.5 py-0.5 rounded-full align-middle">${c.badge}</span>`;
+}
+
+function escAttr(v){
+    return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function normalizeWhatsappNumber(raw){
+    let d = String(raw || "").replace(/[^0-9]/g, "");
+    if (d.startsWith("00")) d = d.slice(2);
+    if (d.length === 10 && d.startsWith("0")) d = "254" + d.slice(1); // Kenyan local format
+    if (d.length === 9 && /^[17]/.test(d)) d = "254" + d;
+    return d;
+}
+
+function toggleTicketChannelFields(){
+    const ch = document.getElementById("modalTicket_channel").value;
+    const contact = document.getElementById("modalTicket_contact");
+    contact.classList.toggle("hidden", ch === "manual");
+    if (ch === "whatsapp") { contact.type = "tel";   contact.placeholder = "Customer WhatsApp number (e.g. 0712 345 678)"; }
+    if (ch === "email")    { contact.type = "email"; contact.placeholder = "Customer email address"; }
+}
+
+function openSupportModal(channel) {
+    const ch = channel || "manual";
     const bodyHtml = `
+        <select id="modalTicket_channel" onchange="toggleTicketChannelFields()" class="w-full p-2 border rounded text-sm">
+            <option value="manual" ${ch === "manual" ? "selected" : ""}>Channel: Manual / Other</option>
+            <option value="whatsapp" ${ch === "whatsapp" ? "selected" : ""}>Channel: WhatsApp</option>
+            <option value="email" ${ch === "email" ? "selected" : ""}>Channel: Email</option>
+        </select>
         <input id="modalTicket_cust" type="text" placeholder="Customer Name" class="w-full p-2 border rounded text-sm">
+        <input id="modalTicket_contact" type="text" class="w-full p-2 border rounded text-sm hidden">
         <input id="modalTicket_subj" type="text" placeholder="Subject Issue Description" class="w-full p-2 border rounded text-sm">
         <select id="modalTicket_priority" class="w-full p-2 border rounded text-sm">
             <option>Low</option>
             <option>Medium</option>
             <option>High</option>
         </select>
-        <textarea id="modalTicket_msg" placeholder="Describe architectural context/bug details..." class="w-full p-2 border rounded text-sm h-20"></textarea>
+        <textarea id="modalTicket_msg" placeholder="Describe architectural context/bug details, or paste the WhatsApp / email message..." class="w-full p-2 border rounded text-sm h-20"></textarea>
     `;
-    openModal("File System Support Ticket", bodyHtml, () => {
+    openModal(ch === "whatsapp" ? "Log WhatsApp Request" : ch === "email" ? "Log Email Request" : "File System Support Ticket", bodyHtml, () => {
+        const channelVal = document.getElementById("modalTicket_channel").value;
         const customer = document.getElementById("modalTicket_cust").value.trim();
+        const contact = document.getElementById("modalTicket_contact").value.trim();
         const subject = document.getElementById("modalTicket_subj").value.trim();
         const priority = document.getElementById("modalTicket_priority").value;
         const message = document.getElementById("modalTicket_msg").value.trim();
         if(!customer || !subject) return alert("Parameters can't be empty.");
+        if(channelVal === "whatsapp" && normalizeWhatsappNumber(contact).length < 9) return alert("Enter a valid WhatsApp number.");
+        if(channelVal === "email" && !/^\S+@\S+\.\S+$/.test(contact)) return alert("Enter a valid email address.");
 
-        supportTickets.push({
+        const ticket = {
             id: Date.now(), ticket: "TCK-" + Math.floor(1000 + Math.random() * 9000),
             customer, subject, priority, status: "Open", message, date: new Date().toLocaleDateString()
-        });
+        };
+        if (channelVal !== "manual") { ticket.source = channelVal; ticket.contact = contact; }
+        supportTickets.push(ticket);
         localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
         renderSupportTickets();
     });
+    toggleTicketChannelFields();
+}
+
+function replyViaChannel(id){
+    const t = supportTickets.find(x => String(x.id) === String(id));
+    if (!t || !t.contact) return alert("No contact saved for this ticket.");
+    const greeting = "Hi " + t.customer + ", this is " + (settings.platformName || "Support") + " regarding your request (" + t.ticket + "): " + t.subject + ". ";
+    if (t.source === "whatsapp") {
+        window.open("https://wa.me/" + normalizeWhatsappNumber(t.contact) + "?text=" + encodeURIComponent(greeting), "_blank", "noopener");
+    } else if (t.source === "email") {
+        window.location.href = "mailto:" + encodeURIComponent(t.contact).replace("%40", "@") +
+            "?subject=" + encodeURIComponent("Re: " + t.subject + " [" + t.ticket + "]") +
+            "&body=" + encodeURIComponent("Hi " + t.customer + ",\n\n\n\nRegards,\n" + (settings.platformName || "Support"));
+    }
+    if (t.status === "Open") { t.status = "In Progress"; localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets)); renderSupportTickets(); }
+}
+
+function setSupportChannel(ch){
+    const sel = document.getElementById("supportChannelFilter");
+    if (sel) sel.value = ch;
+    paginationState.support.page = 1;
+    renderSupportTickets();
 }
 
 function renderSupportTickets(){
@@ -1089,6 +1161,8 @@ function renderSupportTickets(){
     const endDate = document.getElementById("supportEndDate")?.value || "";
     tbody.innerHTML = "";
     let filtered = supportTickets.filter(t => t.customer.toLowerCase().includes(search) || t.subject.toLowerCase().includes(search));
+    const channelFilter = document.getElementById("supportChannelFilter")?.value || "";
+    if (channelFilter) filtered = filtered.filter(t => supportChannelOf(t) === channelFilter);
     if (priorityFilter) filtered = filtered.filter(t => t.priority === priorityFilter);
     if (statusFilter) filtered = filtered.filter(t => t.status === statusFilter);
     if (startDate) filtered = filtered.filter(t => !t.date || new Date(t.date) >= new Date(startDate));
@@ -1104,8 +1178,8 @@ function renderSupportTickets(){
             <tr>
                 <td class="p-4 pl-6"><input type="checkbox" class="support-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${t.id}" onclick="onRowCheckToggle('support')"></td>
                 <td>${t.ticket}</td>
-                <td>${t.subject}${t.source === 'chat' ? ' <span class="ml-1 text-[10px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full align-middle">💬 AI Chat</span>' : ''}${t.source === 'cloud' ? ' <span class="ml-1 text-[10px] font-semibold text-white bg-emerald-600 px-1.5 py-0.5 rounded-full align-middle">☁ Live</span>' : ''}${t.unread ? ' <span class="ml-1 text-[10px] font-semibold text-white bg-red-600 px-1.5 py-0.5 rounded-full align-middle">new</span>' : ''}</td>
-                <td>${t.customer}</td>
+                <td>${t.subject}${supportChannelBadge(t)}${t.unread ? ' <span class="ml-1 text-[10px] font-semibold text-white bg-red-600 px-1.5 py-0.5 rounded-full align-middle">new</span>' : ''}</td>
+                <td>${t.customer}${t.contact ? `<div class="text-xs text-gray-400">${escAttr(t.contact)}</div>` : ''}</td>
                 <td><span class="${t.priority==='High'?'text-red-600 font-bold':''}">${t.priority}</span></td>
                 <td><span class="text-blue-500">${t.status}</span></td>
                 <td>${t.date}</td>
@@ -1115,6 +1189,7 @@ ${t.source === 'cloud' ? `
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubResolveTicket('${t.id}')">Resolve</button>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="hubDeleteTicket('${t.id}')">Delete</button>
                     ` : `
+                    ${t.contact && (t.source === 'whatsapp' || t.source === 'email') ? `<button class="${t.source === 'whatsapp' ? 'bg-emerald-600' : 'bg-amber-600'} text-white px-1 py-1 text-xs rounded mr-1" onclick="replyViaChannel('${t.id}')">${t.source === 'whatsapp' ? 'Reply on WhatsApp' : 'Reply by Email'}</button>` : ''}
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="resolveTicket('${t.id}')">Resolve</button>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteTicket('${t.id}')">Delete</button>
                     `}
@@ -1122,6 +1197,16 @@ ${t.source === 'cloud' ? `
             </tr>`;
         });
     }
+    const chanCount = ch => supportTickets.filter(t => supportChannelOf(t) === ch).length;
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt("chanCountChat", chanCount("chat"));
+    setTxt("chanCountWhatsapp", chanCount("whatsapp"));
+    setTxt("chanCountEmail", chanCount("email"));
+    setTxt("chanCountAll", supportTickets.length);
+    document.querySelectorAll("#supportChannelStrip .support-channel-card").forEach(c => {
+        const on = c.dataset.channel === channelFilter;
+        c.classList.toggle("ring-2", on); c.classList.toggle("ring-blue-500", on);
+    });
     document.getElementById("statTotalTickets").textContent = supportTickets.length;
     document.getElementById("statOpenTickets").textContent = supportTickets.filter(t=>t.status==="Open").length;
     document.getElementById("statResolvedTickets").textContent = supportTickets.filter(t=>t.status==="Resolved").length;
@@ -1218,6 +1303,7 @@ function resetSupportFilters(){
     document.getElementById("supportPriorityFilter").value = "";
     document.getElementById("supportStatusFilter").value = "";
     document.getElementById("supportCategoryFilter").value = "";
+    document.getElementById("supportChannelFilter").value = "";
     document.getElementById("supportStartDate").value = "";
     document.getElementById("supportEndDate").value = "";
     paginationState.support.page = 1;
@@ -1251,6 +1337,7 @@ function savePlatformSettings(){
     settings.platformVersion = document.getElementById("platformVersion").value;
     settings.supportEmail = document.getElementById("supportEmail").value;
     settings.supportPhone = document.getElementById("supportPhone").value;
+    settings.supportWhatsapp = document.getElementById("supportWhatsapp").value;
     settings.lastSaved = new Date().toLocaleString();
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     document.getElementById("lastSaved").textContent = "Last Saved: " + settings.lastSaved;
@@ -1370,6 +1457,7 @@ function loadSettings(){
     document.getElementById("platformVersion").value = settings.platformVersion || "17.10";
     document.getElementById("supportEmail").value = settings.supportEmail || "support@acaciabooks.com";
     document.getElementById("supportPhone").value = settings.supportPhone || "+254700000000";
+    document.getElementById("supportWhatsapp").value = settings.supportWhatsapp || settings.supportPhone || "+254700000000";
     document.getElementById("currency").value = settings.currency || "KES";
     document.getElementById("language").value = settings.language || "English";
     document.getElementById("theme").value = settings.theme || "Light";
