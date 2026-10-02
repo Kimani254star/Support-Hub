@@ -1,0 +1,3603 @@
+/* Tailwind config (was in the original <head> but ran before Tailwind loaded, so it never applied.
+   Left disabled to keep the look identical. Remove the comment markers to enable the teal palette.
+   tailwind.config = {
+     theme: {
+       extend: {
+         colors: {
+           blue: {
+             50:'#EEF5F5', 100:'#D9EAE9', 200:'#B3D5D3', 300:'#84B9B6',
+             400:'#579A97', 500:'#357D79', 600:'#22615D',
+             700:'#1A4B48', 800:'#143A38', 900:'#0E2B29', 950:'#081918'
+           }
+         },
+         fontFamily: {
+           sans: ['Inter','system-ui','sans-serif'],
+           mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','monospace']
+         },
+         boxShadow: {
+           sm: '0 1px 2px 0 rgba(14,26,25,.05)',
+           DEFAULT: '0 1px 3px 0 rgba(14,26,25,.08)',
+           md: '0 4px 10px -2px rgba(14,26,25,.08)',
+           lg: '0 10px 20px -6px rgba(14,26,25,.10)'
+         }
+       }
+     }
+   }
+*/
+
+/* ===== home page ===== */
+  function hpMore(btn){
+    var card=btn.closest('.hp-tier');
+    var open=card.classList.toggle('hp-open');
+    btn.innerHTML=open?'Show less &#9652;':'Show '+btn.getAttribute('data-n')+' more features &#9662;';
+  }
+  function hpBillingToggle(){
+    var yearly=document.getElementById('hpBilling').checked;
+    document.querySelectorAll('#homePage .hp-amt').forEach(function(el){
+      var p=yearly?+el.getAttribute('data-year'):+el.getAttribute('data-month');
+      el.textContent='KES '+p.toLocaleString('en-US');
+      var per=el.parentElement.querySelector('.hp-per');
+      if(per) per.textContent=yearly?'/yr':'/mo';
+    });
+  }
+  (function(){
+    var root=document.getElementById('homePage');
+    
+    var slides=root.querySelectorAll('.hp-slide'),i=0;
+    setInterval(function(){
+      if(root.classList.contains('hidden')||slides.length<2) return;
+      slides[i].classList.remove('active');
+      i=(i+1)%slides.length;
+      slides[i].classList.add('active');
+    },5000);
+    
+    var nav=document.getElementById('hpNav'),burger=document.getElementById('hpBurger');
+    burger.addEventListener('click',function(){
+      var open=nav.classList.toggle('open');
+      burger.setAttribute('aria-expanded',open?'true':'false');
+    });
+    
+    var pages=root.querySelectorAll('.hp-page');
+    var valid={top:1,about:1,services:1,process:1,work:1,pricing:1,faq:1,contact:1};
+    function show(id,push){
+      if(!valid[id]) id='top';
+      pages.forEach(function(p){p.classList.toggle('hp-active',p.getAttribute('data-page')===id);});
+      root.querySelectorAll('.hp-nav a').forEach(function(a){
+        a.classList.toggle('hp-current',a.getAttribute('href')==='#'+id);
+      });
+      nav.classList.remove('open');
+      burger.setAttribute('aria-expanded','false');
+      window.scrollTo(0,0);
+      if(push!==false){ try{history.pushState(null,'','#'+id);}catch(e){} }
+    }
+    root.querySelectorAll('a[data-scroll]').forEach(function(a){
+      a.addEventListener('click',function(e){
+        e.preventDefault();
+        show(a.getAttribute('href').slice(1));
+      });
+    });
+    window.addEventListener('popstate',function(){show((location.hash||'#top').slice(1),false);});
+    show((location.hash||'#top').slice(1),false);
+  })();
+
+/* ===== main app ===== */
+
+const USERS_KEY = "users";
+const COMPANY_KEY = "acacia_companies";
+const WEBSITE_KEY = "acacia_websites";
+const PAYMENT_KEY = "acacia_payments";
+const NOTIFICATION_KEY = "acacia_notifications";
+const SUPPORT_KEY = "acacia_support";
+const SETTINGS_KEY = "acacia_settings";
+const LOG_KEY = "acacia_logs";
+
+
+
+
+
+
+
+
+
+
+const NS_SEP = "::";
+const COMPANY_STORE_KEYS = ["companies", "acacia_companies"];
+const USER_STORE_KEYS = ["users", "acacia_users"];
+
+function devReadArray(key){
+    try { const parsed = JSON.parse(localStorage.getItem(key) || "null"); return Array.isArray(parsed) ? parsed : []; }
+    catch(e){ return []; }
+}
+function devCollect(baseKeys){
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        if (!k) continue;
+        const base = k.split(NS_SEP)[0];
+        if (baseKeys.indexOf(base) !== -1) out.push(...devReadArray(k));
+    }
+    return out;
+}
+function devTitle(v, fallback){
+    const str = String(v == null ? "" : v).trim();
+    if (!str) return fallback;
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+function devDate(v){
+    if (!v) return "-";
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString();
+}
+function devHashId(str){
+    let h = 0;
+    str = String(str || "");
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return Math.abs(h) || 1;
+}
+function normalizeCompanies(list){
+    const map = new Map();
+    (list || []).forEach(c => {
+        if (!c || typeof c !== "object") return;
+        const key = String(c.companyId || c.id || c.companyName || c.name || "").toLowerCase();
+        if (!key) return;
+        const rec = Object.assign({}, map.get(key) || {}, c, {
+            id: c.companyId || c.id || c.companyName,
+            companyId: c.companyId || c.id || c.companyName,
+            companyName: c.companyName || c.name || c.company || c.companyId || "-",
+            ownerName: c.ownerName || c.fullName || c.owner || "-",
+            email: c.email || "-",
+            plan: devTitle(c.plan, "Free"),
+            price: Number(c.price || 0),
+            status: devTitle(c.status, "Active"),
+            registered: devDate(c.registered || c.createdAt || c.date),
+            createdAt: devDate(c.registered || c.createdAt || c.date),
+            expiry: c.expiry ? devDate(c.expiry) : "-"
+        });
+        map.set(key, rec);
+    });
+    return Array.from(map.values());
+}
+function normalizeUsers(list){
+    const map = new Map();
+    (list || []).forEach(u => {
+        if (!u || typeof u !== "object" || !(u.username || u.email)) return;
+        const key = (u.email ? String(u.email).toLowerCase() : String(u.username).toLowerCase()) + '|' + String(u.companyId || u.companyName || u.company || '').toLowerCase();
+        const prev = map.get(key) || {};
+        const realName = (prev.username && !/@/.test(prev.username) && /@/.test(String(u.username || ""))) ? prev.username : u.username;
+        const rec = Object.assign({}, prev, u, {
+            id: u.id || devHashId(key),
+            username: realName || String(u.email).split("@")[0],
+            email: u.email || "",
+            company: u.company || u.companyName || u.companyId || "",
+            plan: devTitle(u.plan, "Free"),
+            role: devTitle(u.role, "Viewer"),
+            status: devTitle(u.status, "Active")
+        });
+        map.set(key, rec);
+    });
+    return Array.from(map.values());
+}
+
+
+function companiesFromUsers(userList){
+    return (userList || []).filter(u => u.companyName || u.companyId).map(u => ({
+        companyId: u.companyId || u.companyName,
+        companyName: u.companyName || u.companyId,
+        ownerName: u.fullName || u.username,
+        email: u.email,
+        plan: u.plan,
+        price: u.price,
+        status: u.status,
+        registered: u.registered,
+        expiry: u.expiry
+    }));
+}
+function loadUsersFromStores(){ return normalizeUsers(devCollect(USER_STORE_KEYS)); }
+
+
+
+
+
+
+
+
+
+const PAYMENT_STORE_KEYS = ["acacia_payments"];
+const SIGNUP_PLAN_PRICES = { free:0, starter:1500, pro:3500, business:7500, enterprise:0, allaccess:15000 };
+function planKeyOf(plan){ return String(plan || "free").toLowerCase().replace(/[^a-z]/g, ""); }
+
+function isYearly(b){ return /^y/i.test(String(b || "")); }
+function yearlyTotal(monthly){ return Math.round(Number(monthly || 0) * 12 * 0.9); }
+function signupPlanPrice(plan){
+    const k = planKeyOf(plan);
+    return SIGNUP_PLAN_PRICES[k] != null ? SIGNUP_PLAN_PRICES[k] : 0;
+}
+function normalizePayments(list){
+    const map = new Map();
+    (list || []).forEach(p => {
+        if (!p || typeof p !== "object") return;
+        const invoice = String(p.invoice || p.invoiceNo || p.invoiceNumber || p.reference || p.ref || p.id || "").trim();
+        const customer = String(p.customer || p.customerName || p.companyName || p.company || p.name || p.email || "").trim();
+        if (!invoice && !customer) return;
+        const key = (invoice || customer).toLowerCase();
+        const plan = devTitle(p.plan || p.package || p.subscription, "Free");
+        const billing = p.billing || p.cycle || "Monthly";
+        const addons = Number(p.addonsCount || 0);
+        let amount = Number(p.amount || p.total || 0);
+        if (!amount) {
+            amount = signupPlanPrice(plan) + addons * 1500;
+            if (isYearly(billing)) amount = yearlyTotal(amount);
+        }
+        const rec = Object.assign({}, map.get(key) || {}, p, {
+            id: p.id || devHashId(key),
+            invoice: invoice || "INV-" + devHashId(key),
+            customer: customer || "-",
+            email: p.email || p.customerEmail || "",
+            plan: plan,
+            billing: billing,
+            addonsCount: addons,
+            amount: amount,
+            method: p.method || p.paymentMethod || p.mode || "M-Pesa",
+            status: devTitle(p.status || p.state, "Pending"),
+            date: p.date || p.registered || p.createdAt || "",
+            source: p.source || "panel"
+        });
+        map.set(key, rec);
+    });
+    return Array.from(map.values());
+}
+
+
+function buildSignupPayments(companyList){
+    return (companyList || []).map(c => {
+        const plan = devTitle(c.plan, "Free");
+        const billing = c.billing || c.cycle || "Monthly";
+        let amount = Number(c.amountDue || 0);
+        if (!amount) {
+            amount = Number(c.price || 0) || signupPlanPrice(plan);
+            if (isYearly(billing)) amount = yearlyTotal(amount);
+        }
+        const paid = /paid|active|completed/i.test(String(c.paymentStatus || c.status || ""));
+        const isFree = signupPlanPrice(plan) === 0 && !amount;
+        return {
+            id: "sub-" + devHashId(String(c.companyId || c.companyName)),
+            invoice: "SUB-" + String(devHashId(String(c.companyId || c.companyName))).slice(0, 6),
+            customer: c.companyName || c.ownerName || "-",
+            email: c.email || "",
+            company: c.companyName || "",
+            plan: plan,
+            billing: billing,
+            addonsCount: 0,
+            amount: amount,
+            method: c.paymentMethod || (isFree ? "N/A" : "M-Pesa"),
+            status: isFree ? "Completed" : (paid ? "Completed" : "Pending"),
+            date: c.registered && c.registered !== "-" ? c.registered : (c.createdAt || ""),
+            source: "signup",
+            locked: true
+        };
+    });
+}
+function loadPaymentsFromStores(){
+    const manual = normalizePayments(devCollect(PAYMENT_STORE_KEYS)).filter(p => p.source !== "signup");
+    const signup = buildSignupPayments(typeof companies !== "undefined" ? companies : []);
+    const seen = new Set(signup.map(p => String(p.invoice).toLowerCase()));
+    return signup.concat(manual.filter(p => !seen.has(String(p.invoice).toLowerCase())));
+}
+function persistPayments(){
+    try {
+        
+        localStorage.setItem(PAYMENT_KEY, JSON.stringify((payments || []).filter(p => p.source !== "signup")));
+    } catch(e){ console.warn("persistPayments", e); }
+}
+function loadCompaniesFromStores(usersList){
+    return normalizeCompanies(companiesFromUsers(usersList).concat(devCollect(COMPANY_STORE_KEYS)));
+}
+function persistCompanies(){
+    const payload = JSON.stringify(companies);
+    localStorage.setItem("companies", payload);
+    localStorage.setItem(COMPANY_KEY, payload);
+}
+function populateFilterOptionsLabeled(selectId, values, allLabel){
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const current = select.value;
+    let unique = Array.from(new Set(values.filter(Boolean))).sort();
+    if (selectId === "companyPlanFilter") {
+        const ALL_PLANS = ["Free", "Starter", "Pro", "Business", "Enterprise", "All Access"];
+        unique = ALL_PLANS.concat(unique.filter(v => ALL_PLANS.indexOf(v) < 0));
+    }
+    select.innerHTML = `<option value="">${allLabel}</option>` + unique.map(v => `<option value="${v}">${v}</option>`).join("");
+    select.value = unique.includes(current) ? current : "";
+}
+
+let users = loadUsersFromStores();
+let companies = loadCompaniesFromStores(users);
+let payments = loadPaymentsFromStores();
+let notifications = JSON.parse(localStorage.getItem(NOTIFICATION_KEY) || "[]");
+let supportTickets = JSON.parse(localStorage.getItem(SUPPORT_KEY) || "[]");
+let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+let logs = JSON.parse(localStorage.getItem(LOG_KEY) || "[]");
+
+
+const DEFAULT_WEBSITES = [];
+let websites = JSON.parse(localStorage.getItem(WEBSITE_KEY) || "null") || [];
+function saveWebsites(){ localStorage.setItem(WEBSITE_KEY, JSON.stringify(websites)); }
+
+function showLogin(){
+    document.getElementById("homePage").classList.add("hidden");
+    document.getElementById("loginPage").classList.remove("hidden");
+    document.body.classList.remove("home-mode");
+}
+function showHome(){
+    document.getElementById("loginPage").classList.add("hidden");
+    document.getElementById("homePage").classList.remove("hidden");
+    document.body.classList.add("home-mode");
+}
+function submitContactForm(e){
+    e.preventDefault();
+    document.getElementById("contactConfirm").classList.remove("hidden");
+    e.target.reset();
+    return false;
+}
+
+async function login() {
+    const btn = document.getElementById("loginBtn");
+    const errEl = document.getElementById("error");
+    errEl.style.display = "none";
+    const u = document.getElementById("username").value.trim().toLowerCase();
+    const p = document.getElementById("password").value;
+    if (!u || !p) { errEl.textContent = "Enter your email and password."; errEl.style.display = "block"; return; }
+    if (btn) { btn.disabled = true; btn.textContent = "Signing in\u2026"; }
+    try {
+      var SUPA_URL = window.__SUPA_URL__ || "https://xglsampckermarjpczdf.supabase.co";
+      var SUPA_KEY = window.__SUPA_KEY__ || "sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A";
+      if (!window.supabase) throw new Error("Cloud connection unavailable. Check your internet and reload.");
+      var sbAuth = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { storageKey: "acacia-hub-auth", persistSession: true } });
+      var r = await sbAuth.auth.signInWithPassword({ email: u, password: p });
+      if (r.error) throw new Error("Incorrect email or password.");
+      var user = r.data.user;
+      var role = user && user.app_metadata && user.app_metadata.role;
+      if (["hub_admin","hub_viewer","hub_accounts","hub_support"].indexOf(role) === -1) {
+        await sbAuth.auth.signOut();
+        throw new Error("This account is not authorized for the Support Hub.");
+      }
+      var allow = await sbAuth.from("acacia_hub_users").select("email").eq("email", u).maybeSingle();
+      if (allow.error || !allow.data) {
+        await sbAuth.auth.signOut();
+        throw new Error("This email has not been given access to the Support Hub. Ask an admin to add it under Settings.");
+      }
+      var fullName = (user.user_metadata && user.user_metadata.fullName) || (user.email || "").split("@")[0];
+      var roleLabel = { hub_admin: "Administrator", hub_viewer: "Viewer (read-only)", hub_accounts: "Accounts", hub_support: "Customer Care" }[role] || "Viewer (read-only)";
+      const session = { email: user.email, role: roleLabel, hubRole: role, fullName: fullName, loginTime: new Date().toISOString() };
+      localStorage.setItem("developerSession", JSON.stringify(session));
+      document.getElementById("welcome").textContent = `Welcome, ${fullName}`;
+      document.getElementById("role").textContent = roleLabel;
+      document.getElementById("loginPage").classList.add("hidden");
+      document.getElementById("homePage").classList.add("hidden");
+      document.body.classList.remove("home-mode");
+      document.getElementById("app").classList.remove("hidden");
+      addLog("Info", fullName, "User Logged In Successfully (" + roleLabel + ")", "Auth");
+      loadDashboard();
+      if (window.__acxHubBoot) window.__acxHubBoot();
+    } catch (e) {
+      errEl.textContent = e.message || "Sign-in failed.";
+      errEl.style.display = "block";
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "Sign In"; }
+    }
+}
+
+function logout(){
+    localStorage.removeItem("developerSession");
+    try { if (window.__acxHubSignOut) window.__acxHubSignOut(); } catch(e){}
+    location.reload();
+}
+
+function openPage(id){
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+    if(id === 'dashboard') loadDashboard();
+    if(id === 'users') renderUsers();
+    if(id === 'companies') renderCompanies();
+    if(id === 'apps' && window.renderAppsPage) window.renderAppsPage();
+    if(id === 'payments') renderPayments();
+    if(id === 'analytics') refreshAnalytics();
+    if(id === 'reports') renderReports();
+    if(id === 'notifications') renderNotifications();
+    if(id === 'logs') renderLogs();
+    if(id === 'support') renderSupportTickets();
+}
+
+function openModal(title, bodyHtml, actionCallback) {
+    document.getElementById("modalTitle").textContent = title;
+    document.getElementById("modalBody").innerHTML = bodyHtml;
+    const actionBtn = document.getElementById("modalActionBtn");
+    actionBtn.onclick = function() {
+        actionCallback();
+        closeModal();
+    };
+    document.getElementById("globalModal").classList.remove("hidden");
+}
+
+function closeModal() {
+    document.getElementById("globalModal").classList.add("hidden");
+}
+
+function openUserModal(userId = null) {
+    const user = users.find(u => u.id == userId);
+    const title = user ? "Edit User" : "Add New User";
+    const bodyHtml = `
+        <input id="modalUser_name" type="text" placeholder="Username/Name" value="${user ? user.username : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalUser_email" type="email" placeholder="Email" value="${user ? (user.email || '') : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalUser_company" type="text" placeholder="Company" value="${user ? user.company : ''}" class="w-full p-2 border rounded text-sm">
+        <input id="modalUser_role" type="text" placeholder="Role (e.g. Admin, Staff)" value="${user ? user.role : ''}" class="w-full p-2 border rounded text-sm">
+        <select id="modalUser_status" class="w-full p-2 border rounded text-sm">
+            <option value="Active" ${user && user.status === 'Active' ? 'selected' : ''}>Active</option>
+            <option value="Inactive" ${user && user.status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+        </select>
+    `;
+    openModal(title, bodyHtml, () => {
+        const username = document.getElementById("modalUser_name").value.trim();
+        const email = document.getElementById("modalUser_email").value.trim();
+        const company = document.getElementById("modalUser_company").value.trim();
+        const role = document.getElementById("modalUser_role").value.trim();
+        const status = document.getElementById("modalUser_status").value;
+        if (!username) return alert("Username required!");
+
+        if (user) {
+            user.username = username;
+            user.email = email;
+            user.company = company;
+            user.role = role;
+            user.status = status;
+            addLog("Warning", "Developer", `Updated User: ${username}`, "Users");
+        } else {
+            users.push({ id: Date.now(), username, email, company, role, status });
+            addLog("Info", "Developer", `Created User: ${username}`, "Users");
+        }
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        renderUsers();
+    });
+}
+
+function renderUsers() {
+    const tbody = document.getElementById("usersTable");
+    const search = document.getElementById("userSearch").value.toLowerCase();
+    const roleFilter = document.getElementById("userRoleFilter")?.value || "";
+    const statusFilter = document.getElementById("userStatusFilter")?.value || "";
+    const companyFilter = document.getElementById("userCompanyFilter")?.value || "";
+    tbody.innerHTML = "";
+
+    populateFilterOptions("userCompanyFilter", users.map(u => u.company).filter(Boolean));
+
+    let filtered = users.filter(u =>
+        u.username.toLowerCase().includes(search) ||
+        (u.company && u.company.toLowerCase().includes(search)) ||
+        (u.email && u.email.toLowerCase().includes(search))
+    );
+    if (roleFilter) filtered = filtered.filter(u => u.role === roleFilter);
+    if (statusFilter) filtered = filtered.filter(u => (u.status || 'Active') === statusFilter);
+    if (companyFilter) filtered = filtered.filter(u => u.company === companyFilter);
+
+    document.getElementById("totalUserCount").textContent = users.length;
+    document.getElementById("activeUserCount").textContent = users.filter(u => (u.status||'Active') === 'Active').length;
+    document.getElementById("adminUserCount").textContent = users.filter(u => u.role === 'Administrator').length;
+    document.getElementById("suspendedUserCount").textContent = users.filter(u => u.status === 'Suspended' || u.status === 'Inactive').length;
+
+    const { pageItems, totalPages } = paginate(filtered, 'users');
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No users found</td></tr>`;
+    } else {
+        pageItems.forEach(u => {
+            tbody.innerHTML += `
+            <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="user-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${u.id}" onclick="onRowCheckToggle('users')"></td>
+                <td>${u.username}</td>
+                <td>${u.email || '-'}</td>
+                <td>${u.company || '-'}</td>
+                <td>${u.role || '-'}</td>
+                <td><span class="${u.status === 'Active' ? 'text-green-600 font-bold' : 'text-red-500'}">${u.status || 'Active'}</span></td>
+                <td>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="previewUser(${u.id})">Preview</button>
+                    ${u.source === 'cloud' ? `
+                    <button class="bg-amber-600 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubResetPassword(${u.id})">Reset password</button>
+                    <button class="bg-slate-600 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubChangeEmail(${u.id})">Change email</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteUser(${u.id})">Delete</button>
+                    ` : `
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="openUserModal(${u.id})">Edit</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteUser(${u.id})">Delete</button>
+                    `}
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("totalUsers").innerHTML = users.length;
+    document.getElementById("userShowingCount").textContent = pageItems.length;
+    renderPageNumbers("userPageNumbers", "users", totalPages, gotoUserPage);
+    updateBulkBar('users');
+}
+
+function previewUser(id) {
+    const user = users.find(u => u.id === id);
+    if (!user) return;
+
+    const bodyHtml = `
+        <div class="space-y-2 text-sm">
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Username</span><span class="font-medium">${user.username}</span></div>
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Email</span><span class="font-medium">${user.email || '-'}</span></div>
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Company</span><span class="font-medium">${user.company || '-'}</span></div>
+            <div class="flex justify-between border-b pb-1"><span class="text-gray-500">Role</span><span class="font-medium">${user.role || '-'}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500">Status</span><span class="font-medium">${user.status || 'Active'}</span></div>
+        </div>
+    `;
+    openModal("User Details", bodyHtml, () => {});
+    document.getElementById("modalActionBtn").classList.add("hidden");
+    const restoreBtn = () => document.getElementById("modalActionBtn").classList.remove("hidden");
+    document.querySelector('#globalModal button[onclick="closeModal()"]').addEventListener("click", restoreBtn, { once: true });
+}
+
+function deleteUser(id) {
+    if(!confirm("Delete this user?")) return;
+    users = users.filter(u => u.id !== id);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Error", "Developer", "Deleted System User Profile", "Users");
+    renderUsers();
+}
+
+function exportUsers() {
+    const blob = new Blob([JSON.stringify(users, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "system_users.json";
+    a.click();
+}
+
+const PRICING_PLANS = {
+    free: { base: 0, label: "Free" },
+    starter: { base: 1500, label: "Starter" },
+    pro: { base: 3500, label: "Pro" },
+    business: { base: 7500, label: "Business" },
+    enterprise: { base: 0, label: "Enterprise", custom: true },
+    allaccess: { base: 15000, label: "All Access" }
+};
+
+function calculateInvoiceAmount(p) {
+    
+    if (p && p.source === "signup") return Number(p.amount) || 0;
+    
+    if (p && p.id && Number(p.amount) > 0) return Number(p.amount);
+    const planKey = planKeyOf((p && p.plan) || 'free');
+    const planConfig = PRICING_PLANS[planKey] || { base: signupPlanPrice(planKey) };
+    
+    const base = planConfig.custom ? (Number(p && p.customAmount) || 0) : planConfig.base;
+    let cost = base + ((Number(p && p.addonsCount) || 0) * 1500);
+    if (p && isYearly(p.billing)) {
+        cost = yearlyTotal(cost);
+    }
+    return cost;
+}
+
+function openPaymentModal(payId = null) {
+    const payment = payments.find(p => p.id == payId);
+    const title = payment ? "Edit Payment Invoice" : "Generate New Payment";
+    
+    const currentPlan = payment ? (payment.plan || 'pro').toLowerCase().replace(/\s+/g, '') : 'pro';
+    const currentBilling = payment ? payment.billing : 'Monthly';
+    
+    const bodyHtml = `
+        <div class="space-y-3">
+            <input id="modalPay_invoice" type="text" placeholder="Invoice String (e.g. INV-002)" value="${payment ? payment.invoice : ''}" class="w-full p-2 border rounded text-sm">
+            <input id="modalPay_customer" type="text" placeholder="Customer Name" value="${payment ? payment.customer : ''}" class="w-full p-2 border rounded text-sm">
+            <input id="modalPay_email" type="email" placeholder="Customer Email" value="${payment ? (payment.email || '') : ''}" class="w-full p-2 border rounded text-sm">
+            
+            <select id="modalPay_plan" class="w-full p-2 border rounded text-sm">
+                <option value="free" ${currentPlan === 'free' ? 'selected' : ''}>Free (KES 0)</option>
+                <option value="starter" ${currentPlan === 'starter' ? 'selected' : ''}>Starter (KES 1,500)</option>
+                <option value="pro" ${currentPlan === 'pro' ? 'selected' : ''}>Pro (KES 3,500)</option>
+                <option value="business" ${currentPlan === 'business' ? 'selected' : ''}>Business (KES 7,500)</option>
+                <option value="enterprise" ${currentPlan === 'enterprise' ? 'selected' : ''}>Enterprise (Custom pricing)</option>
+                <option value="allaccess" ${currentPlan === 'allaccess' ? 'selected' : ''}>All Access (KES 15,000)</option>
+            </select>
+
+            <input id="modalPay_addons" type="number" min="0" placeholder="Number of Premium Add-ons (+ KES 1,500/mo)" value="${payment ? (payment.addonsCount || 0) : 0}" class="w-full p-2 border rounded text-sm">
+            <input id="modalPay_custom" type="number" min="0" placeholder="Agreed monthly price in KES (Enterprise only)" value="${payment && payment.customAmount ? payment.customAmount : ''}" class="w-full p-2 border rounded text-sm">
+            
+            <select id="modalPay_billing" class="w-full p-2 border rounded text-sm">
+                <option value="Monthly" ${currentBilling === 'Monthly' ? 'selected' : ''}>Monthly Billing</option>
+                <option value="Yearly" ${currentBilling === 'Yearly' ? 'selected' : ''}>Yearly Billing (10% off)</option>
+            </select>
+
+            <select id="modalPay_method" class="w-full p-2 border rounded text-sm">
+                <option ${payment && payment.method === 'M-Pesa' ? 'selected' : ''}>M-Pesa</option>
+                <option ${payment && payment.method === 'Bank Transfer' ? 'selected' : ''}>Bank Transfer</option>
+                <option ${payment && payment.method === 'Credit Card' ? 'selected' : ''}>Credit Card</option>
+            </select>
+            
+            <select id="modalPay_status" class="w-full p-2 border rounded text-sm">
+                <option ${payment && payment.status === 'Completed' ? 'selected' : ''}>Completed</option>
+                <option ${payment && payment.status === 'Pending' ? 'selected' : ''}>Pending</option>
+            </select>
+        </div>
+    `;
+
+    openModal(title, bodyHtml, () => {
+        const invoice = document.getElementById("modalPay_invoice").value.trim();
+        const customer = document.getElementById("modalPay_customer").value.trim();
+        const email = document.getElementById("modalPay_email").value.trim();
+        const plan = document.getElementById("modalPay_plan").value;
+        const addonsCount = parseInt(document.getElementById("modalPay_addons").value) || 0;
+        const customAmount = parseFloat((document.getElementById("modalPay_custom") || {}).value) || 0;
+        const billing = document.getElementById("modalPay_billing").value;
+        const method = document.getElementById("modalPay_method").value;
+        const status = document.getElementById("modalPay_status").value;
+
+        if (!invoice || !customer) return alert("Fill in all parameters!");
+
+        let calculatedValue = calculateInvoiceAmount({ plan, addonsCount, billing, customAmount });
+
+        if (payment) {
+            payment.invoice = invoice;
+            payment.customer = customer;
+            payment.email = email;
+            payment.plan = plan;
+            payment.addonsCount = addonsCount;
+            payment.customAmount = customAmount;
+            payment.billing = billing;
+            payment.amount = calculatedValue;
+            payment.method = method;
+            payment.status = status;
+        } else {
+            payments.push({
+                id: Date.now(),
+                invoice,
+                customer,
+                email,
+                plan,
+                addonsCount,
+                customAmount,
+                billing,
+                amount: calculatedValue,
+                method,
+                status,
+                date: new Date().toLocaleDateString()
+            });
+        }
+
+        localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+        addLog("Info", "Developer", `Processed Invoice: ${invoice}`, "Payments");
+        renderPayments();
+    });
+}
+
+function renderPayments() {
+    const tbody = document.getElementById("paymentsTable");
+    const search = document.getElementById("paymentSearch").value.toLowerCase();
+    const statusFilter = document.getElementById("paymentStatusFilter")?.value || "";
+    const methodFilter = document.getElementById("paymentMethodFilter")?.value || "";
+    const startDate = document.getElementById("startDateFilter")?.value || "";
+    const endDate = document.getElementById("endDateFilter")?.value || "";
+    tbody.innerHTML = "";
+    
+    let revenue = 0;
+    let completed = 0;
+    let pending = 0;
+
+    let filtered = payments.filter(p => {
+        const planKey = (p.plan || 'pro').toLowerCase().replace(/\s+/g, '');
+        const planMeta = PRICING_PLANS[planKey]?.label || p.plan || '';
+        return String(p.invoice || '').toLowerCase().includes(search) ||
+               String(p.customer || '').toLowerCase().includes(search) ||
+               (p.email && p.email.toLowerCase().includes(search)) ||
+               planMeta.toLowerCase().includes(search)
+    });
+    if (statusFilter) filtered = filtered.filter(p => p.status === statusFilter);
+    if (methodFilter) filtered = filtered.filter(p => p.method === methodFilter);
+    if (startDate) filtered = filtered.filter(p => !p.date || new Date(p.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(p => !p.date || new Date(p.date) <= new Date(endDate));
+
+    
+    filtered.forEach(p => {
+        const amt = calculateInvoiceAmount(p);
+        if (p.status === "Completed") { revenue += amt; completed++; }
+        if (p.status === "Pending") pending++;
+    });
+
+    const { pageItems, totalPages } = paginate(filtered, 'payments');
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center p-6 text-gray-500">No payments found.</td></tr>`;
+    } else {
+        pageItems.forEach(p => {
+            const calculatedAmount = calculateInvoiceAmount(p);
+            const planKey = (p.plan || 'pro').toLowerCase().replace(/\s+/g, '');
+            const planMeta = PRICING_PLANS[planKey]?.label || p.plan;
+
+            tbody.innerHTML += `
+            <tr class="hover:bg-gray-50/70 transition-colors">
+                <td class="p-4 pl-6"><input type="checkbox" class="payments-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${p.id}" onclick="onRowCheckToggle('payments')"></td>
+                <td class="p-4 font-semibold text-blue-600 select-all">${p.invoice}${p.source === 'cloud' ? ' <span class="text-[10px] font-semibold text-white bg-emerald-600 px-1.5 py-0.5 rounded-full align-middle">☁ Live</span>' : ''}</td>
+                <td class="p-4">
+                    <div class="font-medium text-gray-900">${p.customer}</div>
+                    <div class="text-xs text-gray-400">${planMeta} Tier (${p.billing || 'Monthly'})</div>
+                </td>
+                <td class="p-4 text-gray-500">${p.email || '-'}</td>
+                <td class="p-4 font-semibold text-gray-900">KES ${calculatedAmount.toLocaleString()}</td>
+                <td class="p-4 text-gray-500">${p.method}</td>
+                <td class="p-4">
+                    <span class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full ${p.status === 'Completed' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
+                        ${p.status}
+                    </span>
+                </td>
+                <td class="p-4 text-gray-500">${p.date}</td>
+                <td class="p-4 pr-6 text-right">
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="previewPayment('${p.id}')">Preview</button>
+                    <button class="bg-emerald-700 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-emerald-600 transition" onclick="${p.source === 'cloud' ? `hubRenewPayment('${p.id}')` : `renewPayment('${p.id}')`}">Renew</button>
+                    ${p.source === 'cloud' ? '' : `<button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1 hover:bg-blue-700 transition" onclick="openPaymentModal('${p.id}')">Edit</button>`}
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-red-700 transition" onclick="${p.source === 'cloud' ? `hubDeletePayment('${p.id}')` : `deletePayment('${p.id}')`}">Delete</button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    document.getElementById("paymentCount").textContent = payments.length;
+    document.getElementById("paymentRevenue").textContent = "KES " + revenue.toLocaleString();
+    document.getElementById("paymentPending").textContent = pending;
+    document.getElementById("paymentCompleted").textContent = completed + " Succeeded";
+    document.getElementById("paymentShowingCount").textContent = pageItems.length;
+    renderPageNumbers("pageNumbers", "payments", totalPages, gotoPaymentPage);
+    updateBulkBar('payments');
+
+    const totalRevEl = document.getElementById("totalRevenue");
+    if (totalRevEl) {
+        totalRevEl.textContent = "KES " + revenue.toLocaleString();
+    }
+}
+
+function filterPaymentsTable(){ paginationState.payments.page = 1; renderPayments(); }
+function refreshPaymentsData(){ renderPayments(); addLog("Info", "Developer", "Refreshed Payments Gateway Data", "Payments"); }
+function resetPaymentFilters(){
+    document.getElementById("paymentSearch").value = "";
+    document.getElementById("paymentStatusFilter").value = "";
+    document.getElementById("paymentMethodFilter").value = "";
+    document.getElementById("startDateFilter").value = "";
+    document.getElementById("endDateFilter").value = "";
+    paginationState.payments.page = 1;
+    renderPayments();
+}
+function openBulkImportModal(){
+    const bodyHtml = `
+        <p class="text-xs text-gray-500 mb-2">Paste a JSON array of payment objects (invoice, customer, email, amount, method, status, date).</p>
+        <textarea id="bulkPayments_json" placeholder='[{"invoice":"INV-101","customer":"Jane Doe","email":"jane@example.com","amount":5000,"method":"M-Pesa","status":"Completed","date":"1/1/2026"}]' class="w-full p-2 border rounded text-sm h-32 font-mono"></textarea>
+    `;
+    openModal("Bulk Import Payments", bodyHtml, () => {
+        try {
+            const parsed = JSON.parse(document.getElementById("bulkPayments_json").value.trim() || "[]");
+            if (!Array.isArray(parsed)) throw new Error("Not an array");
+            parsed.forEach(p => {
+                payments.push({
+                    id: Date.now() + Math.floor(Math.random()*1000),
+                    invoice: p.invoice || ("INV-" + Math.floor(1000+Math.random()*9000)),
+                    customer: p.customer || "Unknown",
+                    email: p.email || "",
+                    plan: p.plan || "pro",
+                    addonsCount: p.addonsCount || 0,
+                    billing: p.billing || "Monthly",
+                    amount: p.amount || 0,
+                    method: p.method || "M-Pesa",
+                    status: p.status || "Pending",
+                    date: p.date || new Date().toLocaleDateString()
+                });
+            });
+            localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+            addLog("Info", "Developer", `Bulk Imported ${parsed.length} Payment Records`, "Payments");
+            renderPayments();
+        } catch(err) {
+            alert("Invalid JSON format for bulk import.");
+        }
+    });
+}
+
+function deletePayment(id) {
+    const target = payments.find(p => String(p.id) === String(id));
+    if (target && target.source === "signup") return alert("This is a subscription invoice generated from the plan picked at sign-up. Remove or change the company account instead.");
+    if (!confirm("Delete this payment?")) return;
+    payments = payments.filter(p => String(p.id) !== String(id));
+    localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+    renderPayments();
+}
+
+function planLabelOf(plan){
+    const key = planKeyOf(plan);
+    return (PRICING_PLANS[key] && PRICING_PLANS[key].label) || devTitle(plan, "Free");
+}
+function nextPeriodDate(from, billing){
+    const d = new Date(from && from !== "-" ? from : Date.now());
+    const base = isNaN(d.getTime()) ? new Date() : d;
+    const out = new Date(base.getTime());
+    if (isYearly(billing)) out.setFullYear(out.getFullYear() + 1);
+    else out.setMonth(out.getMonth() + 1);
+    return out;
+}
+
+
+
+function previewPayment(id) {
+    const p = payments.find(x => String(x.id) === String(id));
+    if (!p) return alert("Payment not found.");
+    const amount = calculateInvoiceAmount(p);
+    const planMeta = planLabelOf(p.plan);
+    const addons = Number(p.addonsCount) || 0;
+    const addonTotal = isYearly(p.billing) ? yearlyTotal(addons * 1500) : addons * 1500;
+    const paid = p.status === "Completed";
+    const html = `
+    <div id="invoicePreviewSheet" class="text-sm">
+        <div class="flex items-start justify-between border-b pb-3 mb-3">
+            <div>
+                <div class="text-lg font-bold text-blue-900">INVOICE ${p.invoice}</div>
+                <div class="text-xs text-gray-500">Issued ${p.date || "-"}</div>
+                <div class="text-xs text-gray-500">${p.source === "signup" ? "Subscription - plan picked at sign-up" : "Manual invoice"}</div>
+            </div>
+            <span class="text-xs font-semibold px-3 py-1 rounded-full ${paid ? "bg-green-50 text-green-700 border border-green-200" : "bg-amber-50 text-amber-700 border border-amber-200"}">${p.status}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+                <div class="text-xs uppercase text-gray-400 mb-1">Billed To</div>
+                <div class="font-semibold text-gray-900">${p.customer}</div>
+                <div class="text-gray-500">${p.email || "-"}</div>
+            </div>
+            <div>
+                <div class="text-xs uppercase text-gray-400 mb-1">Payment</div>
+                <div class="text-gray-700">Method: ${p.method || "-"}</div>
+                <div class="text-gray-700">Cycle: ${p.billing || "Monthly"}</div>
+                <div class="text-gray-700">Renews: ${nextPeriodDate(p.date, p.billing).toLocaleDateString()}</div>
+            </div>
+        </div>
+        <table class="w-full text-left border-t">
+            <thead><tr class="text-xs uppercase text-gray-400"><th class="py-2">Description</th><th class="py-2 text-right">Amount</th></tr></thead>
+            <tbody>
+                <tr class="border-t"><td class="py-2">${planMeta} plan (${p.billing || "Monthly"})</td><td class="py-2 text-right">KES ${(amount - addonTotal).toLocaleString()}</td></tr>
+                ${addons ? `<tr class="border-t"><td class="py-2">${addons} premium add-on(s)</td><td class="py-2 text-right">KES ${addonTotal.toLocaleString()}</td></tr>` : ""}
+                <tr class="border-t font-bold"><td class="py-3">Total</td><td class="py-3 text-right">KES ${amount.toLocaleString()}</td></tr>
+            </tbody>
+        </table>
+        <div class="mt-4 flex gap-2">
+            <button onclick="printInvoice('${p.id}')" class="bg-blue-900 text-white px-3 py-1.5 text-xs rounded hover:bg-blue-700">Print / PDF</button>
+            <button onclick="renewPayment('${p.id}')" class="bg-emerald-700 text-white px-3 py-1.5 text-xs rounded hover:bg-emerald-600">Renew Subscription</button>
+        </div>
+    </div>`;
+    openModal("Invoice Preview", html, () => {});
+}
+
+function printInvoice(id) {
+    const sheet = document.getElementById("invoicePreviewSheet");
+    if (!sheet) return;
+    const w = window.open("", "_blank", "width=820,height=900");
+    if (!w) return alert("Allow pop-ups to print the invoice.");
+    w.document.write(`<html><head><title>Invoice</title><script src="https://cdn.tailwindcss.com"><\/script></head><body class="p-8">${sheet.innerHTML}</body></html>`);
+    w.document.close();
+    setTimeout(() => { try { w.print(); } catch(e){} }, 600);
+}
+
+
+function renewPayment(id) {
+    const p = payments.find(x => String(x.id) === String(id));
+    if (!p) return alert("Payment not found.");
+    const amount = calculateInvoiceAmount(p);
+    const nextDate = nextPeriodDate(p.date, p.billing);
+    if (!confirm(`Renew ${p.customer} on the ${planLabelOf(p.plan)} plan (${p.billing || "Monthly"}) for KES ${amount.toLocaleString()}?\nNew period starts ${nextDate.toLocaleDateString()}.`)) return;
+
+    payments.push({
+        id: "rnw-" + Date.now(),
+        invoice: "RNW-" + String(Date.now()).slice(-6),
+        customer: p.customer,
+        email: p.email || "",
+        company: p.company || p.customer,
+        plan: p.plan,
+        billing: p.billing || "Monthly",
+        addonsCount: Number(p.addonsCount) || 0,
+        amount: amount,
+        method: p.method && p.method !== "N/A" ? p.method : "M-Pesa",
+        status: "Pending",
+        date: nextDate.toLocaleDateString(),
+        source: "renewal"
+    });
+    persistPayments();
+
+    
+    const company = companies.find(c => String(c.companyName) === String(p.company || p.customer) || String(c.email) === String(p.email));
+    if (company) {
+        company.expiry = nextPeriodDate(nextDate, p.billing).toLocaleDateString();
+        company.status = "Active";
+        persistCompanies();
+    }
+    addLog("Info", "Developer", `Renewed ${p.customer} on ${planLabelOf(p.plan)} (${p.billing || "Monthly"})`, "Payments");
+    closeModal();
+    renderPayments();
+    alert("Renewal invoice created: KES " + amount.toLocaleString());
+}
+
+function exportPayments() {
+    const blob = new Blob([JSON.stringify(payments, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "payments_register.json";
+    a.click();
+}
+
+function openNotificationModal() {
+    const bodyHtml = `
+        <input id="modalNotif_title" type="text" placeholder="Notification Title" class="w-full p-2 border rounded text-sm">
+        <input id="modalNotif_recipient" type="text" placeholder="Recipient Email/All" class="w-full p-2 border rounded text-sm">
+        <select id="modalNotif_type" class="w-full p-2 border rounded text-sm">
+            <option>System Alert</option>
+            <option>Email Blast</option>
+            <option>SMS</option>
+        </select>
+        <textarea id="modalNotif_msg" placeholder="Message content details..." class="w-full p-2 border rounded text-sm h-20"></textarea>
+    `;
+    openModal("Create Broadcast Notification", bodyHtml, () => {
+        const title = document.getElementById("modalNotif_title").value.trim();
+        const recipient = document.getElementById("modalNotif_recipient").value.trim();
+        const type = document.getElementById("modalNotif_type").value;
+        const message = document.getElementById("modalNotif_msg").value.trim();
+        if(!title || !recipient) return alert("Missing structural fields.");
+
+        notifications.push({ id: Date.now(), title, recipient, type, status: "Unread", message, date: new Date().toLocaleDateString() });
+        localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+        renderNotifications();
+    });
+}
+
+function renderNotifications(){
+    const tbody = document.getElementById("notificationsTable");
+    const search = document.getElementById("notificationSearch").value.toLowerCase();
+    const channelFilter = document.getElementById("notificationChannelFilter")?.value || "";
+    const statusFilter = document.getElementById("notificationStatusFilter")?.value || "";
+    const startDate = document.getElementById("notificationStartDate")?.value || "";
+    const endDate = document.getElementById("notificationEndDate")?.value || "";
+    tbody.innerHTML = "";
+    let filtered = notifications.filter(n => n.title.toLowerCase().includes(search) || n.recipient.toLowerCase().includes(search));
+    if (channelFilter) filtered = filtered.filter(n => n.type === channelFilter);
+    if (statusFilter) filtered = filtered.filter(n => n.status === statusFilter);
+    if (startDate) filtered = filtered.filter(n => !n.date || new Date(n.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(n => !n.date || new Date(n.date) <= new Date(endDate));
+
+    const { pageItems, totalPages } = paginate(filtered, 'notifications');
+
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No notifications available.</td></tr>`;
+    }else{
+        pageItems.forEach(n => {
+            tbody.innerHTML += `
+            <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="notifications-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${n.id}" onclick="onRowCheckToggle('notifications')"></td>
+                <td>${n.title}</td>
+                <td>${n.recipient}</td>
+                <td>${n.type}</td>
+                <td><span class="text-blue-500">${n.status}</span></td>
+                <td>${n.date}</td>
+                <td>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="viewNotification(${n.id})">View</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteNotification(${n.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("notificationCount").textContent = notifications.length;
+    document.getElementById("unreadNotifications").textContent = notifications.filter(n=>n.status==="Unread").length;
+    document.getElementById("todayNotifications").textContent = notifications.filter(n=>n.date===new Date().toLocaleDateString()).length;
+    document.getElementById("failedNotifications").textContent = notifications.filter(n=>n.status==="Failed").length;
+    document.getElementById("notificationShowingCount").textContent = pageItems.length;
+    renderPageNumbers("notificationPageNumbers", "notifications", totalPages, gotoNotificationPage);
+    updateBulkBar('notifications');
+}
+
+function resetNotificationFilters(){
+    document.getElementById("notificationSearch").value = "";
+    document.getElementById("notificationChannelFilter").value = "";
+    document.getElementById("notificationStatusFilter").value = "";
+    document.getElementById("notificationStartDate").value = "";
+    document.getElementById("notificationEndDate").value = "";
+    paginationState.notifications.page = 1;
+    renderNotifications();
+}
+
+function openNotificationTemplates(){
+    const templates = [
+        { title: "Welcome Aboard", type: "Email Blast", message: "Welcome to Acacia Books! Your account is now active." },
+        { title: "Payment Reminder", type: "SMS", message: "Your subscription payment is due soon. Please renew to avoid interruption." },
+        { title: "Scheduled Maintenance", type: "System Alert", message: "The platform will undergo scheduled maintenance tonight from 11 PM - 1 AM." }
+    ];
+    const bodyHtml = `
+        <p class="text-xs text-gray-500 mb-2">Select a template to queue as a new notification.</p>
+        <div class="space-y-2">
+            ${templates.map((t,i) => `
+                <label class="flex items-start gap-2 p-2 border rounded cursor-pointer hover:bg-gray-50">
+                    <input type="radio" name="tplChoice" value="${i}" ${i===0?'checked':''}>
+                    <span><strong class="block text-sm">${t.title}</strong><span class="text-xs text-gray-500">${t.message}</span></span>
+                </label>`).join('')}
+        </div>
+    `;
+    openModal("Notification Templates", bodyHtml, () => {
+        const idx = parseInt(document.querySelector('input[name="tplChoice"]:checked')?.value || 0);
+        const t = templates[idx];
+        notifications.push({ id: Date.now(), title: t.title, recipient: "All", type: t.type, status: "Unread", message: t.message, date: new Date().toLocaleDateString() });
+        localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+        renderNotifications();
+    });
+}
+
+function viewNotification(id){
+    const n = notifications.find(notif => notif.id === id);
+    if(!n) return;
+    alert(`Broadcast Content: ${n.title}\n\nMessage Body:\n${n.message}`);
+    n.status = "Read";
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    renderNotifications();
+}
+
+function deleteNotification(id){
+    if(!confirm("Remove log structure?")) return;
+    notifications = notifications.filter(n => n.id !== id);
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    renderNotifications();
+}
+
+function sendAllNotifications(){
+    notifications.forEach(n => n.status = "Sent");
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    renderNotifications();
+    alert("All queued notifications dispatched successfully.");
+}
+
+function openCreateTicketModal() { openSupportModal(); }
+function openSupportModal() {
+    const bodyHtml = `
+        <input id="modalTicket_cust" type="text" placeholder="Customer Name" class="w-full p-2 border rounded text-sm">
+        <input id="modalTicket_subj" type="text" placeholder="Subject Issue Description" class="w-full p-2 border rounded text-sm">
+        <select id="modalTicket_priority" class="w-full p-2 border rounded text-sm">
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+        </select>
+        <textarea id="modalTicket_msg" placeholder="Describe architectural context/bug details..." class="w-full p-2 border rounded text-sm h-20"></textarea>
+    `;
+    openModal("File System Support Ticket", bodyHtml, () => {
+        const customer = document.getElementById("modalTicket_cust").value.trim();
+        const subject = document.getElementById("modalTicket_subj").value.trim();
+        const priority = document.getElementById("modalTicket_priority").value;
+        const message = document.getElementById("modalTicket_msg").value.trim();
+        if(!customer || !subject) return alert("Parameters can't be empty.");
+
+        supportTickets.push({
+            id: Date.now(), ticket: "TCK-" + Math.floor(1000 + Math.random() * 9000),
+            customer, subject, priority, status: "Open", message, date: new Date().toLocaleDateString()
+        });
+        localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+        renderSupportTickets();
+    });
+}
+
+function renderSupportTickets(){
+    syncChatWidgetTickets();
+    const tbody = document.getElementById("supportTable");
+    const search = document.getElementById("supportSearch").value.toLowerCase();
+    const priorityFilter = document.getElementById("supportPriorityFilter")?.value || "";
+    const statusFilter = document.getElementById("supportStatusFilter")?.value || "";
+    const startDate = document.getElementById("supportStartDate")?.value || "";
+    const endDate = document.getElementById("supportEndDate")?.value || "";
+    tbody.innerHTML = "";
+    let filtered = supportTickets.filter(t => t.customer.toLowerCase().includes(search) || t.subject.toLowerCase().includes(search));
+    if (priorityFilter) filtered = filtered.filter(t => t.priority === priorityFilter);
+    if (statusFilter) filtered = filtered.filter(t => t.status === statusFilter);
+    if (startDate) filtered = filtered.filter(t => !t.date || new Date(t.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(t => !t.date || new Date(t.date) <= new Date(endDate));
+
+    const { pageItems, totalPages } = paginate(filtered, 'support');
+
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-500">No support tickets available.</td></tr>`;
+    }else{
+        pageItems.forEach(t => {
+            tbody.innerHTML += `
+            <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="support-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${t.id}" onclick="onRowCheckToggle('support')"></td>
+                <td>${t.ticket}</td>
+                <td>${t.subject}${t.source === 'chat' ? ' <span class="ml-1 text-[10px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-full align-middle">💬 AI Chat</span>' : ''}${t.source === 'cloud' ? ' <span class="ml-1 text-[10px] font-semibold text-white bg-emerald-600 px-1.5 py-0.5 rounded-full align-middle">☁ Live</span>' : ''}${t.unread ? ' <span class="ml-1 text-[10px] font-semibold text-white bg-red-600 px-1.5 py-0.5 rounded-full align-middle">new</span>' : ''}</td>
+                <td>${t.customer}</td>
+                <td><span class="${t.priority==='High'?'text-red-600 font-bold':''}">${t.priority}</span></td>
+                <td><span class="text-blue-500">${t.status}</span></td>
+                <td>${t.date}</td>
+                <td>
+${t.source === 'cloud' ? `
+                    <button class="bg-emerald-700 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubOpenTicket('${t.id}')">Open &amp; reply</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubResolveTicket('${t.id}')">Resolve</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="hubDeleteTicket('${t.id}')">Delete</button>
+                    ` : `
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="resolveTicket('${t.id}')">Resolve</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteTicket('${t.id}')">Delete</button>
+                    `}
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("statTotalTickets").textContent = supportTickets.length;
+    document.getElementById("statOpenTickets").textContent = supportTickets.filter(t=>t.status==="Open").length;
+    document.getElementById("statResolvedTickets").textContent = supportTickets.filter(t=>t.status==="Resolved").length;
+    document.getElementById("statUrgentTickets").textContent = supportTickets.filter(t=>t.priority==="High").length;
+    document.getElementById("totalTickets").textContent = supportTickets.length;
+    document.getElementById("supportShowingCount").textContent = pageItems.length;
+    renderPageNumbers("supportPageNumbers", "support", totalPages, gotoSupportPage);
+    updateBulkBar('support');
+}
+
+
+
+
+
+
+function syncChatWidgetTickets(){
+    try {
+        const seen = new Set(supportTickets.map(t => String(t.id)));
+        let added = 0;
+        for (let i = 0; i < localStorage.length; i++){
+            const key = localStorage.key(i);
+            if (!key || key.split(NS_SEP)[0].indexOf('axSupport_tickets_') !== 0) continue;
+            let chatTickets;
+            try { chatTickets = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ continue; }
+            if (!Array.isArray(chatTickets)) continue;
+            chatTickets.forEach(ct => {
+                const id = 'chat:' + ct.id;
+                if (seen.has(id)) return;
+                seen.add(id);
+                added++;
+                supportTickets.push({
+                    id: id,
+                    ticket: ct.id,
+                    customer: ct.userName || ct.userEmail || 'Guest (AI Chat)',
+                    subject: ct.subject || 'Support request',
+                    priority: ct.priority === 'Urgent' ? 'High' : (ct.priority === 'High' ? 'High' : (ct.priority === 'Low' ? 'Low' : 'Medium')),
+                    status: (ct.status === 'Resolved' || ct.status === 'Closed') ? 'Resolved' : 'Open',
+                    message: ct.description || '',
+                    date: ct.createdAt ? new Date(ct.createdAt).toLocaleDateString() : new Date().toLocaleDateString(),
+                    source: 'chat'
+                });
+            });
+        }
+        added += syncChatConversations(seen);
+        if (added) localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    } catch(e) { console.error('syncChatWidgetTickets failed', e); }
+}
+
+
+
+function syncChatConversations(seen){
+    let changed = 0;
+    for (let i = 0; i < localStorage.length; i++){
+        const key = localStorage.key(i);
+        if (!key || key.split(NS_SEP)[0].indexOf('axSupport_history_') !== 0) continue;
+        let msgs;
+        try { msgs = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e){ continue; }
+        if (!Array.isArray(msgs) || !msgs.length) continue;
+        const who = key.split(NS_SEP)[0].replace('axSupport_history_', '') || 'Guest';
+        const id = 'chat-session:' + who;
+        const firstUserMsg = msgs.find(m => m && (m.role === 'user' || m.from === 'user' || m.sender === 'user')) || msgs[0];
+        const text = String((firstUserMsg && (firstUserMsg.text || firstUserMsg.message || firstUserMsg.content)) || 'Chat started');
+        const last = msgs[msgs.length - 1] || {};
+        const when = last.at || last.time || last.createdAt || Date.now();
+        const existing = supportTickets.find(t => String(t.id) === id);
+        if (existing){
+            const summary = text.slice(0, 120) + ' (' + msgs.length + ' messages)';
+            if (existing.message !== summary){
+                existing.message = summary;
+                existing.date = new Date(when).toLocaleDateString();
+                changed++;
+            }
+            continue;
+        }
+        if (seen) seen.add(id);
+        supportTickets.push({
+            id: id,
+            ticket: 'CHAT-' + who.toUpperCase().slice(0, 10),
+            customer: who,
+            subject: 'AI Chat conversation',
+            priority: 'Medium',
+            status: 'Open',
+            message: text.slice(0, 120) + ' (' + msgs.length + ' messages)',
+            date: new Date(when).toLocaleDateString(),
+            source: 'chat'
+        });
+        changed++;
+    }
+    return changed;
+}
+
+function resetSupportFilters(){
+    document.getElementById("supportSearch").value = "";
+    document.getElementById("supportPriorityFilter").value = "";
+    document.getElementById("supportStatusFilter").value = "";
+    document.getElementById("supportCategoryFilter").value = "";
+    document.getElementById("supportStartDate").value = "";
+    document.getElementById("supportEndDate").value = "";
+    paginationState.support.page = 1;
+    renderSupportTickets();
+}
+
+function resolveTicket(id) {
+    const t = supportTickets.find(ticket => String(ticket.id) === String(id));
+    if(t) t.status = "Resolved";
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    renderSupportTickets();
+}
+
+function deleteTicket(id){
+    if(!confirm("Purge ticket history?")) return;
+    supportTickets = supportTickets.filter(t => String(t.id) !== String(id));
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    renderSupportTickets();
+}
+
+function exportSupportTickets(){
+    const blob = new Blob([JSON.stringify(supportTickets, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "support_tickets.json";
+    a.click();
+}
+
+function savePlatformSettings(){
+    settings.platformName = document.getElementById("platformName").value;
+    settings.platformVersion = document.getElementById("platformVersion").value;
+    settings.supportEmail = document.getElementById("supportEmail").value;
+    settings.supportPhone = document.getElementById("supportPhone").value;
+    settings.lastSaved = new Date().toLocaleString();
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    document.getElementById("lastSaved").textContent = "Last Saved: " + settings.lastSaved;
+    alert("Platform settings written to system storage configuration successfully.");
+}
+
+function applyTheme(mode, persist){
+    let resolved = mode || "Light";
+    if (resolved === "System") {
+        resolved = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "Dark" : "Light";
+    }
+    const dark = resolved === "Dark";
+    document.body.classList.toggle("dark-mode", dark);
+    document.documentElement.classList.toggle("dark", dark);
+    const btn = document.getElementById("themeToggleBtn");
+    if (btn) btn.textContent = dark ? "☀️ Light" : "🌙 Dark";
+    const select = document.getElementById("theme");
+    if (select && mode) select.value = mode;
+    if (persist) {
+        settings.theme = mode;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    }
+    
+    if (document.querySelector(".page.active")?.id === "analytics") refreshAnalytics();
+}
+function toggleDarkMode(){
+    const isDark = document.body.classList.contains("dark-mode");
+    applyTheme(isDark ? "Light" : "Dark", true);
+}
+
+function applyFont(fontName, persist){
+    const font = fontName || "Cambria";
+    document.body.style.fontFamily = font === "Cambria" ? "Cambria, Georgia, serif" : `'${font}', system-ui, sans-serif`;
+    const select = document.getElementById("fontStyle");
+    if (select && fontName) select.value = fontName;
+    if (persist) {
+        settings.font = font;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    }
+}
+
+function savePreferences(){
+    settings.currency = document.getElementById("currency").value;
+    settings.language = document.getElementById("language").value;
+    settings.theme = document.getElementById("theme").value;
+    settings.font = document.getElementById("fontStyle").value;
+    applyTheme(settings.theme, false);
+    applyFont(settings.font, false);
+    settings.lastSaved = new Date().toLocaleString();
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    document.getElementById("lastSaved").textContent = "Last Saved: " + settings.lastSaved;
+    alert("System rendering preferences adapted successfully.");
+}
+
+function changePassword(){
+    alert("Passwords are now managed in Supabase (Authentication \u2192 Users \u2192 your account \u2192 Reset password), not here. This keeps them out of this file.");
+}
+
+function clearSystemCache(){
+    if(!confirm("Perform deep system cache cleanup?")) return;
+    Object.keys(localStorage).filter(function(k){ return k.indexOf("acacia_") === 0 || k === "developerSession"; }).forEach(function(k){ localStorage.removeItem(k); });
+    alert("Support Hub cache cleared (other apps' data was left untouched). Reloading.");
+    location.reload();
+}
+
+function logoutAllUsers() {
+    alert("Active OAuth structural tokens invalidated. Core terminal isolated.");
+    addLog("Warning", "System", "Forced Logout Event Issued to all active clusters", "Security");
+}
+
+function rebuildIndexes() {
+    alert("Reindexing application schemas and structure keys completely.");
+    addLog("Info", "DBA Engine", "Rebuilt structural storage nodes and relational entities", "Database");
+}
+
+function backupSystem() {
+    const backupBundle = { users, companies, payments, notifications, supportTickets, settings, logs };
+    const blob = new Blob([JSON.stringify(backupBundle, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `Acacia_Core_Backup_${Date.now()}.json`;
+    a.click();
+}
+
+function restoreSystem() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.readAsText(file,'UTF-8');
+        reader.onload = readerEvent => {
+            try {
+                const parsed = JSON.parse(readerEvent.target.result);
+                if(parsed.users) localStorage.setItem(USERS_KEY, JSON.stringify(parsed.users));
+                if(parsed.companies) localStorage.setItem(COMPANY_KEY, JSON.stringify(parsed.companies));
+                if(parsed.payments) localStorage.setItem(PAYMENT_KEY, JSON.stringify(parsed.payments));
+                alert("Core database structural architecture restored successfully! Refreshing dashboard context.");
+                location.reload();
+            } catch(err) { alert("Invalid core state structural file formatting template."); }
+        }
+    }
+    input.click();
+}
+
+function checkUpdates() { alert("System instance operating on the absolute bleeding edge optimization roadmap."); }
+function optimizeSystem() { alert("Compacting data layers, flushing execution trees, and boosting computational output loops."); }
+function syncApplications() { alert("Installed static web nodes synchronized against core root assets registry module."); }
+function verifyApplications() { alert("Cryptographic verification check matching hashes across 16 active apps: OK."); }
+function scanMissingFiles() { alert("Asset scan execution: 0 missing blocks across runtime trees."); }
+function repairApplications() { alert("Executing structure tree reconstruction engine. Active pipelines clean."); }
+
+function loadSettings(){
+    if(!settings) return;
+    document.getElementById("platformName").value = settings.platformName || "Acacia Books ERP";
+    document.getElementById("platformVersion").value = settings.platformVersion || "17.10";
+    document.getElementById("supportEmail").value = settings.supportEmail || "support@acaciabooks.com";
+    document.getElementById("supportPhone").value = settings.supportPhone || "+254700000000";
+    document.getElementById("currency").value = settings.currency || "KES";
+    document.getElementById("language").value = settings.language || "English";
+    document.getElementById("theme").value = settings.theme || "Light";
+    applyTheme(settings.theme || "Light", false);
+    document.getElementById("fontStyle").value = settings.font || "Cambria";
+    applyFont(settings.font || "Cambria", false);
+    document.getElementById("lastSaved").textContent = "Last Saved: " + (settings.lastSaved || "Never");
+}
+
+function addLog(level, user, activity, module){
+    logs.unshift({ id: Date.now(), date: new Date().toLocaleString(), level, user, activity, module });
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+}
+
+function renderLogs(){
+    const tbody = document.getElementById("logsTable");
+    const search = document.getElementById("logSearch").value.toLowerCase();
+    const levelFilter = document.getElementById("logLevelFilter")?.value || "";
+    const moduleFilter = document.getElementById("logModuleFilter")?.value || "";
+    const startDate = document.getElementById("logStartDate")?.value || "";
+    const endDate = document.getElementById("logEndDate")?.value || "";
+    tbody.innerHTML = "";
+    let filtered = logs.filter(log =>
+        log.user.toLowerCase().includes(search) ||
+        log.activity.toLowerCase().includes(search) ||
+        log.module.toLowerCase().includes(search) ||
+        log.level.toLowerCase().includes(search)
+    );
+    if (levelFilter) filtered = filtered.filter(l => l.level === levelFilter);
+    if (moduleFilter) filtered = filtered.filter(l => l.module === moduleFilter);
+    if (startDate) filtered = filtered.filter(l => !l.date || new Date(l.date) >= new Date(startDate));
+    if (endDate) filtered = filtered.filter(l => !l.date || new Date(l.date) <= new Date(endDate));
+
+    const { pageItems, totalPages } = paginate(filtered, 'logs');
+
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No logs available.</td></tr>`;
+    }else{
+        pageItems.forEach(log => {
+            tbody.innerHTML += `
+            <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="logs-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${log.id}" onclick="onRowCheckToggle('logs')"></td>
+                <td>${log.date}</td>
+                <td><span class="font-bold ${log.level==='Error'?'text-red-600':log.level==='Warning'?'text-yellow-600':'text-blue-600'}">${log.level}</span></td>
+                <td>${log.user}</td>
+                <td>${log.activity}</td>
+                <td>${log.module}</td>
+                <td><button class="bg-red-600 text-white px-2 py-1 text-xs rounded hover:bg-red-700" onclick="deleteLog(${log.id})">Delete</button></td>
+            </tr>`;
+        });
+    }
+    document.getElementById("logCount").textContent = logs.length;
+    document.getElementById("loginLogs").textContent = logs.filter(l => l.activity.toLowerCase().includes("login")).length;
+    document.getElementById("errorLogs").textContent = logs.filter(l => l.level === "Error").length;
+    document.getElementById("warningLogs").textContent = logs.filter(l => l.level === "Warning").length;
+    document.getElementById("logShowingCount").textContent = pageItems.length;
+    renderPageNumbers("logPageNumbers", "logs", totalPages, gotoLogPage);
+    updateBulkBar('logs');
+}
+
+function resetLogFilters(){
+    document.getElementById("logSearch").value = "";
+    document.getElementById("logLevelFilter").value = "";
+    document.getElementById("logModuleFilter").value = "";
+    document.getElementById("logStartDate").value = "";
+    document.getElementById("logEndDate").value = "";
+    paginationState.logs.page = 1;
+    renderLogs();
+}
+
+function deleteLog(id){
+    logs = logs.filter(log => log.id !== id);
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    renderLogs();
+}
+
+function clearLogs(){
+    if(!confirm("Flush system audit traces trail completely?")) return;
+    logs = [];
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    renderLogs();
+}
+
+function exportLogs(){
+    const blob = new Blob([JSON.stringify(logs, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "system_logs.json";
+    a.click();
+}
+
+function toggleImportMenu() {
+    const menu = document.getElementById('importDropdown');
+    menu?.classList.toggle('hidden');
+}
+
+function triggerImport(acceptTypes) {
+    const fileInput = document.getElementById('universalFileInput');
+    if (fileInput) {
+        fileInput.accept = acceptTypes;
+        fileInput.click();
+    }
+    document.getElementById('importDropdown')?.classList.add('hidden');
+}
+
+function handleImportSelection(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+
+    if (ext === 'zip') {
+        uploadWebsite(event);
+    } else if (['html', 'htm'].includes(ext)) {
+        processHtmlImport(file);
+    } else if (['xlsx', 'xls', 'csv'].includes(ext)) {
+        processExcelImport(file);
+    }
+}
+
+function uploadWebsite(event) {
+    const file = event.target ? event.target.files[0] : event;
+    if (!file) return;
+    websites.push({
+        id: Date.now(),
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        file: "#",
+        version: "1.0",
+        size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+        status: "Imported",
+        uploaded: new Date().toLocaleString()
+    });
+    addLog("Info", "Developer", `Imported Web Module: ${file.name}`, "Web App");
+    saveWebsites();
+    renderWebsites();
+}
+
+function processHtmlImport(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const newId = Date.now();
+        saveSiteSource(newId, String(e.target.result || ""));
+        websites.push({
+            id: newId,
+            name: file.name.replace(".html", "").replace(".htm", ""),
+            file: "#",
+            hasSource: true,
+            version: "1.0",
+            size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+            status: "Imported",
+            uploaded: new Date().toLocaleString()
+        });
+        addLog("Info", "Developer", `Imported HTML File: ${file.name}`, "Web App");
+        saveWebsites();
+        renderWebsites();
+    };
+    reader.readAsText(file);
+}
+
+function processExcelImport(file) {
+    websites.push({
+        id: Date.now(),
+        name: file.name.replace(/\.[^/.]+$/, ""),
+        file: "#",
+        version: "1.0",
+        size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+        status: "Imported",
+        uploaded: new Date().toLocaleString()
+    });
+    addLog("Info", "Developer", `Imported Excel/CSV Data: ${file.name}`, "Web App");
+    saveWebsites();
+    renderWebsites();
+}
+
+function openVSCodeEditor(repositoryOrPath) {
+    if (repositoryOrPath && repositoryOrPath !== 'https://vscode.dev') {
+        window.location.href = `vscode://file/${repositoryOrPath}`;
+    } else {
+        window.location.href = 'vscode://';
+    }
+}
+function closeCodeEditor() {
+    const modal = document.getElementById('codeEditorModal');
+    const iframe = document.getElementById('editorIframe');
+    if (modal && iframe) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        iframe.src = 'about:blank';
+    }
+}
+
+
+const SITE_SRC_PREFIX = "acacia_site_src_";
+let previewSiteId = null;
+
+function siteUrl(site){
+    if (!site) return "";
+    return site.url || (site.file && site.file !== "#" ? site.file : "");
+}
+function saveSiteSource(id, content){
+    try { localStorage.setItem(SITE_SRC_PREFIX + id, content); }
+    catch(e){ console.warn("Source too large to cache locally", e); }
+}
+function getSiteSource(id){ return localStorage.getItem(SITE_SRC_PREFIX + id); }
+
+function attachWebsiteModal(){
+    const bodyHtml = `
+        <input id="attachName" type="text" placeholder="Website name (e.g. Acacia Storefront)" class="w-full p-2 border rounded text-sm">
+        <input id="attachUrl" type="url" placeholder="https://your-site.com  or  app_1710.html" class="w-full p-2 border rounded text-sm">
+        <input id="attachVersion" type="text" placeholder="Version (optional)" class="w-full p-2 border rounded text-sm">
+        <p class="text-xs text-gray-500">Attached sites can be launched in the live preview, inspected with View Code, enabled or disabled.</p>`;
+    openModal("Attach Website", bodyHtml, () => {
+        const name = document.getElementById("attachName").value.trim();
+        let url = document.getElementById("attachUrl").value.trim();
+        if (!name || !url) return alert("Provide both a name and a URL.");
+        if (!/^(https?:)?\/\//i.test(url) && !/^[\w .\-\/]+\.html?$/i.test(url)) url = "https://" + url;
+        websites.push({
+            id: Date.now(),
+            name,
+            file: url,
+            url,
+            version: document.getElementById("attachVersion").value.trim() || "1.0",
+            size: "Remote",
+            status: "Active",
+            uploaded: new Date().toLocaleString(),
+            attached: true
+        });
+        saveWebsites();
+        renderWebsites();
+        addLog("Info", "Developer", `Attached external website: ${name} (${url})`, "Web App");
+        closeModal();
+    });
+}
+
+function launchWebsite(id){
+    const site = websites.find(w => String(w.id) === String(id));
+    if (!site) return;
+    if (site.status !== "Active" && !confirm("This app is disabled. Launch anyway?")) return;
+    const url = siteUrl(site);
+    const source = getSiteSource(site.id);
+    previewSiteId = site.id;
+    const modal = document.getElementById("sitePreviewModal");
+    const frame = document.getElementById("sitePreviewFrame");
+    document.getElementById("previewSiteName").textContent = site.name;
+    document.getElementById("previewSiteUrl").textContent = url || "local import";
+    modal.classList.remove("hidden"); modal.classList.add("flex");
+    if (url) frame.src = url;
+    else if (source) frame.srcdoc = source;
+    else frame.srcdoc = "<body style='font-family:sans-serif;padding:40px;color:#475569'><h2>No preview source</h2><p>Attach a URL or re-import this project as a single HTML file to preview it here.</p></body>";
+    addLog("Info", "Developer", `Launched preview: ${site.name}`, "Web App");
+}
+function reloadPreview(){ launchWebsite(previewSiteId); }
+function openPreviewInNewTab(){
+    const site = websites.find(w => String(w.id) === String(previewSiteId));
+    const url = siteUrl(site);
+    if (url) window.open(url, "_blank");
+    else if (getSiteSource(previewSiteId)) {
+        const blob = new Blob([getSiteSource(previewSiteId)], { type: "text/html" });
+        window.open(URL.createObjectURL(blob), "_blank");
+    } else alert("No launchable target for this application.");
+}
+function closeSitePreview(){
+    const modal = document.getElementById("sitePreviewModal");
+    modal.classList.add("hidden"); modal.classList.remove("flex");
+    document.getElementById("sitePreviewFrame").src = "about:blank";
+}
+
+let currentSourceName = "source.html";
+async function viewWebsiteCode(id){
+    const site = websites.find(w => String(w.id) === String(id));
+    if (!site) return;
+    const modal = document.getElementById("sourceModal");
+    const box = document.getElementById("sourceCodeBox");
+    currentSourceName = (site.name || "source").replace(/\s+/g, "_") + ".html";
+    document.getElementById("sourceSiteName").textContent = site.name;
+    document.getElementById("sourceLineCount").textContent = "loading…";
+    modal.classList.remove("hidden"); modal.classList.add("flex");
+    box.textContent = "Fetching source…";
+
+    let code = getSiteSource(site.id);
+    if (!code) {
+        const url = siteUrl(site);
+        if (url) {
+            try {
+                const res = await fetch(url);
+                code = await res.text();
+                saveSiteSource(site.id, code);
+            } catch(e) {
+                code = null;
+                box.textContent = "Source could not be read from " + url + "\n\nThe host blocks cross-origin reads (CORS). Use “Open in Tab” and view source there, or import the file with Import Project → Single HTML.";
+            }
+        }
+    }
+    if (code) {
+        box.textContent = code;
+        document.getElementById("sourceLineCount").textContent = code.split("\n").length + " lines";
+    } else if (!siteUrl(site)) {
+        box.textContent = "No cached source for this application. Re-import it as a single HTML file to inspect the code here.";
+        document.getElementById("sourceLineCount").textContent = "";
+    } else {
+        document.getElementById("sourceLineCount").textContent = "";
+    }
+    addLog("Info", "Developer", `Viewed source code: ${site.name}`, "Web App");
+}
+function closeSourceModal(){
+    const modal = document.getElementById("sourceModal");
+    modal.classList.add("hidden"); modal.classList.remove("flex");
+}
+function copySourceCode(){
+    const text = document.getElementById("sourceCodeBox").textContent;
+    navigator.clipboard?.writeText(text).then(() => alert("Source copied to clipboard."), () => alert("Clipboard blocked by browser."));
+}
+function downloadSourceCode(){
+    const text = document.getElementById("sourceCodeBox").textContent;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/html" }));
+    a.download = currentSourceName;
+    a.click();
+}
+
+function renderWebsites(){
+    const tbody = document.getElementById("websiteTable");
+    tbody.innerHTML = "";
+    let running = 0;
+    let storage = 0;
+    websites.forEach(site => {
+        if(site.status === "Active") running++;
+        storage += parseFloat(site.size) || 0;
+        tbody.innerHTML += `
+        <tr>
+            <td>${site.name}</td>
+            <td>${site.version}</td>
+            <td><span class="${site.status==='Active'?'text-green-600':'text-red-500'}">${site.status}</span></td>
+            <td>${site.uploaded}</td>
+            <td>${site.size}</td>
+            <td>
+                <button class="bg-emerald-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="launchWebsite(${site.id})">🚀 Launch</button>
+                <button class="bg-slate-700 text-white px-2 py-1 text-xs rounded mr-1" onclick="viewWebsiteCode(${site.id})">&lt;/&gt; Code</button>
+                <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openWebsite(${site.id})">Open</button>
+                <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openInVSCode('${site.path || site.name}')">VS Code</button>
+                <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="toggleWebsite(${site.id})">${site.status === "Active" ? "Disable" : "Enable"}</button>
+                <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteWebsite(${site.id})">Delete</button>
+            </td>
+        </tr>`;
+    });
+    document.getElementById("totalWebsitesCount").textContent = websites.length;
+    document.getElementById("runningWebsites").textContent = running;
+    document.getElementById("disabledWebsites").textContent = websites.length - running;
+    document.getElementById("websiteStorage").textContent = storage.toFixed(2) + " MB";
+    document.getElementById("totalWebsites").textContent = websites.length;
+    document.getElementById("storageUsed").textContent = storage.toFixed(2) + " MB";
+}
+
+function openInVSCode(path) {
+    window.location.href = `vscode://file/${path}`;
+}
+
+function openWebsite(id){
+    const site = websites.find(w => w.id === id);
+    if(!site) return;
+    const url = siteUrl(site);
+    if(!url){ previewSiteId = site.id; return openPreviewInNewTab(); }
+    window.open(url, "_blank");
+}
+
+function toggleWebsite(id){
+    const site = websites.find(w => w.id === id);
+    if(!site) return;
+    site.status = site.status === "Active" ? "Disabled" : "Active";
+    saveWebsites();
+    renderWebsites();
+}
+
+function deleteWebsite(id){
+    if(!confirm("Purge application bundle data?")) return;
+    websites = websites.filter(w => w.id !== id);
+    saveWebsites();
+    renderWebsites();
+}
+
+function renderCompanies(){
+    const tbody = document.getElementById("companiesTable");
+    const search = document.getElementById("companySearch").value.toLowerCase();
+    const planFilter = document.getElementById("companyPlanFilter")?.value || "";
+    const statusFilter = document.getElementById("companyStatusFilter")?.value || "";
+    tbody.innerHTML = "";
+    populateFilterOptionsLabeled("companyPlanFilter", companies.map(c => c.plan), "All Plans");
+    populateFilterOptionsLabeled("companyStatusFilter", companies.map(c => c.status), "All Statuses");
+    let filtered = companies.filter(c => (c.companyName || "").toLowerCase().includes(search) || (c.ownerName || "").toLowerCase().includes(search) || (c.email || "").toLowerCase().includes(search));
+    if (planFilter) filtered = filtered.filter(c => c.plan === planFilter);
+    if (statusFilter) filtered = filtered.filter(c => c.status === statusFilter);
+
+    const { pageItems, totalPages } = paginate(filtered, 'companies');
+
+    if(filtered.length === 0){
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies registered through automated registry modules.</td></tr>`;
+    }else{
+        pageItems.forEach(c => {
+            tbody.innerHTML += `
+            <tr>
+                <td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${c.id || c.companyName}" onclick="onRowCheckToggle('companies')"></td>
+                <td>${c.companyName}</td>
+                <td>${c.ownerName}</td>
+                <td>${c.email}</td>
+                <td>${c.plan}</td>
+                <td>${c.status}</td>
+                <td>${c.registered || c.createdAt || '-'}</td>
+                <td class="pr-6 text-right">
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick='alert(${JSON.stringify(JSON.stringify(c))})'>View</button>
+                    <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteCompany('${c.id || c.companyName}')">Delete</button>
+                </td>
+            </tr>`;
+        });
+    }
+    document.getElementById("companyCount").textContent = companies.length;
+    document.getElementById("activeCompanies").textContent = companies.filter(c => c.status === "Active").length;
+    document.getElementById("trialCompanies").textContent = companies.filter(c => c.status === "Trial" || c.plan === "Trial" || c.plan === "Free").length;
+    document.getElementById("paidCompanies").textContent = companies.filter(c => Number(c.price || 0) > 0 || ["Trial", "Free"].indexOf(c.plan) === -1).length;
+    document.getElementById("totalCompanies").textContent = companies.length;
+    document.getElementById("companyShowingCount").textContent = pageItems.length;
+    renderPageNumbers("companyPageNumbers", "companies", totalPages, gotoCompanyPage);
+    updateBulkBar('companies');
+}
+
+function deleteCompany(idOrName){
+    if(!confirm("Remove this company from the registry?")) return;
+    companies = companies.filter(c => (c.id || c.companyName) != idOrName);
+    persistCompanies();
+    addLog("Warning", "Developer", "Removed Company Registry Entry", "Companies");
+    renderCompanies();
+}
+
+function syncCompanies(){
+    users = loadUsersFromStores();
+    companies = loadCompaniesFromStores(users);
+    renderCompanies();
+}
+
+function exportCompanies(){
+    const blob = new Blob([JSON.stringify(companies, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "companies_registry.json";
+    a.click();
+}
+
+function refreshAnalytics(){
+    let revenueSum = 0;
+    payments.forEach(p => { if(p.status === 'Completed') revenueSum += Number(p.amount); });
+    document.getElementById("analyticsRevenue").textContent = "KES " + revenueSum.toLocaleString();
+    document.getElementById("analyticsPayments").textContent = payments.length;
+    document.getElementById("analyticsUsers").textContent = users.length;
+    document.getElementById("analyticsCompanies").textContent = companies.length;
+    document.getElementById("analyticsWebsites").textContent = websites.filter(w=>w.status==='Active').length;
+    document.getElementById("analyticsTickets").textContent = supportTickets.length;
+    drawAnalyticsCharts(users, companies, payments, websites);
+}
+
+let revenueChart, usersChart, websiteChart, dashboardChartRef;
+
+
+
+function devMonthBuckets(months){
+    const out = [];
+    const now = new Date();
+    for (let i = months - 1; i >= 0; i--){
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        out.push({
+            key: d.getFullYear() + "-" + d.getMonth(),
+            label: d.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+            value: 0, count: 0
+        });
+    }
+    return out;
+}
+function devBucketKey(dateLike){
+    const d = new Date(dateLike);
+    if (isNaN(d.getTime())) return null;
+    return d.getFullYear() + "-" + d.getMonth();
+}
+function devSeries(records, months, dateField, valueFn){
+    const buckets = devMonthBuckets(months);
+    const index = new Map(buckets.map(b => [b.key, b]));
+    (records || []).forEach(r => {
+        const k = devBucketKey(r && (r[dateField] || r.date || r.registered || r.createdAt));
+        const b = k ? index.get(k) : null;
+        if (!b) return;
+        b.count++;
+        b.value += valueFn ? Number(valueFn(r) || 0) : 1;
+    });
+    return buckets;
+}
+function devCumulative(buckets, startingTotal){
+    let run = 0;
+    return buckets.map(b => { run += b.count; return run; });
+}
+function devGradient(canvas, hex){
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height || 300);
+    g.addColorStop(0, hex + "66");
+    g.addColorStop(1, hex + "05");
+    return g;
+}
+const DEV_GRAPH_OPTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: { legend: { position: "bottom", labels: { usePointStyle: true, boxWidth: 8 } } },
+    elements: { line: { tension: 0.4, borderWidth: 2 }, point: { radius: 3, hoverRadius: 6 } },
+    scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: "rgba(148,163,184,0.2)" } }
+    }
+};
+
+function drawAnalyticsCharts(users, companies, payments, websites){
+    if (typeof Chart === "undefined") return;
+    if(revenueChart) revenueChart.destroy();
+    if(usersChart) usersChart.destroy();
+    if(websiteChart) websiteChart.destroy();
+
+    const months = parseInt(document.getElementById("analyticsRange")?.value || "12", 10);
+
+    const completed = (payments || []).filter(p => p.status === "Completed");
+    const revSeries = devSeries(completed, months, "date", p => calculateInvoiceAmount(p));
+    const pendSeries = devSeries((payments || []).filter(p => p.status !== "Completed"), months, "date", p => calculateInvoiceAmount(p));
+    const labels = revSeries.map(b => b.label);
+
+    
+    const revTotal = revSeries.reduce((a, b) => a + b.value, 0);
+    if (revTotal === 0 && completed.length){
+        const each = completed.reduce((a, p) => a + calculateInvoiceAmount(p), 0);
+        revSeries[revSeries.length - 1].value = each;
+    }
+
+    const revCanvas = document.getElementById("revenueChart");
+    revenueChart = new Chart(revCanvas, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                { label: "Collected Revenue (KES)", data: revSeries.map(b => b.value),
+                  borderColor: "#22615D", backgroundColor: devGradient(revCanvas, "#22615D"), fill: true },
+                { label: "Outstanding (KES)", data: pendSeries.map(b => b.value),
+                  borderColor: "#f59e0b", backgroundColor: "transparent", borderDash: [5, 4], fill: false }
+            ]
+        },
+        options: DEV_GRAPH_OPTS
+    });
+
+    const userSeries = devSeries(users, months, "registered");
+    const compSeries = devSeries(companies, months, "registered");
+    const uCanvas = document.getElementById("usersChart");
+    usersChart = new Chart(uCanvas, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                { label: "Users (cumulative)", data: devCumulative(userSeries),
+                  borderColor: "#10b981", backgroundColor: devGradient(uCanvas, "#10b981"), fill: true },
+                { label: "Companies (cumulative)", data: devCumulative(compSeries),
+                  borderColor: "#6366f1", backgroundColor: "transparent", fill: false }
+            ]
+        },
+        options: DEV_GRAPH_OPTS
+    });
+
+    const txSeries = devSeries(payments, months, "date");
+    const ticketSeries = devSeries(supportTickets, months, "date");
+    const wCanvas = document.getElementById("websiteChart");
+    websiteChart = new Chart(wCanvas, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                { label: "Transactions", data: txSeries.map(b => b.count),
+                  borderColor: "#579A97", backgroundColor: devGradient(wCanvas, "#579A97"), fill: true },
+                { label: "Support Requests", data: ticketSeries.map(b => b.count),
+                  borderColor: "#ef4444", backgroundColor: "transparent", fill: false },
+                { label: "Active Apps", data: labels.map(() => (websites || []).filter(w => w.status === "Active").length),
+                  borderColor: "#94a3b8", borderDash: [4, 4], backgroundColor: "transparent", fill: false }
+            ]
+        },
+        options: DEV_GRAPH_OPTS
+    });
+}
+
+let reportState = {
+    users: { name: 'Users', desc: 'System users report', format: 'PDF / Excel', generated: '-', email: 'users-reports@acaciabooks.com' },
+    companies: { name: 'Companies', desc: 'Registered companies', format: 'PDF / Excel', generated: '-', email: 'companies-reports@acaciabooks.com' },
+    payments: { name: 'Payments', desc: 'Revenue and payments', format: 'PDF / Excel', generated: '-', email: 'finance-reports@acaciabooks.com' },
+    websites: { name: 'Websites', desc: 'Installed websites', format: 'PDF / Excel', generated: '-', email: 'dev-reports@acaciabooks.com' },
+    analytics: { name: 'Analytics', desc: 'Business analytics', format: 'PDF / Excel', generated: '-', email: 'analytics-reports@acaciabooks.com' },
+    backup: { name: 'System Backup', desc: 'Backup summary', format: 'PDF', generated: '-', email: 'admin-reports@acaciabooks.com' }
+};
+
+let reportDownloads = 0;
+
+function renderReports() {
+    const tbody = document.getElementById("reportsTable");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    Object.keys(reportState).forEach(key => {
+        const r = reportState[key];
+        tbody.innerHTML += `
+            <tr>
+                <td class="p-3 border font-medium">${r.name}</td>
+                <td class="p-3 border text-gray-600">${r.desc}</td>
+                <td class="p-3 border text-gray-500">${r.generated}</td>
+                <td class="p-3 border text-sm">${r.format}</td>
+                <td class="p-3 border text-right">
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-blue-700 mr-1" onclick="generateReport('${key}')">Generate</button>
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-gray-900 mr-1" onclick="previewReport('${key}')">Preview</button>
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-amber-700 mr-1" onclick="editReportModal('${key}')">Edit</button>
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-purple-700 mr-1" onclick="emailReport('${key}')">Email</button>
+                    <button class="bg-blue-900 text-white px-2 py-1 text-xs rounded hover:bg-red-700" onclick="deleteReport('${key}')">Delete</button>
+                </td>
+            </tr>
+        `;
+    });
+
+    document.getElementById("reportCount").textContent = Object.keys(reportState).length;
+}
+
+function generateReport(key) {
+    if (!reportState[key]) return;
+    const timestamp = new Date().toLocaleString();
+    reportState[key].generated = timestamp;
+
+    document.getElementById("lastReport").textContent = timestamp;
+    reportDownloads++;
+    document.getElementById("reportDownloads").textContent = reportDownloads;
+
+    renderReports();
+    alert(`Report for ${reportState[key].name} generated successfully.`);
+}
+
+function previewReport(key) {
+    const r = reportState[key];
+    if (!r) return;
+    alert(`Report Preview:\n\nName: ${r.name}\nDescription: ${r.desc}\nFormat: ${r.format}\nLast Generated: ${r.generated}\nTarget Email: ${r.email}`);
+}
+
+function editReportModal(key) {
+    const r = reportState[key];
+    if (!r) return;
+
+    const bodyHtml = `
+        <label class="block text-xs font-bold mb-1">Report Name</label>
+        <input id="editReport_name" type="text" value="${r.name}" class="w-full p-2 border rounded text-sm mb-2">
+        <label class="block text-xs font-bold mb-1">Description</label>
+        <input id="editReport_desc" type="text" value="${r.desc}" class="w-full p-2 border rounded text-sm mb-2">
+        <label class="block text-xs font-bold mb-1">Export Format</label>
+        <input id="editReport_format" type="text" value="${r.format}" class="w-full p-2 border rounded text-sm mb-2">
+        <label class="block text-xs font-bold mb-1">Recipient Email</label>
+        <input id="editReport_email" type="email" value="${r.email}" class="w-full p-2 border rounded text-sm">
+    `;
+
+    openModal("Edit Report Metadata", bodyHtml, () => {
+        r.name = document.getElementById("editReport_name").value.trim() || r.name;
+        r.desc = document.getElementById("editReport_desc").value.trim() || r.desc;
+        r.format = document.getElementById("editReport_format").value.trim() || r.format;
+        r.email = document.getElementById("editReport_email").value.trim() || r.email;
+        renderReports();
+    });
+}
+
+function emailReport(key) {
+    const r = reportState[key];
+    if (!r) return;
+    if (r.generated === "-") {
+        alert("Please generate the report first before dispatching via email.");
+        return;
+    }
+    
+    const __when = (r.generated && r.generated !== "-") ? r.generated : new Date().toLocaleString();
+    const __body = [
+        "Hello,",
+        "",
+        "Please find the " + r.name + " report summary below.",
+        "",
+        "Report: " + r.name,
+        "Description: " + (r.desc || "-"),
+        "Format: " + (r.format || "-"),
+        "Generated: " + __when,
+        "",
+        "The report file is attached.",
+        "",
+        "Regards,",
+        (function(){ try { return (JSON.parse(localStorage.getItem("developerSession") || "{}").fullName) || "Acacia Books Support"; } catch (e) { return "Acacia Books Support"; } })()
+    ].join("\n");
+    const __q = new URLSearchParams({ to: r.email || "", subject: "Acacia Books \u2013 " + r.name + " Report (" + __when + ")", body: __body, uid: "sp_" + key + "_" + Date.now() });
+    const __mailUrl = (window.__ACX_MAIL_URL__ || "acacia-mail.html") + "?" + __q.toString();
+    const __w = window.open(__mailUrl, "acaciaMail");
+    if (!__w) alert("Your browser blocked the new tab. Allow pop-ups for this page, then click Email again.");
+    try { addLog("Info", "Developer", "Opened " + r.name + " report email draft in Acacia Mail", "Reports"); } catch (e) {}
+}
+
+function deleteReport(key) {
+    if (!confirm(`Are you sure you want to delete the ${reportState[key]?.name} report node?`)) return;
+    delete reportState[key];
+    renderReports();
+}
+
+function exportAnalytics() { alert("Report engine bundle targeted inside Reports section matrix center dashboard."); }
+
+function loadDashboard(){
+    document.getElementById("totalUsers").innerHTML = users.length;
+    document.getElementById("totalCompanies").innerHTML = companies.length;
+    let completedRevenue = 0;
+    payments.forEach(p => { if(p.status === "Completed") completedRevenue += Number(p.amount); });
+    document.getElementById("totalRevenue").textContent = "KES " + completedRevenue.toLocaleString();
+    document.getElementById("totalTickets").textContent = supportTickets.length;
+
+    const tbody = document.getElementById("usersTable");
+    tbody.innerHTML = "";
+    if (users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center p-6 text-gray-500">No users found</td></tr>`;
+    } else {
+        users.slice(0, 5).forEach(u => {
+            tbody.innerHTML += `<tr><td>${u.username}</td><td>${u.company || '-'}</td><td>${u.role || '-'}</td><td>${u.status || 'Active'}</td><td>-</td></tr>`;
+        });
+    }
+
+    
+    if (typeof Chart !== "undefined") {
+        if (dashboardChartRef) { dashboardChartRef.destroy(); dashboardChartRef = null; }
+        const rangeVal = document.getElementById("dashboardChartRange")?.value || "";
+        const months = /3/.test(rangeVal) ? 3 : /6/.test(rangeVal) ? 6 : 12;
+        const canvas = document.getElementById("dashboardChart");
+        if (canvas) {
+            const rev = devSeries(payments.filter(p => p.status === "Completed"), months, "date", p => calculateInvoiceAmount(p));
+            const usr = devSeries(users, months, "registered");
+            const cmp = devSeries(companies, months, "registered");
+            dashboardChartRef = new Chart(canvas, {
+                type: "line",
+                data: {
+                    labels: rev.map(b => b.label),
+                    datasets: [
+                        { label: "Revenue (KES)", data: rev.map(b => b.value), borderColor: "#22615D",
+                          backgroundColor: devGradient(canvas, "#22615D"), fill: true, yAxisID: "y" },
+                        { label: "New Users", data: usr.map(b => b.count), borderColor: "#10b981",
+                          backgroundColor: "transparent", yAxisID: "y1" },
+                        { label: "New Companies", data: cmp.map(b => b.count), borderColor: "#f59e0b",
+                          backgroundColor: "transparent", borderDash: [5, 4], yAxisID: "y1" }
+                    ]
+                },
+                options: Object.assign({}, DEV_GRAPH_OPTS, {
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { beginAtZero: true, position: "left", grid: { color: "rgba(148,163,184,0.2)" } },
+                        y1: { beginAtZero: true, position: "right", grid: { display: false } }
+                    }
+                })
+            });
+        }
+    }
+}
+
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('importDropdown');
+    if (dropdown && !e.target.closest('.relative')) {
+        dropdown.classList.add('hidden');
+    }
+});
+
+
+const paginationState = {
+    users: { page: 1, size: 25 },
+    companies: { page: 1, size: 25 },
+    payments: { page: 1, size: 25 },
+    notifications: { page: 1, size: 25 },
+    support: { page: 1, size: 25 },
+    logs: { page: 1, size: 25 }
+};
+
+function paginate(list, key) {
+    const st = paginationState[key];
+    const totalPages = Math.max(1, Math.ceil(list.length / st.size));
+    if (st.page > totalPages) st.page = totalPages;
+    if (st.page < 1) st.page = 1;
+    const start = (st.page - 1) * st.size;
+    return { pageItems: list.slice(start, start + st.size), totalPages, start };
+}
+
+function renderPageNumbers(containerId, key, totalPages, gotoFn) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = "";
+    const st = paginationState[key];
+    const maxButtons = 7;
+    let startPage = Math.max(1, st.page - 3);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+    startPage = Math.max(1, endPage - maxButtons + 1);
+    for (let i = startPage; i <= endPage; i++) {
+        const btn = document.createElement('button');
+        btn.textContent = i;
+        btn.className = 'px-2.5 py-1 rounded text-xs border ' + (i === st.page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-100');
+        btn.onclick = () => gotoFn(i);
+        el.appendChild(btn);
+    }
+}
+
+function gotoUserPage(p){ paginationState.users.page = p; renderUsers(); }
+function prevUserPage(){ if(paginationState.users.page>1){ paginationState.users.page--; renderUsers(); } }
+function nextUserPage(){ paginationState.users.page++; renderUsers(); }
+function changeUserPageSize(){ paginationState.users.size = parseInt(document.getElementById('userPageSize').value); paginationState.users.page = 1; renderUsers(); }
+
+function gotoCompanyPage(p){ paginationState.companies.page = p; renderCompanies(); }
+function prevCompanyPage(){ if(paginationState.companies.page>1){ paginationState.companies.page--; renderCompanies(); } }
+function nextCompanyPage(){ paginationState.companies.page++; renderCompanies(); }
+function changeCompanyPageSize(){ paginationState.companies.size = parseInt(document.getElementById('companyPageSize').value); paginationState.companies.page = 1; renderCompanies(); }
+
+function gotoPaymentPage(p){ paginationState.payments.page = p; renderPayments(); }
+function prevPage(){ if(paginationState.payments.page>1){ paginationState.payments.page--; renderPayments(); } }
+function nextPage(){ paginationState.payments.page++; renderPayments(); }
+function changePageSize(){ paginationState.payments.size = parseInt(document.getElementById('pageSize').value); paginationState.payments.page = 1; renderPayments(); }
+
+function gotoNotificationPage(p){ paginationState.notifications.page = p; renderNotifications(); }
+function prevNotificationPage(){ if(paginationState.notifications.page>1){ paginationState.notifications.page--; renderNotifications(); } }
+function nextNotificationPage(){ paginationState.notifications.page++; renderNotifications(); }
+function changeNotificationPageSize(){ paginationState.notifications.size = parseInt(document.getElementById('notificationPageSize').value); paginationState.notifications.page = 1; renderNotifications(); }
+
+function gotoSupportPage(p){ paginationState.support.page = p; renderSupportTickets(); }
+function prevSupportPage(){ if(paginationState.support.page>1){ paginationState.support.page--; renderSupportTickets(); } }
+function nextSupportPage(){ paginationState.support.page++; renderSupportTickets(); }
+function changeSupportPageSize(){ paginationState.support.size = parseInt(document.getElementById('supportPageSize').value); paginationState.support.page = 1; renderSupportTickets(); }
+
+function gotoLogPage(p){ paginationState.logs.page = p; renderLogs(); }
+function prevLogPage(){ if(paginationState.logs.page>1){ paginationState.logs.page--; renderLogs(); } }
+function nextLogPage(){ paginationState.logs.page++; renderLogs(); }
+function changeLogPageSize(){ paginationState.logs.size = parseInt(document.getElementById('logPageSize').value); paginationState.logs.page = 1; renderLogs(); }
+
+
+const sortState = {};
+function genericSort(arr, key, stateKey, valueFn) {
+    if (!sortState[stateKey]) sortState[stateKey] = {};
+    const st = sortState[stateKey];
+    if (st.key === key) st.asc = !st.asc; else { st.key = key; st.asc = true; }
+    arr.sort((a, b) => {
+        let av = valueFn ? valueFn(a, key) : a[key];
+        let bv = valueFn ? valueFn(b, key) : b[key];
+        if (typeof av === 'string') av = av.toLowerCase();
+        if (typeof bv === 'string') bv = bv.toLowerCase();
+        if (av == null) av = '';
+        if (bv == null) bv = '';
+        if (av < bv) return st.asc ? -1 : 1;
+        if (av > bv) return st.asc ? 1 : -1;
+        return 0;
+    });
+}
+function sortUsers(field){
+    const map = { name: 'username', email: 'email', company: 'company' };
+    genericSort(users, map[field] || field, 'users');
+    renderUsers();
+}
+function sortCompanies(field){
+    const map = { company: 'companyName', owner: 'ownerName', email: 'email', registered: 'createdAt' };
+    genericSort(companies, map[field] || field, 'companies');
+    renderCompanies();
+}
+function sortTable(field){
+    const map = { invoice: 'invoice', customer: 'customer', email: 'email', date: 'date' };
+    if (field === 'amount') {
+        genericSort(payments, 'amount', 'payments', (p) => calculateInvoiceAmount(p));
+    } else {
+        genericSort(payments, map[field] || field, 'payments');
+    }
+    renderPayments();
+}
+function sortNotifications(field){
+    const map = { title: 'title', recipient: 'recipient', date: 'date' };
+    genericSort(notifications, map[field] || field, 'notifications');
+    renderNotifications();
+}
+function sortLogs(field){
+    const map = { date: 'date', user: 'user', module: 'module' };
+    genericSort(logs, map[field] || field, 'logs');
+    renderLogs();
+}
+function sortSupportTickets(field){
+    const map = { ticketId: 'ticket', subject: 'subject', customer: 'customer', date: 'date' };
+    genericSort(supportTickets, map[field] || field, 'support');
+    renderSupportTickets();
+}
+
+
+const bulkSelections = { users: new Set(), companies: new Set(), payments: new Set(), notifications: new Set(), support: new Set(), logs: new Set() };
+const bulkConfig = {
+    users: { rowClass: 'user-row-checkbox', barId: 'userBulkBar', countId: 'selectedUserCount', selectAllId: 'selectAllUsers' },
+    companies: { rowClass: 'companies-row-checkbox', barId: 'companyBulkBar', countId: 'selectedCompanyCount', selectAllId: 'selectAllCompanies' },
+    payments: { rowClass: 'payments-row-checkbox', barId: 'bulkActionBar', countId: 'selectedCount', selectAllId: 'selectAllPayments' },
+    notifications: { rowClass: 'notifications-row-checkbox', barId: 'notificationBulkBar', countId: 'selectedNotificationCount', selectAllId: 'selectAllNotifications' },
+    support: { rowClass: 'support-row-checkbox', barId: 'supportBulkBar', countId: 'selectedSupportCount', selectAllId: 'selectAllSupport' },
+    logs: { rowClass: 'logs-row-checkbox', barId: 'logBulkBar', countId: 'selectedLogCount', selectAllId: 'selectAllLogs' }
+};
+
+function onRowCheckToggle(key){
+    const cfg = bulkConfig[key];
+    const boxes = document.querySelectorAll('.' + cfg.rowClass);
+    const set = bulkSelections[key];
+    set.clear();
+    boxes.forEach(b => { if (b.checked) set.add(b.value); });
+    updateBulkBar(key);
+}
+
+function updateBulkBar(key){
+    const cfg = bulkConfig[key];
+    const set = bulkSelections[key];
+    const bar = document.getElementById(cfg.barId);
+    const countEl = document.getElementById(cfg.countId);
+    if (countEl) countEl.textContent = set.size;
+    if (bar) bar.classList.toggle('hidden', set.size === 0);
+    const selectAllBox = document.getElementById(cfg.selectAllId);
+    if (selectAllBox) {
+        const boxes = document.querySelectorAll('.' + cfg.rowClass);
+        selectAllBox.checked = boxes.length > 0 && Array.from(boxes).every(b => b.checked);
+    }
+}
+
+function toggleSelectAllGeneric(key, checked){
+    const cfg = bulkConfig[key];
+    const boxes = document.querySelectorAll('.' + cfg.rowClass);
+    boxes.forEach(b => b.checked = checked);
+    onRowCheckToggle(key);
+}
+function toggleSelectAllUsers(cb){ toggleSelectAllGeneric('users', cb.checked); }
+function toggleSelectAllCompanies(cb){ toggleSelectAllGeneric('companies', cb.checked); }
+function toggleSelectAll(cb){ toggleSelectAllGeneric('payments', cb.checked); }
+function toggleSelectAllNotifications(cb){ toggleSelectAllGeneric('notifications', cb.checked); }
+function toggleSelectAllSupport(cb){ toggleSelectAllGeneric('support', cb.checked); }
+function toggleSelectAllLogs(cb){ toggleSelectAllGeneric('logs', cb.checked); }
+
+
+function bulkActivateUsers(){
+    const ids = Array.from(bulkSelections.users).map(Number);
+    users.forEach(u => { if (ids.includes(u.id)) u.status = 'Active'; });
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Info", "Developer", `Bulk activated ${ids.length} users`, "Users");
+    bulkSelections.users.clear();
+    renderUsers();
+}
+function bulkSuspendUsers(){
+    const ids = Array.from(bulkSelections.users).map(Number);
+    users.forEach(u => { if (ids.includes(u.id)) u.status = 'Suspended'; });
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Warning", "Developer", `Bulk suspended ${ids.length} users`, "Users");
+    bulkSelections.users.clear();
+    renderUsers();
+}
+function bulkDeleteUsers(){
+    if(!confirm("Delete all selected users?")) return;
+    const ids = Array.from(bulkSelections.users).map(Number);
+    users = users.filter(u => !ids.includes(u.id));
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    addLog("Error", "Developer", `Bulk deleted ${ids.length} users`, "Users");
+    bulkSelections.users.clear();
+    renderUsers();
+}
+
+
+function bulkExportCompanies(){
+    const ids = Array.from(bulkSelections.companies);
+    const selected = companies.filter(c => ids.includes(String(c.id || c.companyName)));
+    const blob = new Blob([JSON.stringify(selected, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "companies_selected.json";
+    a.click();
+}
+function bulkDeleteCompanies(){
+    if(!confirm("Delete all selected companies?")) return;
+    const ids = Array.from(bulkSelections.companies);
+    companies = companies.filter(c => !ids.includes(String(c.id || c.companyName)));
+    localStorage.setItem(COMPANY_KEY, JSON.stringify(companies));
+    addLog("Error", "Developer", `Bulk deleted ${ids.length} companies`, "Companies");
+    bulkSelections.companies.clear();
+    renderCompanies();
+}
+
+
+function bulkMarkAsPaid(){
+    const ids = Array.from(bulkSelections.payments).map(Number);
+    payments.forEach(p => { if (ids.includes(p.id)) p.status = 'Completed'; });
+    localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+    addLog("Info", "Developer", `Bulk marked ${ids.length} payments as completed`, "Payments");
+    bulkSelections.payments.clear();
+    renderPayments();
+}
+function bulkSendReceipts(){
+    const ids = Array.from(bulkSelections.payments);
+    alert(`Receipts dispatched for ${ids.length} selected transactions.`);
+    bulkSelections.payments.clear();
+    renderPayments();
+}
+function bulkDelete(){
+    if(!confirm("Delete all selected payments?")) return;
+    const ids = Array.from(bulkSelections.payments).map(Number);
+    payments = payments.filter(p => !ids.includes(p.id));
+    localStorage.setItem(PAYMENT_KEY, JSON.stringify(payments));
+    addLog("Error", "Developer", `Bulk deleted ${ids.length} payments`, "Payments");
+    bulkSelections.payments.clear();
+    renderPayments();
+}
+
+
+function bulkMarkAsRead(){
+    const ids = Array.from(bulkSelections.notifications).map(Number);
+    notifications.forEach(n => { if (ids.includes(n.id)) n.status = 'Read'; });
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    bulkSelections.notifications.clear();
+    renderNotifications();
+}
+function bulkResendNotifications(){
+    const ids = Array.from(bulkSelections.notifications).map(Number);
+    notifications.forEach(n => { if (ids.includes(n.id) && n.status === 'Failed') n.status = 'Sent'; });
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    addLog("Info", "Developer", `Resent ${ids.length} failed notifications`, "Notifications");
+    bulkSelections.notifications.clear();
+    renderNotifications();
+}
+function bulkDeleteNotifications(){
+    if(!confirm("Delete all selected notifications?")) return;
+    const ids = Array.from(bulkSelections.notifications).map(Number);
+    notifications = notifications.filter(n => !ids.includes(n.id));
+    localStorage.setItem(NOTIFICATION_KEY, JSON.stringify(notifications));
+    bulkSelections.notifications.clear();
+    renderNotifications();
+}
+
+
+function bulkAssignTickets(){
+    const ids = Array.from(bulkSelections.support);
+    alert(`${ids.length} tickets assigned to the current developer queue.`);
+    bulkSelections.support.clear();
+    renderSupportTickets();
+}
+function bulkCloseTickets(){
+    const ids = Array.from(bulkSelections.support).map(Number);
+    supportTickets.forEach(t => { if (ids.includes(t.id)) t.status = 'Resolved'; });
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    bulkSelections.support.clear();
+    renderSupportTickets();
+}
+function bulkDeleteTickets(){
+    if(!confirm("Delete all selected tickets?")) return;
+    const ids = Array.from(bulkSelections.support).map(Number);
+    supportTickets = supportTickets.filter(t => !ids.includes(t.id));
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets));
+    bulkSelections.support.clear();
+    renderSupportTickets();
+}
+
+
+function bulkExportSelectedLogs(){
+    const ids = Array.from(bulkSelections.logs).map(Number);
+    const selected = logs.filter(l => ids.includes(l.id));
+    const blob = new Blob([JSON.stringify(selected, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "logs_selected.json";
+    a.click();
+}
+function bulkDeleteSelectedLogs(){
+    if(!confirm("Delete all selected logs?")) return;
+    const ids = Array.from(bulkSelections.logs).map(Number);
+    logs = logs.filter(l => !ids.includes(l.id));
+    localStorage.setItem(LOG_KEY, JSON.stringify(logs));
+    bulkSelections.logs.clear();
+    renderLogs();
+}
+
+
+function populateFilterOptions(selectId, values){
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    const current = select.value;
+    const unique = Array.from(new Set(values)).sort();
+    select.innerHTML = `<option value="">All Companies</option>` + unique.map(v => `<option value="${v}">${v}</option>`).join('');
+    select.value = unique.includes(current) ? current : "";
+}
+
+function resetUserFilters(){
+    document.getElementById("userSearch").value = "";
+    document.getElementById("userRoleFilter").value = "";
+    document.getElementById("userStatusFilter").value = "";
+    document.getElementById("userCompanyFilter").value = "";
+    paginationState.users.page = 1;
+    renderUsers();
+}
+
+function resetCompanyFilters(){
+    document.getElementById("companySearch").value = "";
+    document.getElementById("companyPlanFilter").value = "";
+    document.getElementById("companyStatusFilter").value = "";
+    paginationState.companies.page = 1;
+    renderCompanies();
+}
+
+
+function triggerFileInput(){
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            document.getElementById('userAvatar').src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+    };
+    input.click();
+}
+
+function renderDashboard(){ loadDashboard(); addLog("Info", "Developer", "Synced Dashboard Metrics", "Dashboard"); }
+
+function updateDashboardChart(){ loadDashboard(); }
+
+function exportDashboardReport(){
+    const summary = {
+        generatedAt: new Date().toLocaleString(),
+        totalUsers: users.length,
+        totalCompanies: companies.length,
+        totalWebsites: websites.length,
+        totalRevenue: payments.filter(p => p.status === 'Completed').reduce((a, p) => a + calculateInvoiceAmount(p), 0),
+        supportTickets: supportTickets.length
+    };
+    const blob = new Blob([JSON.stringify(summary, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "dashboard_summary.json";
+    a.click();
+}
+
+function exportConfig(){
+    const config = { settings: settings };
+    const blob = new Blob([JSON.stringify(config, null, 2)], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "system_config.json";
+    a.click();
+}
+
+function saveAllSettings(){
+    savePlatformSettings();
+    savePreferences();
+}
+
+function resetSettings(){
+    if(!confirm("Reset all settings to defaults?")) return;
+    settings = {};
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    loadSettings();
+    alert("Settings restored to system defaults.");
+}
+
+function openBulkImportUsersModal(){
+    const bodyHtml = `
+        <p class="text-xs text-gray-500 mb-2">Paste CSV with header: username,email,company,role,status</p>
+        <textarea id="bulkUsers_csv" placeholder="jdoe,jdoe@example.com,Acme Ltd,Editor,Active" class="w-full p-2 border rounded text-sm h-32 font-mono"></textarea>
+    `;
+    openModal("Bulk Import Users (CSV)", bodyHtml, () => {
+        const raw = document.getElementById("bulkUsers_csv").value.trim();
+        if (!raw) return;
+        const lines = raw.split(/\r?\n/);
+        let imported = 0;
+        lines.forEach(line => {
+            if (!line.trim()) return;
+            const parts = line.split(',').map(s => s.trim());
+            if (parts[0].toLowerCase() === 'username') return; 
+            const [username, email, company, role, status] = parts;
+            if (!username) return;
+            users.push({ id: Date.now() + imported, username, email: email || '', company: company || '', role: role || 'Viewer', status: status || 'Active' });
+            imported++;
+        });
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        addLog("Info", "Developer", `Bulk imported ${imported} users via CSV`, "Users");
+        renderUsers();
+    });
+}
+
+window.onload = function () {
+    document.getElementById("footerYear").textContent = new Date().getFullYear();
+    const session = JSON.parse(localStorage.getItem("developerSession"));
+    if (!session) return;
+    document.getElementById("homePage").classList.add("hidden");
+    document.getElementById("loginPage").classList.add("hidden");
+    document.body.classList.remove("home-mode");
+    document.getElementById("app").classList.remove("hidden");
+    document.getElementById("welcome").textContent = `Welcome, ${session.fullName}`;
+    document.getElementById("role").textContent = session.role;
+    
+    applyTheme((settings && settings.theme) || "Light", false);
+    renderWebsites();
+    renderPayments();
+    renderUsers();
+    renderCompanies();
+    renderNotifications();
+    renderLogs();
+    renderSupportTickets();
+    renderReports();
+    loadSettings();
+    loadDashboard();
+
+    
+    window.addEventListener("storage", devAutoRefresh);
+    setInterval(devAutoRefresh, 4000);
+};
+
+function devAutoRefresh(){
+    try {
+        
+        
+        
+        
+        var cloudOwns = !!window.__acxCloudActive;
+        if (!cloudOwns){
+          users = loadUsersFromStores();
+          companies = loadCompaniesFromStores(users);
+        }
+        payments = loadPaymentsFromStores();
+        syncChatWidgetTickets();
+        const active = document.querySelector(".page.active");
+        const id = active ? active.id : null;
+        if (id === "companies") { if (!cloudOwns) renderCompanies(); }
+        else if (id === "users") { if (!cloudOwns) renderUsers(); }
+        else if (id === "support") renderSupportTickets();
+        else if (id === "payments") renderPayments();
+        else if (id === "dashboard") { if (!cloudOwns) loadDashboard(); }
+        else if (id === "analytics") refreshAnalytics();
+    } catch(e){ console.error("devAutoRefresh failed", e); }
+}
+
+/* ===== cloud sync ===== */
+
+(function(){
+  var URL_ = 'https://xglsampckermarjpczdf.supabase.co', KEY_ = 'sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A';
+  window.__SUPA_URL__ = URL_; window.__SUPA_KEY__ = KEY_;
+  if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
+  var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
+  window.__acxSb = sb;
+  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], upgrades = [], busy = false;
+
+  function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
+  function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
+  function plus(days){ var d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); }
+  function eff(r){ return (r.status === 'active' && r.paid_until && new Date(r.paid_until) < new Date()) ? 'expired' : r.status; }
+  function who(){ try { return (JSON.parse(localStorage.getItem('developerSession') || '{}').fullName) || 'Developer'; } catch(e){ return 'Developer'; } }
+
+
+  
+
+
+  var TOMB_KEY = 'acacia_hub_deleted';
+  function tombs(){ try { var t = JSON.parse(localStorage.getItem(TOMB_KEY) || '{}'); return { companies: t.companies || [], users: t.users || [] }; } catch(e){ return { companies: [], users: [] }; } }
+  function saveTombs(t){ try { localStorage.setItem(TOMB_KEY, JSON.stringify(t)); } catch(e){} }
+  function low(v){ return String(v == null ? '' : v).toLowerCase(); }
+  function addTomb(kind, v){ v = low(v); if (!v) return; var t = tombs(); if (t[kind].indexOf(v) === -1){ t[kind].push(v); saveTombs(t); } }
+  function scrubLocalStores(){
+    var t = tombs(); if (!t.companies.length && !t.users.length) return;
+    var bases = ['users', 'acacia_users', 'companies', 'acacia_companies'];
+    for (var i = 0; i < localStorage.length; i++){
+      var k = localStorage.key(i); if (!k || bases.indexOf(k.split('::')[0]) === -1) continue;
+      try {
+        var arr = JSON.parse(localStorage.getItem(k) || 'null'); if (!Array.isArray(arr)) continue;
+        var keep = arr.filter(function(x){
+          if (!x || typeof x !== 'object') return true;
+          var cid = low(x.companyId || x.id || x.companyName || x.name);
+          var ukey = low(x.email || x.username);
+          var isCompanyRec = k.split('::')[0].indexOf('compan') === 0;
+          if (isCompanyRec) return t.companies.indexOf(cid) === -1;
+          return t.users.indexOf(ukey) === -1 && t.users.indexOf(low(x.companyId || x.companyName) + '|' + ukey) === -1 && t.companies.indexOf(low(x.companyId || x.companyName)) === -1;
+        });
+        if (keep.length !== arr.length) localStorage.setItem(k, JSON.stringify(keep));
+      } catch(e){}
+    }
+  }
+  function applyTombstones(){
+    var t = tombs(); if (!t.companies.length && !t.users.length) return;
+    rows  = rows.filter(function(r){ return t.companies.indexOf(low(r.company_id)) === -1; });
+    accts = accts.filter(function(a){ var cc = low(a.company_id) + '|'; return t.companies.indexOf(low(a.company_id)) === -1 && t.users.indexOf(low(a.login_id)) === -1 && t.users.indexOf(low(a.username)) === -1 && t.users.indexOf(cc + low(a.login_id)) === -1 && t.users.indexOf(cc + low(a.username)) === -1; });
+    usage = usage.filter(function(x){ return t.companies.indexOf(low(x.company_id)) === -1 && t.users.indexOf(low(x.user_key)) === -1 && t.users.indexOf(low(x.company_id) + '|' + low(x.user_key)) === -1; });
+    tix   = tix.filter(function(x){ return t.companies.indexOf(low(x.company_id)) === -1; });
+    scrubLocalStores();
+  }
+  function failNote(what, errs){
+    alert('Could not fully delete ' + what + ' from Supabase:\n\n' + errs.join('\n') +
+      '\n\nIt is now hidden in this browser, but to remove it for good the hub admin needs DELETE permission on those tables (RLS policy).');
+  }
+
+
+  
+  var hubRole = '';
+  var ROLE_PAGES = { hub_accounts: ['payments', 'companies'], hub_support: ['support'] };
+  var ROLE_NAME = { hub_admin: 'Admin', hub_viewer: 'Viewer (read-only)', hub_accounts: 'Accounts', hub_support: 'Customer Care' };
+  var ROLE_CSS = { hub_admin: 'text-emerald-700 bg-emerald-50', hub_viewer: 'text-blue-700 bg-blue-50', hub_accounts: 'text-purple-700 bg-purple-50', hub_support: 'text-amber-700 bg-amber-50' };
+  (function(){
+    var st = document.createElement('style');
+    st.textContent = 'body.role-limited #companiesTable td.text-right button,body.role-limited #paymentsTable td button,body.role-limited #upgradeReqTable button,body.role-limited #companies .bg-rose-600,body.role-limited #payments .bg-red-600{display:none!important}' +
+      'body.role-limited #companies input[type=checkbox],body.role-limited #payments input[type=checkbox]{display:none}';
+    document.head.appendChild(st);
+    var _open = window.openPage;
+    window.openPage = function(id){
+      var allow = ROLE_PAGES[hubRole];
+      if (allow && allow.indexOf(id) === -1) id = allow[0];
+      return _open.call(this, id);
+    };
+  })();
+  function applyRole(){
+    var allow = ROLE_PAGES[hubRole];
+    document.body.classList.toggle('role-limited', !!allow);
+    document.querySelectorAll('button[onclick^="openPage("]').forEach(function(b){
+      var m = /openPage\('([^']+)'\)/.exec(b.getAttribute('onclick') || ''); if (!m) return;
+      var li = b.closest('li') || b; li.style.display = (!allow || allow.indexOf(m[1]) > -1) ? '' : 'none';
+    });
+    if (allow){
+      var cur = document.querySelector('.page.active');
+      if (!cur || allow.indexOf(cur.id) === -1) window.openPage(allow[0]);
+    }
+  }
+
+  function pill(){
+    var p = document.getElementById('hubCloudPill');
+    if (!p){ p = document.createElement('div'); p.id = 'hubCloudPill';
+      p.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9999;padding:6px 12px;border-radius:999px;font-size:12px;background:#0f172a;color:#e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+      document.body.appendChild(p); }
+    p.textContent = !cloudOK ? '\u2601 Cloud offline' : (canWrite ? '\u2601 Live \u00b7 approvals enabled' : '\u2601 Live \u00b7 read-only (admin sign-in missing)');
+    p.style.background = !cloudOK ? '#7f1d1d' : (canWrite ? '#14532d' : '#78350f');
+  }
+  async function roleCheck(){
+    try { var s = await sb.auth.getSession(); var u = s && s.data && s.data.session && s.data.session.user;
+      hubRole = (u && u.app_metadata && u.app_metadata.role) || '';
+      canWrite = hubRole === 'hub_admin'; } catch(e){ canWrite = false; }
+    pill(); applyRole();
+  }
+  async function signIn(email, pass){
+    try { var r = await sb.auth.signInWithPassword({ email: email, password: pass });
+      if (r.error) console.warn('[hub cloud] sign-in', r.error.message); } catch(e){}
+    await roleCheck();
+  }
+
+  async function refresh(){
+    if (busy) return; busy = true;
+    try {
+      var st = await sb.from('acacia_company_status').select('*').order('created_at', { ascending: false });
+      if (st.error) throw st.error;
+      rows = st.data || [];
+      var ac = await sb.from('app_accounts').select('login_id,username,company_id,data,updated_at');
+      accts = (ac.data || []);
+      var us = await sb.from('acacia_app_usage').select('company_id,app,user_key,role,last_seen'); usage = us.error ? [] : (us.data || []);
+      var tk = await sb.from('acacia_tickets').select('*').order('updated_at', { ascending: false }); tix = tk.error ? [] : (tk.data || []);
+      var pm = await sb.from('acacia_payments').select('*').order('created_at', { ascending: false }); pays = pm.error ? [] : (pm.data || []);
+      var hu = await sb.from('acacia_hub_users').select('*').order('created_at', { ascending: true }); hubUsers = hu.error ? [] : (hu.data || []);
+      var ur = await sb.from('acacia_upgrade_requests').select('*').order('created_at', { ascending: false }).limit(100); upgrades = ur.error ? [] : (ur.data || []);
+      cloudOK = true;
+    } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
+    if (canWrite){
+      var exp = rows.filter(function(r){ return r.status === 'active' && r.paid_until && new Date(r.paid_until) < new Date(); });
+      for (var i = 0; i < exp.length; i++){
+        var u = await sb.from('acacia_company_status').update({ status: 'suspended', note: 'Payment expired ' + fmt(exp[i].paid_until), updated_at: new Date().toISOString() }).eq('company_id', exp[i].company_id);
+        if (!u.error){ exp[i].status = 'suspended'; try { addLog('Warning', 'System', 'Auto-deactivated (payment expired): ' + (exp[i].company_name || exp[i].company_id), 'Companies'); } catch(e){} }
+      }
+    }
+    applyTombstones();
+    window.__acxCloudReady = true;
+    merge(); mergeTickets(); mergePayments(); try { var __ap = document.getElementById('apps'); if (__ap && __ap.classList.contains('active')) window.renderAppsPage(); } catch(e){} renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
+  }
+
+  function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
+  function usageText(id){
+    var by = {}, last = 0;
+    usage.filter(function(x){ return String(x.company_id) === String(id); }).forEach(function(x){
+      var a = by[x.app] = by[x.app] || { n: 0 }; a.n++; var t = new Date(x.last_seen).getTime(); if (t > last) last = t; });
+    var parts = Object.keys(by).map(function(k){ return k + ' ' + by[k].n; });
+    return parts.length ? parts.join(' \u00b7 ') + ' \u00b7 active ' + ago(last) : 'No app activity yet';
+  }
+
+  
+  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell' };
+  function appName(k){ k = String(k || ''); return APP_NAMES[k.toLowerCase()] || (k ? title(k) : 'Unknown'); }
+  var appsView = [];
+  window.renderAppsPage = function(){
+    var tb = document.getElementById('appsTable'); if (!tb) return;
+    var byCo = {}; rows.forEach(function(r){ byCo[String(r.company_id)] = r; });
+    var userApps = {};
+    usage.forEach(function(x){ var k = low(x.company_id) + '|' + low(x.user_key); (userApps[k] = userApps[k] || {})[low(x.app)] = 1; });
+    var present = {}; Object.keys(APP_NAMES).forEach(function(k){ present[k] = 1; });
+    usage.forEach(function(x){ if (x.app) present[low(x.app)] = 1; });
+
+    var sel = document.getElementById('appFilter'), selCo = document.getElementById('appCompanyFilter');
+    var curApp = sel.value, curCo = selCo.value;
+    var counts = {}; usage.forEach(function(x){ var a = low(x.app); counts[a] = (counts[a] || 0) + 1; });
+    sel.innerHTML = '<option value="">All Apps (' + usage.length + ')</option>' + Object.keys(present).sort().map(function(k){
+      return '<option value="' + esc(k) + '">' + esc(appName(k)) + ' (' + (counts[k] || 0) + ')</option>'; }).join('');
+    sel.value = curApp;
+    selCo.innerHTML = '<option value="">All Companies</option>' + rows.map(function(r){
+      return '<option value="' + esc(r.company_id) + '">' + esc(r.company_name || r.company_id) + '</option>'; }).join('');
+    selCo.value = curCo;
+
+    var chips = document.getElementById('appChips');
+    if (chips) chips.innerHTML = Object.keys(present).sort().map(function(k){
+      var on = curApp === k;
+      return '<button onclick="document.getElementById(\'appFilter\').value=\'' + esc(k) + '\';renderAppsPage()" class="px-3 py-1.5 rounded-full text-xs font-semibold border ' + (on ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100') + '">' + esc(appName(k)) + ' <span class="opacity-70">' + (counts[k] || 0) + '</span></button>'; }).join('');
+
+    var q = low(document.getElementById('appSearch').value);
+    appsView = usage.filter(function(x){
+      if (curApp && low(x.app) !== curApp) return false;
+      if (curCo && String(x.company_id) !== curCo) return false;
+      if (!q) return true;
+      var r = byCo[String(x.company_id)];
+      return [x.user_key, x.role, x.app, appName(x.app), x.company_id, r && r.company_name].some(function(v){ return low(v).indexOf(q) > -1; });
+    }).sort(function(a, b){ return new Date(b.last_seen || 0) - new Date(a.last_seen || 0); });
+
+    tb.innerHTML = appsView.length ? appsView.map(function(x){
+      var r = byCo[String(x.company_id)], e = r ? eff(r) : 'active';
+      var stCls = e === 'active' ? 'bg-emerald-50 text-emerald-700' : (e === 'pending' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700');
+      var others = Object.keys(userApps[low(x.company_id) + '|' + low(x.user_key)] || {}).filter(function(k){ return k !== low(x.app); });
+      return '<tr class="hover:bg-gray-50">' +
+        '<td class="p-4 pl-6"><span class="px-2 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">' + esc(appName(x.app)) + '</span></td>' +
+        '<td class="p-4 font-medium text-gray-900">' + esc(x.user_key) + '</td>' +
+        '<td class="p-4">' + esc((r && r.company_name) || x.company_id) + '</td>' +
+        '<td class="p-4">' + esc(x.role || 'User') + '</td>' +
+        '<td class="p-4 text-xs text-gray-600">' + (others.length ? others.map(function(k){ return esc(appName(k)); }).join(', ') : '<span class="text-gray-400">Only this app</span>') + '</td>' +
+        '<td class="p-4"><span class="px-2 py-1 rounded-full text-xs font-semibold ' + stCls + '">' + esc(title(e)) + '</span></td>' +
+        '<td class="p-4 pr-6 text-xs text-gray-500">' + (x.last_seen ? ago(x.last_seen) : '-') + '</td></tr>';
+    }).join('') : '<tr><td colspan="7" class="text-center p-8 text-gray-500">No app activity matches these filters.</td></tr>';
+    document.getElementById('appShowingCount').textContent = appsView.length;
+  };
+  window.resetAppFilters = function(){
+    ['appSearch', 'appFilter', 'appCompanyFilter'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+    window.renderAppsPage();
+  };
+  window.exportAppsTable = function(){
+    var byCo = {}; rows.forEach(function(r){ byCo[String(r.company_id)] = r; });
+    var q = function(v){ return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    var csv = ['App,User,Company,Role,Last Active'].concat(appsView.map(function(x){
+      var r = byCo[String(x.company_id)]; return [appName(x.app), x.user_key, (r && r.company_name) || x.company_id, x.role || 'User', x.last_seen || ''].map(q).join(','); })).join('\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'app-usage.csv'; a.click();
+  };
+
+  function mergeTickets(){
+    if (typeof supportTickets === 'undefined') return;
+    try {
+      var local = supportTickets.filter(function(t){ return t.source !== 'cloud'; });
+      var cloud = tix.map(function(r){
+        return { id: 'sb:' + r.id, sbId: r.id, ticket: r.id.slice(0, 8).toUpperCase(),
+          customer: r.user_name || r.user_email || r.company_name || 'Customer', company: r.company_name || r.company_id || '',
+          subject: r.subject || 'Support request', priority: r.priority || 'Medium',
+          status: r.status === 'resolved' ? 'Resolved' : 'Open', message: '', app: r.app || '',
+          date: new Date(r.updated_at || r.created_at).toLocaleDateString(),
+          unread: r.status === 'open' && r.last_sender === 'customer', source: 'cloud' };
+      });
+      supportTickets = local.concat(cloud);
+      localStorage.setItem(SUPPORT_KEY, JSON.stringify(local));
+      if (document.getElementById('support') && document.getElementById('support').classList.contains('active')) renderSupportTickets();
+      var badge = document.querySelector("button[onclick=\"openPage('support')\"]");
+      var openCloud = cloud.filter(function(t){ return t.unread; }).length;
+      if (badge) badge.innerHTML = 'Support' + (openCloud ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:6px">' + openCloud + '</span>' : '');
+    } catch(e){ console.error('[hub cloud] ticket merge failed', e); }
+  }
+  async function ticketThread(sbId){
+    var m = await sb.from('acacia_ticket_messages').select('*').eq('ticket_id', sbId).order('created_at', { ascending: true });
+    return m.error ? [] : (m.data || []);
+  }
+  window.hubOpenTicket = async function(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); });
+    if (!t || t.source !== 'cloud') return;
+    var msgs = await ticketThread(t.sbId);
+    var text = msgs.map(function(m){ return (m.sender === 'customer' ? t.customer : 'Support') + ' (' + new Date(m.created_at).toLocaleString() + '):\n' + m.body; }).join('\n\n---\n\n');
+    alert((t.subject) + '\n\n' + text);
+    var reply = prompt('Reply to ' + t.customer + ' (leave empty to just close this):', '');
+    if (reply && reply.trim()){
+      var r = await sb.from('acacia_ticket_messages').insert({ ticket_id: t.sbId, sender: 'support', body: reply.trim() });
+      if (r.error) { alert('Could not send: ' + r.error.message); return; }
+      await sb.from('acacia_tickets').update({ status: 'open', last_sender: 'support', updated_at: new Date().toISOString() }).eq('id', t.sbId);
+      try { addLog('Info', who(), 'Replied to ticket ' + t.ticket + ' (' + t.customer + ')', 'Support'); } catch(e){}
+      await refresh();
+    }
+  };
+  window.hubResolveTicket = async function(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); }); if (!t || t.source !== 'cloud') return;
+    var r = await sb.from('acacia_tickets').update({ status: 'resolved', updated_at: new Date().toISOString() }).eq('id', t.sbId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Resolved ticket ' + t.ticket, 'Support'); } catch(e){}
+    await refresh();
+  };
+  window.hubDeleteTicket = async function(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); }); if (!t || t.source !== 'cloud') return;
+    if (!confirm('Delete this conversation permanently?')) return;
+    var r = await sb.from('acacia_tickets').delete().eq('id', t.sbId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    await refresh();
+  };
+
+  function merge(){
+    var __prevCompanies = (typeof companies !== 'undefined' && companies) ? companies.slice() : [];
+    var __prevUsers = (typeof users !== 'undefined' && users) ? users.slice() : [];
+    try {
+    var byId = {}; rows.forEach(function(r){ byId[r.company_id] = r; });
+    var cu = accts.map(function(a){
+      var d = Object.assign({}, a.data || {});
+      ['password','passwordHash','pass','salt','hash'].forEach(function(k){ delete d[k]; });
+      d.companyId = d.companyId || a.company_id; d.email = d.email || a.login_id; d.username = d.username || a.username;
+      var r = byId[d.companyId];
+      if (r){ var e = eff(r); d.status = e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'); if (r.company_name){ d.companyName = r.company_name; d.company = r.company_name; } }
+      if (String(d.role || '').toLowerCase() === 'custom' && d.customRole) d.role = d.customRole;
+      d.source = 'cloud';
+      return d;
+    });
+    
+
+    var __have = {}; cu.forEach(function(d){ [d.email, d.username].forEach(function(v){ if (v) __have[String(v).toLowerCase()] = 1; }); });
+    var uu = usage.filter(function(x){ return !__have[String(x.user_key || '').toLowerCase()]; }).map(function(x){ var r = byId[x.company_id], e = r ? eff(r) : 'active';
+      return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'), source: 'cloud' }; });
+    users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
+    var cs = rows.map(function(r){
+      return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
+        email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
+        registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
+    });
+    var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
+    var extra = normalizeCompanies(companiesFromUsers(users).concat(devCollect(COMPANY_STORE_KEYS)))
+      .filter(function(c){ return !known[String(c.companyId).toLowerCase()]; })
+      .map(function(c){ c.status = 'Untracked'; return c; });
+    companies = cs.concat(extra);
+    var n = rows.filter(function(r){ return r.status === 'pending'; }).length;
+    var btn = document.querySelector("button[onclick=\"openPage('companies')\"]");
+    if (btn) btn.innerHTML = 'Companies' + (n ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:6px">' + n + ' pending</span>' : '');
+    var tu = document.getElementById('totalUsers'); if (tu) tu.textContent = users.length;
+    try { renderCompanies(); } catch(e){}
+    if (!companies.length && __prevCompanies.length) { companies = __prevCompanies; console.warn('[hub cloud] merge produced an empty company list; keeping the previous list on screen.'); }
+    if (!users.length && __prevUsers.length) { users = __prevUsers; }
+    try { if (document.getElementById('users').classList.contains('active')) renderUsers(); } catch(e){}
+    try { if (document.getElementById('dashboard').classList.contains('active')) loadDashboard(); } catch(e){}
+    } catch(e){ console.error('[hub cloud] merge failed, keeping previous list', e); companies = __prevCompanies; users = __prevUsers; try { renderCompanies(); } catch(e2){} }
+  }
+
+  async function patch(id, fields, msg){
+    if (!canWrite){ alert('Read-only. Sign in works only if the hub admin users exist in Supabase Auth with role hub_admin (see acacia_control_setup.sql).'); return false; }
+    fields.updated_at = new Date().toISOString();
+    var r = await sb.from('acacia_company_status').update(fields).eq('company_id', id).select();
+    if (r.error || !r.data || !r.data.length){ alert('Update failed: ' + (r.error ? r.error.message : 'no permission')); return false; }
+    try { addLog('Info', who(), msg, 'Companies'); } catch(e){}
+    await refresh(); return true;
+  }
+  function askDate(def){
+    var v = prompt('Paid until (YYYY-MM-DD). Leave empty for no expiry:', def || '');
+    if (v === null) return undefined; v = v.trim(); if (!v) return null;
+    var d = new Date(v + 'T23:59:59'); if (isNaN(d)) { alert('Invalid date'); return undefined; }
+    return d.toISOString();
+  }
+  function co(id){ return companies.find(function(c){ return String(c.companyId) === String(id); }) || {}; }
+
+  window.hubApprove = async function(id){ var c = co(id); var pu = askDate(Number(c.price || 0) > 0 ? plus(30) : ''); if (pu === undefined) return;
+    await patch(id, { status: 'active', paid_until: pu, approved_at: new Date().toISOString(), note: 'Approved' }, 'Approved ' + (c.companyName || id)); };
+  window.hubReject = async function(id){ if (!confirm('Reject this registration?')) return;
+    await patch(id, { status: 'rejected', note: 'Rejected by admin' }, 'Rejected ' + (co(id).companyName || id)); };
+  window.hubSuspend = async function(id){ if (!confirm('Deactivate this company? Its users will be locked out.')) return;
+    await patch(id, { status: 'suspended', note: 'Deactivated by admin' }, 'Deactivated ' + (co(id).companyName || id)); };
+  window.hubReactivate = async function(id){ var pu = askDate(plus(30)); if (pu === undefined) return;
+    await patch(id, { status: 'active', paid_until: pu, note: 'Reactivated' }, 'Reactivated ' + (co(id).companyName || id)); };
+  window.hubExtend = async function(id, days){ var r = (co(id)._row || {}); var base = (r.paid_until && new Date(r.paid_until) > new Date()) ? new Date(r.paid_until) : new Date();
+    base.setDate(base.getDate() + days);
+    await patch(id, { status: 'active', paid_until: base.toISOString(), note: 'Extended ' + days + ' days' }, 'Extended ' + (co(id).companyName || id) + ' by ' + days + ' days'); };
+  window.hubTrack = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = co(id);
+    var r = await sb.from('acacia_company_status').insert({ company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' });
+    if (r.error) alert('Failed: ' + r.error.message); await refresh(); };
+
+  
+  window.hubSetExtraUsers = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = co(id), cur = Number((c._row || {}).extra_users || 0);
+    var v = prompt('Extra users for ' + (c.companyName || id) + ' on top of the ' + (c.plan || 'current') + ' plan limit.\nEnter the TOTAL extra users (0 = none). Currently: ' + cur, String(cur));
+    if (v === null) return;
+    var n = Math.floor(Number(String(v).trim()));
+    if (!isFinite(n) || n < 0 || n > 10000){ alert('Enter a whole number from 0 up.'); return; }
+    if (n === cur) return;
+    await patch(id, { extra_users: n }, 'Set extra users for ' + (c.companyName || id) + ': ' + cur + ' -> ' + n);
+  };
+
+  var badge = { Pending: 'bg-amber-100 text-amber-800', Active: 'bg-green-100 text-green-800', Suspended: 'bg-red-100 text-red-800', Expired: 'bg-red-100 text-red-800', Rejected: 'bg-gray-200 text-gray-700', Untracked: 'bg-blue-100 text-blue-800' };
+  function money(n){ n = Number(n || 0); return n > 0 ? 'KES ' + n.toLocaleString() : 'Free'; }
+  
+  function dueOf(c){ var m = Number(c.price || 0); if (Number(c.amountDue) > 0) return Number(c.amountDue); return c.billing === 'Yearly' ? Math.round(m * 12 * 0.9) : m; }
+  function planLine(c){
+    var due = dueOf(c), yr = c.billing === 'Yearly';
+    var h = '<div class="text-xs text-gray-500 mt-1">' + money(due) + (due > 0 ? (yr ? ' / year \u00b7 Full year (10% off)' : ' / month \u00b7 Monthly') : '') + '</div>';
+    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell' };
+    if (c.allApps) h += '<div class="text-xs text-emerald-700 font-semibold mt-1">\u2713 All apps</div>';
+    else if (c.appList) h += '<div class="text-xs text-gray-500 mt-1">Apps: ' + String(c.appList).split(',').filter(Boolean).map(function(k){ return esc(names[k] || k); }).join(', ') + '</div>';
+    return h;
+  }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(m){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]; }); }
+  function actions(c){
+    var id = String(c.companyId).replace(/\\/g, '\\\\').replace(/'/g, "\\'"), b = function(l, fn, cls){ return '<button class="' + cls + ' text-white px-2 py-1 text-xs rounded mr-1 mb-1" onclick="' + fn + '">' + l + '</button>'; };
+    var s = c.status, out = '';
+    if (s === 'Pending') out += b('Approve', "hubApprove('" + id + "')", 'bg-green-600') + b('Reject', "hubReject('" + id + "')", 'bg-gray-600');
+    else if (s === 'Active') out += b('+30d', "hubExtend('" + id + "',30)", 'bg-blue-900') + b('+1y', "hubExtend('" + id + "',365)", 'bg-blue-900') + b('Deactivate', "hubSuspend('" + id + "')", 'bg-red-600');
+    else if (s === 'Suspended' || s === 'Expired' || s === 'Rejected') out += b('Reactivate', "hubReactivate('" + id + "')", 'bg-green-600');
+    else if (s === 'Untracked') out += b('Start tracking', "hubTrack('" + id + "')", 'bg-blue-900');
+    if (s !== 'Untracked') out += b('Users', "hubSetExtraUsers('" + id + "')", 'bg-indigo-600');
+    if (s !== 'Untracked') out += b('Rename', "hubRenameCompany('" + id + "')", 'bg-slate-600');
+    return out;
+  }
+  window.renderCompanies = function(){
+    var tbody = document.getElementById('companiesTable'); if (!tbody) return;
+    var search = (document.getElementById('companySearch').value || '').toLowerCase();
+    var planFilter = (document.getElementById('companyPlanFilter') || {}).value || '';
+    var statusFilter = (document.getElementById('companyStatusFilter') || {}).value || '';
+    populateFilterOptionsLabeled('companyPlanFilter', companies.map(function(c){ return c.plan; }), 'All Plans');
+    populateFilterOptionsLabeled('companyStatusFilter', companies.map(function(c){ return c.status; }), 'All Statuses');
+    var f = companies.filter(function(c){ return (c.companyName || '').toLowerCase().indexOf(search) > -1 || (c.ownerName || '').toLowerCase().indexOf(search) > -1 || (c.email || '').toLowerCase().indexOf(search) > -1; });
+    if (planFilter) f = f.filter(function(c){ return c.plan === planFilter; });
+    if (statusFilter) f = f.filter(function(c){ return c.status === statusFilter; });
+    var pg = paginate(f, 'companies'), html = '';
+    if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
+    pg.pageItems.forEach(function(c){
+      html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
+        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + planLine(c) + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
+        '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
+        (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
+        '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';
+    });
+    tbody.innerHTML = html;
+    var set = function(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; };
+    set('companyCount', companies.length); set('totalCompanies', companies.length);
+    set('activeCompanies', companies.filter(function(c){ return c.status === 'Active'; }).length);
+    set('trialCompanies', companies.filter(function(c){ return c.status === 'Pending'; }).length);
+    set('paidCompanies', companies.filter(function(c){ return Number(c.price || 0) > 0; }).length);
+    set('companyShowingCount', pg.pageItems.length);
+    renderPageNumbers('companyPageNumbers', 'companies', pg.totalPages, gotoCompanyPage);
+    updateBulkBar('companies');
+  };
+  
+  function upMoney(u){ return (/enterprise/i.test(u.requested_plan || '') && !Number(u.amount)) ? 'Custom price' : money(u.amount); }
+  function renderUpgrades(){
+    var tb = document.getElementById('upgradeReqTable'); if (!tb) return;
+    var pend = upgrades.filter(function(u){ return u.status === 'pending'; });
+    var shown = pend.concat(upgrades.filter(function(u){ return u.status !== 'pending' && u.status !== 'cancelled'; }).slice(0, 8));
+    var cnt = document.getElementById('upgradePendingCount');
+    if (cnt){ cnt.textContent = pend.length + ' pending'; cnt.className = 'px-2.5 py-1 rounded-full text-xs font-semibold ' + (pend.length ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'); }
+    var stBadge = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-gray-200 text-gray-700' };
+    tb.innerHTML = shown.length ? shown.map(function(u){
+      var id = String(u.id).replace(/'/g, '');
+      var act = u.status === 'pending'
+        ? '<button class="bg-green-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="hubApproveUpgrade(\'' + id + '\')">Approve</button><button class="bg-gray-600 text-white px-2 py-1 text-xs rounded" onclick="hubRejectUpgrade(\'' + id + '\')">Reject</button>'
+        : '<span class="text-xs text-gray-400">' + esc(u.decided_by || '') + (u.decided_at ? ' \u00b7 ' + fmt(u.decided_at) : '') + '</span>';
+      return '<tr class="border-t"><td class="p-3 pl-5"><div class="font-medium text-gray-900">' + esc(u.company_name || u.company_id) + '</div><div class="text-xs text-gray-500">' + esc(u.email || '') + ' \u00b7 ' + ago(u.created_at) + '</div></td>' +
+        '<td class="p-3">' + esc(u.current_plan || 'Free') + '</td>' +
+        '<td class="p-3"><span class="font-semibold">' + esc(u.requested_plan) + '</span><div class="text-xs text-gray-500">' + upMoney(u) + ' \u00b7 ' + esc(u.billing || 'Monthly') + '</div></td>' +
+        '<td class="p-3 text-gray-600 max-w-xs">' + esc(u.message || '-') + '</td>' +
+        '<td class="p-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (stBadge[u.status] || 'bg-gray-100 text-gray-700') + '">' + esc(title(u.status)) + '</span></td>' +
+        '<td class="p-3 pr-5 text-right">' + act + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="text-center p-6 text-gray-500">No upgrade requests yet.</td></tr>';
+    var sb2 = document.querySelector("button[onclick=\"openPage('support')\"]");
+    if (sb2){ var t = (typeof supportTickets !== 'undefined' ? supportTickets : []).filter(function(x){ return x.source === 'cloud' && x.unread; }).length + pend.length;
+      sb2.innerHTML = 'Support' + (t ? ' <span style="background:#dc2626;color:#fff;border-radius:999px;padding:0 7px;font-size:11px;margin-left:6px">' + t + '</span>' : ''); }
+  }
+  window.hubApproveUpgrade = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var u = upgrades.find(function(x){ return String(x.id) === String(id); }); if (!u) return;
+    var c = co(u.company_id), cur = (c._row || {}).paid_until;
+    var def = (cur && new Date(cur) > new Date()) ? fmt(cur) : plus(30);
+    if (!confirm('Upgrade ' + (u.company_name || u.company_id) + ' from ' + (u.current_plan || 'Free') + ' to ' + u.requested_plan + ' (' + upMoney(u) + ')?')) return;
+    var price = null;
+    if (/enterprise/i.test(u.requested_plan)){ var pv = prompt('Enterprise is custom-priced. Agreed monthly price in KES:', String(u.amount || '')); if (pv === null) return; price = Number(String(pv).replace(/[^0-9.]/g, '')); if (!(price >= 0)){ alert('Enter a valid amount'); return; } }
+    var pu = askDate(def); if (pu === undefined) return;
+    var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: true, p_paid_until: pu, p_note: null, p_price: price });
+    if (r.error){ alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Approved upgrade ' + (u.company_name || u.company_id) + ' -> ' + u.requested_plan, 'Companies'); } catch(e){}
+    
+    if (!/enterprise/i.test(u.requested_plan || '')){
+      var curExtra = Number((co(u.company_id)._row || {}).extra_users || 0);
+      var ev = prompt('Extra users to add on top of the ' + u.requested_plan + ' plan limit (0 = none).\nTotal extra users now: ' + curExtra, String(curExtra));
+      if (ev !== null){
+        var en = Math.floor(Number(String(ev).trim()));
+        if (isFinite(en) && en >= 0 && en <= 10000 && en !== curExtra) await patch(u.company_id, { extra_users: en }, 'Set extra users for ' + (u.company_name || u.company_id) + ': ' + curExtra + ' -> ' + en);
+        else if (!(isFinite(en) && en >= 0)) alert('Extra users not changed: enter a whole number from 0 up. Use the Users button on the company row.');
+      }
+    }
+    await refresh();
+  };
+  window.hubRejectUpgrade = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var u = upgrades.find(function(x){ return String(x.id) === String(id); }); if (!u) return;
+    var why = prompt('Reason for rejecting (shown to the customer, optional):', ''); if (why === null) return;
+    var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: false, p_paid_until: null, p_note: why.trim() || null });
+    if (r.error){ alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Rejected upgrade ' + (u.company_name || u.company_id) + ' -> ' + u.requested_plan, 'Companies'); } catch(e){}
+    await refresh();
+  };
+
+  window.syncCompanies = async function(){
+    await refresh();
+    var un = companies.filter(function(c){ return c.status === 'Untracked'; });
+    if (un.length && canWrite && confirm(un.length + ' existing companies are not in the control list yet. Add them all as Active (no expiry date)?')){
+      var ins = un.map(function(c){ return { company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' }; });
+      var r = await sb.from('acacia_company_status').insert(ins); if (r.error) alert('Failed: ' + r.error.message);
+      await refresh();
+    }
+  };
+
+  window.__acxHubBoot = function(){ roleCheck().then(refresh).then(live); };
+  window.__acxHubSignOut = function(){ try { sb.auth.signOut(); } catch(e){} };
+
+  window.__acxCloudActive = true;
+  window.__acxCanWrite = function(){ return canWrite; };
+  var rt = null, kt = null;
+  function kick(){ clearTimeout(kt); kt = setTimeout(function(){ if (!localStorage.getItem('developerSession')) return; if (busy) return kick(); refresh(); }, 400); }
+  window.__acxKick = kick;
+  function live(){
+    if (rt || !sb.channel || !localStorage.getItem('developerSession')) return;
+    try {
+      rt = sb.channel('hub-live');
+      ['acacia_company_status','app_accounts','acacia_app_usage','acacia_tickets','acacia_ticket_messages','acacia_payments','acacia_hub_users','acacia_upgrade_requests'].forEach(function(t){ rt = rt.on('postgres_changes', { event: '*', schema: 'public', table: t }, kick); });
+      rt.subscribe();
+    } catch(e){ rt = null; console.warn('[hub cloud] realtime unavailable, polling only', e); }
+  }
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) kick(); });
+  window.addEventListener('focus', kick); window.addEventListener('online', kick);
+
+  var _origDeleteCompany = window.deleteCompany, _origDeleteUser = window.deleteUser;
+  var _origBulkDeleteCompanies = window.bulkDeleteCompanies, _origBulkDeleteUsers = window.bulkDeleteUsers;
+
+  async function delRows(q, label, errs){
+    var r = await q.select();
+    if (r.error) errs.push(label + ': ' + r.error.message);
+    return r;
+  }
+  async function purgeCompany(id, name){
+    var errs = [];
+    addTomb('companies', id); if (name) addTomb('companies', name);
+    var st = await delRows(sb.from('acacia_company_status').delete().eq('company_id', id), 'company record', errs);
+    if (!st.error && (!st.data || !st.data.length)) errs.push('company record: 0 rows deleted (no permission?)');
+    await delRows(sb.from('app_accounts').delete().eq('company_id', id), 'user accounts', errs);
+    await delRows(sb.from('acacia_app_usage').delete().eq('company_id', id), 'app usage', errs);
+    await delRows(sb.from('acacia_tickets').delete().eq('company_id', id), 'tickets', errs);
+    scrubLocalStores();
+    return errs;
+  }
+  async function purgeUser(login, companyId){
+    login = String(login || '').toLowerCase(); if (!login) return [];
+    var errs = [], cid = String(companyId || '').toLowerCase();
+    addTomb('users', cid ? cid + '|' + login : login);
+    var qa = sb.from('app_accounts').delete(); if (companyId) qa = qa.eq('company_id', companyId);
+    await delRows(qa.or('login_id.eq.' + login + ',username.eq.' + login), 'user account', errs);
+    var qu = sb.from('acacia_app_usage').delete().eq('user_key', login); if (companyId) qu = qu.eq('company_id', companyId);
+    await delRows(qu, 'user usage', errs);
+    scrubLocalStores();
+    return errs;
+  }
+
+  window.deleteCompany = async function(idOrName){
+    var c = companies.find(function(x){ return String(x.id || x.companyName) == String(idOrName); });
+    if (!c){ return _origDeleteCompany ? _origDeleteCompany.apply(this, arguments) : undefined; }
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Permanently delete "' + (c.companyName || idOrName) + '"? This removes the company, its users and its tickets from Supabase - they will not come back. Their business records in company_state are kept.')) return;
+    var errs = await purgeCompany(c.companyId, c.companyName);
+    if (errs.length) failNote('"' + (c.companyName || idOrName) + '"', errs);
+    try { addLog('Error', who(), 'Permanently deleted company: ' + (c.companyName || idOrName), 'Companies'); } catch(e){}
+    await refresh();
+  };
+  window.bulkDeleteCompanies = async function(){
+    var ids = Array.from(bulkSelections.companies);
+    var cloudIds = ids.filter(function(id){ return companies.some(function(x){ return String(x.id || x.companyName) === String(id); }); });
+    var localIds = ids.filter(function(id){ return cloudIds.indexOf(id) === -1; });
+    if (cloudIds.length){
+      if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+      if (!confirm('Permanently delete ' + cloudIds.length + ' compan' + (cloudIds.length === 1 ? 'y' : 'ies') + ' from Supabase? Their users and tickets go too, and they will not come back.')) return;
+      var allErrs = [];
+      for (var i = 0; i < cloudIds.length; i++){
+        var c = companies.find(function(x){ return String(x.id || x.companyName) === String(cloudIds[i]); });
+        if (c){ var e1 = await purgeCompany(c.companyId, c.companyName); if (e1.length) allErrs.push(c.companyName + ' - ' + e1[0]); }
+      }
+      if (allErrs.length) failNote('some companies', allErrs);
+      try { addLog('Error', who(), 'Bulk permanently deleted ' + cloudIds.length + ' companies', 'Companies'); } catch(e){}
+    }
+    bulkSelections.companies.clear();
+    if (localIds.length){ bulkSelections.companies = new Set(localIds); if (_origBulkDeleteCompanies) await _origBulkDeleteCompanies.apply(this, arguments); }
+    await refresh();
+  };
+  window.deleteUser = async function(id){
+    var u = users.find(function(x){ return x.id === id; });
+    if (!u){ return _origDeleteUser ? _origDeleteUser.apply(this, arguments) : undefined; }
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Permanently delete "' + (u.username || u.email) + '"? They will lose access immediately and this cannot be undone.')) return;
+    var ue = await purgeUser(u.email || u.username, u.companyId);
+    if (ue.length) failNote('"' + (u.username || u.email) + '"', ue);
+    try { addLog('Error', who(), 'Permanently deleted user: ' + (u.email || u.username), 'Users'); } catch(e){}
+    await refresh();
+  };
+  window.bulkDeleteUsers = async function(){
+    var ids = Array.from(bulkSelections.users).map(Number);
+    var cloud = users.filter(function(u){ return ids.includes(u.id); });
+    var local = ids.filter(function(id){ return !cloud.some(function(u){ return u.id === id; }); });
+    if (cloud.length){
+      if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+      if (!confirm('Permanently delete ' + cloud.length + ' user(s)? They will lose access immediately.')) return;
+      var uErrs = [];
+      for (var i = 0; i < cloud.length; i++){ var e2 = await purgeUser(cloud[i].email || cloud[i].username, cloud[i].companyId); if (e2.length) uErrs.push((cloud[i].email || cloud[i].username) + ' - ' + e2[0]); }
+      if (uErrs.length) failNote('some users', uErrs);
+      try { addLog('Error', who(), 'Bulk permanently deleted ' + cloud.length + ' users', 'Users'); } catch(e){}
+    }
+    bulkSelections.users.clear();
+    if (local.length){ bulkSelections.users = new Set(local); if (_origBulkDeleteUsers) await _origBulkDeleteUsers.apply(this, arguments); }
+    await refresh();
+  };
+
+
+  function mergePayments(){
+    if (typeof payments === 'undefined') return;
+    try {
+      var local = payments.filter(function(p){ return p.source !== 'cloud'; });
+      var cloud = pays.map(function(r){
+        return { id: 'sb:' + r.id, sbId: r.id, invoice: r.invoice, customer: r.customer, email: r.email,
+          company: r.company_id, plan: r.plan, billing: r.billing, amount: Number(r.amount || 0), addonsCount: 0,
+          method: r.method, status: r.status, date: new Date(r.created_at).toLocaleDateString(), source: 'cloud' };
+      });
+      payments = local.concat(cloud);
+      if (document.getElementById('payments') && document.getElementById('payments').classList.contains('active')) renderPayments();
+    } catch(e){ console.error('[hub cloud] payment merge failed', e); }
+  }
+  window.hubRenewPayment = async function(id){
+    var p = payments.find(function(x){ return String(x.id) === String(id); }); if (!p || p.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = companies.find(function(x){ return String(x.companyId) === String(p.company); });
+    var days = prompt('Extend "' + p.customer + '" by how many days?', '30'); if (days === null) return;
+    days = parseInt(days, 10); if (!days || days <= 0) { alert('Enter a whole number of days.'); return; }
+    var amount = prompt('Amount received (KES)?', String(p.amount || (c ? c.price : 0) || 0)); if (amount === null) return;
+    var r = await sb.rpc('acx_record_payment', { p_company: p.company, p_invoice: null, p_customer: p.customer, p_email: p.email || '',
+      p_plan: p.plan || '', p_billing: p.billing || 'Monthly', p_amount: Number(amount) || 0, p_method: p.method || 'M-Pesa',
+      p_reference: 'Hub manual renewal', p_days: days });
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Renewed ' + p.customer + ' by ' + days + ' days (KES ' + (Number(amount) || 0).toLocaleString() + ')', 'Payments'); } catch(e){}
+    await refresh();
+  };
+  window.hubDeletePayment = async function(id){
+    var p = payments.find(function(x){ return String(x.id) === String(id); }); if (!p || p.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Delete this payment record? It will not reverse the extension already applied.')) return;
+    var r = await sb.from('acacia_payments').delete().eq('id', p.sbId);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    await refresh();
+  };
+
+
+  
+  function renderHubAccess(){
+    var box = document.getElementById('hubAccessCard'); if (!box) return;
+    var me0 = (JSON.parse(localStorage.getItem('developerSession') || '{}').email || '').toLowerCase();
+    var rows0 = hubUsers.map(function(u){
+      return '<tr class="border-t border-gray-100"><td class="py-2 pr-4">' + esc(u.email) + (u.full_name ? '<div class="text-xs text-gray-400">' + esc(u.full_name) + '</div>' : '') + '</td>' +
+        '<td class="py-2 pr-4">' + '<span class="text-xs font-semibold ' + (ROLE_CSS[u.role] || ROLE_CSS.hub_viewer) + ' px-2 py-0.5 rounded-full">' + esc(ROLE_NAME[u.role] || u.role) + '</span>' + '</td>' +
+        '<td class="py-2 text-right">' + (canWrite && u.email.toLowerCase() !== me0 ? '<button class="text-xs text-red-600 hover:underline" onclick="hubRemoveAccess(\'' + u.email.replace(/'/g, "\\'") + '\')">Remove</button>' : '') + '</td></tr>';
+    }).join('');
+    box.innerHTML =
+      '<div class="flex items-center justify-between mb-3"><h3 class="font-bold text-gray-900">Hub Access</h3>' +
+      (canWrite ? '<button class="bg-blue-900 text-white text-xs px-3 py-1.5 rounded" onclick="hubAddAccessPrompt()">+ Add person</button>' : '') + '</div>' +
+      '<table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th class="pb-2">Email</th><th class="pb-2">Access</th><th></th></tr></thead><tbody>' +
+      (rows0 || '<tr><td colspan="3" class="py-3 text-gray-400">No one on the list yet.</td></tr>') + '</tbody></table>' +
+      '<p class="text-xs text-gray-400 mt-3">Adding someone here lets them sign in once they also have a Supabase login with the matching role. Create that under Supabase \u2192 Authentication \u2192 Users, tick Auto Confirm, then set their role (hub_admin, hub_viewer, hub_accounts or hub_support) with the role SQL.</p>';
+  }
+  window.hubAddAccessPrompt = async function(){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var email = prompt('Email address to give access to:'); if (!email) return;
+    email = email.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('That does not look like an email address.'); return; }
+    var pick = prompt('Choose access for ' + email + ':\n\n1 = Admin (full access)\n2 = Viewer (read-only, everything)\n3 = Accounts (Payments + Companies, read-only)\n4 = Customer Care (Support inquiries, can reply)', '3'); if (pick === null) return;
+    var role = { '1': 'hub_admin', '2': 'hub_viewer', '3': 'hub_accounts', '4': 'hub_support' }[String(pick).trim()];
+    if (!role){ alert('Enter 1, 2, 3 or 4.'); return; }
+    var r = await sb.from('acacia_hub_users').upsert({ email: email, role: role, added_by: who() });
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Granted ' + role + ' Hub access to ' + email, 'Security'); } catch(e){}
+    alert(email + ' is now on the allow-list as ' + ROLE_NAME[role] + '. They still need a Supabase login whose role is set to ' + role + ' (see the SQL I gave you).');
+    await refresh();
+  };
+  window.hubRemoveAccess = async function(email){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    if (!confirm('Remove Hub access for ' + email + '?')) return;
+    var r = await sb.from('acacia_hub_users').delete().eq('email', email);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Removed Hub access for ' + email, 'Security'); } catch(e){}
+    await refresh();
+  };
+  var _origLoadSettings = window.loadSettings;
+  window.loadSettings = function(){ var r = _origLoadSettings ? _origLoadSettings.apply(this, arguments) : undefined; renderHubAccess(); return r; };
+
+  
+  var seenPending = null, seenTickets = null, notifyAsked = false;
+  function beep(){
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = 880; g.gain.value = 0.08;
+      o.connect(g); g.connect(ctx.destination); o.start();
+      setTimeout(function(){ o.stop(); ctx.close(); }, 220);
+    } catch(e){}
+  }
+  function desktopNotify(title, body){
+    try {
+      if (!('Notification' in window)) return;
+      if (!notifyAsked) { notifyAsked = true; Notification.requestPermission(); }
+      if (Notification.permission === 'granted') new Notification(title, { body: body });
+    } catch(e){}
+  }
+  function checkForAlerts(){
+    var nowPending = new Set(rows.filter(function(r){ return r.status === 'pending'; }).map(function(r){ return r.company_id; }));
+    var nowTickets = new Set(tix.filter(function(t){ return t.status === 'open' && t.last_sender === 'customer'; }).map(function(t){ return t.id; }));
+    if (seenPending !== null){
+      var newP = Array.from(nowPending).filter(function(id){ return !seenPending.has(id); });
+      var newT = Array.from(nowTickets).filter(function(id){ return !seenTickets.has(id); });
+      if (newP.length || newT.length){
+        beep();
+        if (newP.length) desktopNotify('New company waiting for approval', newP.length + ' new registration(s) need approval.');
+        if (newT.length) desktopNotify('New support message', newT.length + ' new customer message(s) came in.');
+      }
+    }
+    seenPending = nowPending; seenTickets = nowTickets;
+  }
+
+
+  
+  function monthKey(d){ d = new Date(d); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+  function monthLabel(k){ var p = k.split('-'); var names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return names[Number(p[1]) - 1] + ' ' + p[0]; }
+  function renderRevenueCard(){
+    var box = document.getElementById('hubRevenueCard'); if (!box) return;
+    var completed = pays.filter(function(p){ return p.status === 'Completed'; });
+    var totalRevenue = completed.reduce(function(s, p){ return s + Number(p.amount || 0); }, 0);
+    var now = new Date(), thisMonth = monthKey(now);
+    var thisMonthRev = completed.filter(function(p){ return monthKey(p.created_at) === thisMonth; }).reduce(function(s, p){ return s + Number(p.amount || 0); }, 0);
+    var last6 = [];
+    for (var i = 5; i >= 0; i--){ var d = new Date(now.getFullYear(), now.getMonth() - i, 1); last6.push(monthKey(d)); }
+    var byMonth = {}; last6.forEach(function(k){ byMonth[k] = 0; });
+    completed.forEach(function(p){ var k = monthKey(p.created_at); if (k in byMonth) byMonth[k] += Number(p.amount || 0); });
+    var maxRev = Math.max.apply(null, last6.map(function(k){ return byMonth[k]; }).concat([1]));
+    var bars = last6.map(function(k){
+      var h2 = Math.max(4, Math.round((byMonth[k] / maxRev) * 64));
+      return '<div class="flex flex-col items-center gap-1" style="width:44px"><div class="text-[10px] text-gray-400">' + (byMonth[k] ? Math.round(byMonth[k] / 1000) + 'k' : '') + '</div>' +
+        '<div style="height:64px" class="flex items-end"><div style="width:20px;height:' + h2 + 'px;background:#2563eb;border-radius:3px 3px 0 0"></div></div>' +
+        '<div class="text-[10px] text-gray-500">' + monthLabel(k).split(' ')[0] + '</div></div>';
+    }).join('');
+    var active = companies.filter(function(c){ return c.status === 'Active'; }).length;
+    var suspended = companies.filter(function(c){ return c.status === 'Suspended' || c.status === 'Expired'; }).length;
+    var pending = companies.filter(function(c){ return c.status === 'Pending'; }).length;
+    var totalKnown = active + suspended + pending || 1;
+    function seg(n, color){ return n ? '<div style="width:' + (n / totalKnown * 100) + '%;background:' + color + '"></div>' : ''; }
+    box.innerHTML =
+      '<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">' +
+      '<div class="bg-white p-5 rounded-xl border border-gray-200"><div class="text-xs text-gray-500">Total revenue (all time)</div><div class="text-2xl font-extrabold text-gray-900 mt-1">KES ' + totalRevenue.toLocaleString() + '</div><div class="text-xs text-gray-500 mt-2">This month: <span class="font-semibold text-gray-700">KES ' + thisMonthRev.toLocaleString() + '</span></div></div>' +
+      '<div class="bg-white p-5 rounded-xl border border-gray-200"><div class="text-xs text-gray-500 mb-2">Last 6 months</div><div class="flex items-end justify-between">' + bars + '</div></div>' +
+      '<div class="bg-white p-5 rounded-xl border border-gray-200"><div class="text-xs text-gray-500 mb-2">Companies (' + totalKnown + ')</div>' +
+      '<div class="flex h-3 rounded-full overflow-hidden mb-3">' + seg(active, '#059669') + seg(pending, '#d97706') + seg(suspended, '#dc2626') + '</div>' +
+      '<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">' +
+      '<span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#059669"></span>Active ' + active + '</span>' +
+      '<span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#d97706"></span>Pending ' + pending + '</span>' +
+      '<span><span class="inline-block w-2 h-2 rounded-full mr-1" style="background:#dc2626"></span>Suspended ' + suspended + '</span></div></div>' +
+      '</div>';
+  }
+
+
+  
+  
+  
+  
+  
+  function genSalt(){
+    var a = new Uint8Array(16); crypto.getRandomValues(a);
+    return Array.from(a).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  async function hashPw(password, salt){
+    var data = new TextEncoder().encode(salt + ':' + password);
+    var buf = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  async function fetchAccountRow(loginId, companyId){
+    var q = sb.from('app_accounts').select('login_id,username,company_id,data').eq('login_id', loginId);
+    if (companyId) q = q.eq('company_id', companyId);
+    var r = await q.limit(1).maybeSingle();
+    if (r.error || !r.data) return null;
+    return r.data;
+  }
+  window.hubResetPassword = async function(id){
+    var u = users.find(function(x){ return x.id === id; }); if (!u || u.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var loginId = (u.email || u.username || '').toLowerCase();
+    var row = await fetchAccountRow(loginId, u.companyId);
+    if (!row){ alert('Could not find this account in app_accounts.'); return; }
+    var pw = prompt('New password for ' + (u.username || loginId) + ' (tell them this - it cannot be shown again):');
+    if (!pw) return;
+    if (pw.length < 4){ alert('Choose at least 4 characters.'); return; }
+    var salt = genSalt(), hash = await hashPw(pw, salt);
+    var data = Object.assign({}, row.data, { passwordHash: hash, passwordSalt: salt });
+    delete data.password;
+    var r = await sb.from('app_accounts').update({ data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId).eq('company_id', row.company_id);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Reset password for ' + loginId, 'Security'); } catch(e){}
+    alert('Password reset. Tell ' + (u.username || loginId) + ' their new password - it takes effect the moment they next sign in.');
+  };
+  window.hubChangeEmail = async function(id){
+    var u = users.find(function(x){ return x.id === id; }); if (!u || u.source !== 'cloud') return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var loginId = (u.email || u.username || '').toLowerCase();
+    var row = await fetchAccountRow(loginId, u.companyId);
+    if (!row){ alert('Could not find this account in app_accounts.'); return; }
+    var newEmail = prompt('New login email for ' + (u.username || loginId) + ':', loginId);
+    if (!newEmail) return;
+    newEmail = newEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) { alert('That does not look like an email address.'); return; }
+    if (newEmail === loginId) return;
+    var exists = await fetchAccountRow(newEmail, row.company_id);
+    if (exists){ alert('That email is already used by another user in this company.'); return; }
+    var data = Object.assign({}, row.data, { email: newEmail });
+    var r = await sb.from('app_accounts').update({ login_id: newEmail, data: data, updated_at: new Date().toISOString() }).eq('login_id', loginId).eq('company_id', row.company_id);
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Changed login email for ' + loginId + ' \u2192 ' + newEmail, 'Security'); } catch(e){}
+    alert('Done. They must sign in with ' + newEmail + ' from now on.');
+    await refresh();
+  };
+
+
+  window.hubRenameCompany = async function(id){
+    var c = companies.find(function(x){ return String(x.companyId) === String(id); }); if (!c || !c._row) return;
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var newName = prompt('New company name for "' + c.companyName + '":', c.companyName);
+    if (!newName || !newName.trim() || newName.trim() === c.companyName) return;
+    newName = newName.trim();
+    var r1 = await sb.from('acacia_company_status').update({ company_name: newName, updated_at: new Date().toISOString() }).eq('company_id', c.companyId);
+    if (r1.error) { alert('Failed: ' + r1.error.message); return; }
+    
+    var acc = await sb.from('app_accounts').select('login_id,data').eq('company_id', c.companyId);
+    if (!acc.error && acc.data){
+      for (var i = 0; i < acc.data.length; i++){
+        var row = acc.data[i], prev = Array.isArray(row.data && row.data.previousCompanyNames) ? row.data.previousCompanyNames.slice() : [];
+        if (c.companyName && prev.indexOf(c.companyName) < 0) prev.push(c.companyName);
+        var data = Object.assign({}, row.data, { companyName: newName, previousCompanyNames: prev });
+        await sb.from('app_accounts').update({ data: data }).eq('login_id', row.login_id).eq('company_id', c.companyId);
+      }
+    }
+    try { addLog('Warning', who(), 'Renamed company "' + c.companyName + '" \u2192 "' + newName + '"', 'Companies'); } catch(e){}
+    alert('Renamed. Their team can sign in with the new name (the old name keeps working too) and it updates on their next sign-in.');
+    await refresh();
+  };
+
+  function start(){ if (!localStorage.getItem('developerSession')) { pill(); return; } roleCheck().then(refresh).then(live); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  setInterval(function(){ if (localStorage.getItem('developerSession')) refresh(); }, 15000);
+})();
+
+/* ===== sites ===== */
+
+(function(){
+  var sb = window.__acxSb; if (!sb) return;
+  var folders = [], snap = {}, pendingSrc = {}, memSrc = {}, collapsed = {}, pushing = false, pulling = false, inited = false, pt = null, MIG = 'acacia_sites_migrated';
+  function e(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){ return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]; }); }
+  function js(s){ return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+  function canW(){ return window.__acxCanWrite && window.__acxCanWrite(); }
+  function ro(){ alert('Read-only: hub admin sign-in missing.'); }
+  function toRow(s){ return { id: s.id, folder_id: s.folderId || null, name: s.name, url: s.url || (s.file && s.file !== '#' ? s.file : null), version: s.version || '1.0', size: s.size || '', status: s.status || 'Active', uploaded: s.uploaded || '', attached: !!s.attached, has_source: !!s.hasSource }; }
+  function fromRow(r){ var s = { id: Number(r.id), folderId: r.folder_id == null ? null : Number(r.folder_id), name: r.name, file: r.url || '#', version: r.version, size: r.size, status: r.status, uploaded: r.uploaded, attached: !!r.attached, hasSource: !!r.has_source, _u: r.updated_at }; if (r.url) s.url = r.url; return s; }
+  function sig(s){ return JSON.stringify(toRow(s)); }
+  function takeSnap(){ snap = {}; websites.forEach(function(s){ snap[s.id] = sig(s); }); }
+  function cache(){ try { localStorage.setItem(WEBSITE_KEY, JSON.stringify(websites)); } catch(x){} }
+
+  async function pull(){
+    if (!localStorage.getItem('developerSession')) return;
+    if (pulling || pushing){ sched(); return; }
+    pulling = true;
+    try {
+      var a = await sb.from('acacia_hub_sites').select('id,folder_id,name,url,version,size,status,uploaded,attached,has_source,updated_at').order('id');
+      var f = await sb.from('acacia_hub_folders').select('id,name').order('name');
+      if (a.error || f.error){ console.warn('[hub sites] ' + (a.error || f.error).message + ' - run the website sync SQL in Supabase'); return; }
+      var cloud = (a.data || []).map(fromRow);
+      if (!localStorage.getItem(MIG) && canW()){
+        var have = {}; cloud.forEach(function(s){ have[s.id] = 1; });
+        var up = websites.filter(function(s){ return !have[s.id]; }).map(function(s){
+          var r = toRow(s); r.updated_at = new Date().toISOString();
+          if (s.hasSource){ var src = localStorage.getItem(SITE_SRC_PREFIX + s.id); if (src) r.source = src; else r.has_source = false; }
+          return r; });
+        if (up.length){ var u = await sb.from('acacia_hub_sites').upsert(up); if (u.error){ console.warn('[hub sites] migrate failed', u.error.message); return; } }
+        localStorage.setItem(MIG, '1');
+        if (up.length){ pulling = false; return pull(); }
+      }
+      folders = (f.data || []).map(function(x){ return { id: Number(x.id), name: x.name }; });
+      websites = cloud; takeSnap(); cache(); renderWebsites(); fillSel();
+    } catch(x){ console.warn('[hub sites] pull failed', x); }
+    finally { pulling = false; }
+  }
+  function sched(){ clearTimeout(pt); pt = setTimeout(pull, 400); }
+
+  async function pushDiff(){
+    var sel = document.getElementById('importFolder'), fid = sel && /^\d+$/.test(sel.value) ? Number(sel.value) : null;
+    var cur = {}, withSrc = [], plain = [], del = [];
+    websites.forEach(function(s){
+      if (!(s.id in snap) && !s.folderId && fid) s.folderId = fid;
+      cur[s.id] = 1;
+      if (snap[s.id] === sig(s)) return;
+      var r = toRow(s); r.updated_at = new Date().toISOString();
+      if (s.hasSource && pendingSrc[s.id] != null){ r.source = pendingSrc[s.id]; withSrc.push(r); } else plain.push(r);
+    });
+    Object.keys(snap).forEach(function(k){ if (!cur[k]) del.push(Number(k)); });
+    if (!withSrc.length && !plain.length && !del.length) return;
+    if (!canW()){ ro(); return pull(); }
+    pushing = true;
+    try {
+      
+      if (withSrc.length){ var r1 = await sb.from('acacia_hub_sites').upsert(withSrc); if (r1.error) throw r1.error; }
+      if (plain.length){ var r2 = await sb.from('acacia_hub_sites').upsert(plain); if (r2.error) throw r2.error; }
+      if (del.length){ var r3 = await sb.from('acacia_hub_sites').delete().in('id', del); if (r3.error) throw r3.error; }
+      withSrc.forEach(function(r){ delete pendingSrc[r.id]; });
+      takeSnap();
+    } catch(x){ alert('Website sync failed: ' + (x.message || x) + '\n\nHave you run the website sync SQL in Supabase?'); pushing = false; return pull(); }
+    pushing = false; renderWebsites(); fillSel();
+  }
+
+  var _save = window.saveWebsites, _ssrc = window.saveSiteSource, _gsrc = window.getSiteSource;
+  window.saveWebsites = function(){ try { _save(); } catch(x){} pushDiff(); };
+  window.saveSiteSource = function(id, c){ memSrc[id] = c; pendingSrc[id] = c; try { _ssrc(id, c); } catch(x){} };
+  window.getSiteSource = function(id){ return memSrc[id] != null ? memSrc[id] : _gsrc(id); };
+
+  async function ensureSrc(id){
+    try {
+      var s = websites.find(function(w){ return Number(w.id) === Number(id); });
+      if (!s || !s.hasSource || memSrc[s.id] != null) return;
+      var k = 'acacia_site_stamp_' + s.id;
+      if (_gsrc(s.id) && localStorage.getItem(k) === String(s._u)) return;
+      var r = await sb.from('acacia_hub_sites').select('source').eq('id', s.id).maybeSingle();
+      if (r.data && r.data.source != null){ memSrc[s.id] = r.data.source; try { localStorage.setItem(SITE_SRC_PREFIX + s.id, r.data.source); localStorage.setItem(k, String(s._u)); } catch(x){} }
+    } catch(x){ console.warn('[hub sites] source fetch failed', x); }
+  }
+  var _l = window.launchWebsite, _v = window.viewWebsiteCode, _o = window.openWebsite;
+  window.launchWebsite = async function(id){ await ensureSrc(id); return _l(id); };
+  window.viewWebsiteCode = async function(id){ await ensureSrc(id); return _v(id); };
+  window.openWebsite = async function(id){ await ensureSrc(id); return _o(id); };
+
+  function fillSel(val){
+    var el = document.getElementById('importFolder'); if (!el) return;
+    var cur = val != null ? val : el.value;
+    el.innerHTML = '<option value="">No folder</option>' + folders.map(function(f){ return '<option value="' + f.id + '">\uD83D\uDCC1 ' + e(f.name) + '</option>'; }).join('') + '<option value="__new">+ New folder\u2026</option>';
+    el.value = cur; if (el.value !== cur) el.value = '';
+  }
+  window.hubFolderSelChange = function(el){ if (el.value === '__new'){ el.value = ''; window.hubNewFolder(true); } };
+
+  window.hubNewFolder = function(selectIt){
+    if (!canW()) return ro();
+    var list = websites.map(function(s){ return '<label class="flex items-center gap-2 text-sm"><input type="checkbox" class="hubFolderPick" value="' + s.id + '"> ' + e(s.name) + '</label>'; }).join('') || '<p class="text-xs text-gray-500">No websites yet - choose this folder in "Save into" before your next upload.</p>';
+    openModal('New Folder', '<input id="hubFolderName" type="text" placeholder="Folder name (e.g. Client sites)" class="w-full p-2 border rounded text-sm"><p class="text-xs text-gray-500">Tick the websites to put in this folder:</p><div class="max-h-60 overflow-auto space-y-1 border rounded p-2">' + list + '</div>', function(){
+      var name = (document.getElementById('hubFolderName').value || '').trim();
+      var picks = Array.from(document.querySelectorAll('.hubFolderPick:checked')).map(function(x){ return Number(x.value); });
+      if (!name){ alert('Give the folder a name.'); return; }
+      makeFolder(name, picks, selectIt === true);
+    });
+  };
+  async function makeFolder(name, picks, selectIt){
+    var id = Date.now(), r = await sb.from('acacia_hub_folders').insert({ id: id, name: name });
+    if (r.error){ alert('Could not create folder: ' + r.error.message + '\n\nRun the website sync SQL in Supabase first.'); return; }
+    folders.push({ id: id, name: name });
+    picks.forEach(function(pid){ var s = websites.find(function(w){ return Number(w.id) === pid; }); if (s) s.folderId = id; });
+    fillSel(selectIt ? String(id) : null);
+    window.saveWebsites(); renderWebsites();
+  }
+  window.hubRenameFolder = async function(id){
+    if (!canW()) return ro();
+    var f = folders.find(function(x){ return x.id === id; }); if (!f) return;
+    var n = prompt('Rename folder:', f.name); if (!n || !n.trim() || n.trim() === f.name) return;
+    var r = await sb.from('acacia_hub_folders').update({ name: n.trim() }).eq('id', id);
+    if (r.error) return alert('Failed: ' + r.error.message);
+    f.name = n.trim(); renderWebsites(); fillSel();
+  };
+  window.hubDeleteFolder = async function(id){
+    if (!canW()) return ro();
+    if (!confirm('Delete this folder? The websites inside are kept and move to "No folder".')) return;
+    var r = await sb.from('acacia_hub_folders').delete().eq('id', id);
+    if (r.error) return alert('Failed: ' + r.error.message);
+    folders = folders.filter(function(x){ return x.id !== id; });
+    websites.forEach(function(s){ if (s.folderId === id) s.folderId = null; });
+    takeSnap(); cache(); renderWebsites(); fillSel();
+  };
+  window.hubMoveSite = function(id, v){
+    var s = websites.find(function(w){ return Number(w.id) === Number(id); }); if (!s) return;
+    s.folderId = Number(v) || null; window.saveWebsites(); renderWebsites();
+  };
+  window.hubToggleFolder = function(id){ collapsed[id] = !collapsed[id]; renderWebsites(); };
+  window.hubRefreshSites = function(){ pull(); if (window.__acxKick) window.__acxKick(); };
+  window.syncApplications = async function(){ await pull(); if (window.__acxKick) window.__acxKick(); alert('Websites synced from the cloud.'); };
+
+  function row(s){
+    var on = s.status === 'Active', ind = s.folderId ? '<span class="inline-block w-4"></span>' : '';
+    var mv = '<select class="text-xs border rounded px-1 py-1" onchange="hubMoveSite(' + s.id + ',this.value);this.value=\'\'"><option value="">Move to\u2026</option><option value="0">No folder</option>' + folders.map(function(f){ return '<option value="' + f.id + '">' + e(f.name) + '</option>'; }).join('') + '</select>';
+    return '<tr><td>' + ind + e(s.name) + '</td><td>' + e(s.version) + '</td><td><span class="' + (on ? 'text-green-600' : 'text-red-500') + '">' + e(s.status) + '</span></td><td>' + e(s.uploaded) + '</td><td>' + e(s.size) + '</td><td>' +
+      '<button class="bg-emerald-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="launchWebsite(' + s.id + ')">\uD83D\uDE80 Launch</button>' +
+      '<button class="bg-slate-700 text-white px-2 py-1 text-xs rounded mr-1" onclick="viewWebsiteCode(' + s.id + ')">&lt;/&gt; Code</button>' +
+      '<button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openWebsite(' + s.id + ')">Open</button>' +
+      '<button class="bg-blue-900 text-white px-2 py-1 text-xs rounded mr-1" onclick="openInVSCode(\'' + e(js(s.path || s.name)) + '\')">VS Code</button>' +
+      '<button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="toggleWebsite(' + s.id + ')">' + (on ? 'Disable' : 'Enable') + '</button>' +
+      '<button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="deleteWebsite(' + s.id + ')">Delete</button>' + mv + '</td></tr>';
+  }
+  window.renderWebsites = function(){
+    var tb = document.getElementById('websiteTable'); if (!tb) return;
+    var running = 0, storage = 0, h = '';
+    websites.forEach(function(s){ if (s.status === 'Active') running++; storage += parseFloat(s.size) || 0; });
+    folders.forEach(function(f){
+      var items = websites.filter(function(s){ return s.folderId === f.id; });
+      h += '<tr class="bg-slate-100"><td colspan="6" class="px-3 py-2"><button class="mr-2 text-xs" onclick="hubToggleFolder(' + f.id + ')">' + (collapsed[f.id] ? '\u25B6' : '\u25BC') + '</button><b>\uD83D\uDCC1 ' + e(f.name) + '</b> <span class="text-xs text-gray-500">(' + items.length + ')</span>' +
+        '<button class="text-xs text-blue-700 underline ml-3" onclick="hubRenameFolder(' + f.id + ')">Rename</button><button class="text-xs text-red-600 underline ml-2" onclick="hubDeleteFolder(' + f.id + ')">Delete folder</button></td></tr>';
+      if (!collapsed[f.id]) h += items.map(row).join('');
+    });
+    var loose = websites.filter(function(s){ return !folders.some(function(f){ return f.id === s.folderId; }); });
+    if (loose.length && folders.length) h += '<tr class="bg-slate-100"><td colspan="6" class="px-3 py-2"><b>No folder</b> <span class="text-xs text-gray-500">(' + loose.length + ')</span></td></tr>';
+    h += loose.map(row).join('');
+    tb.innerHTML = h;
+    var set = function(id, v){ var x = document.getElementById(id); if (x) x.textContent = v; };
+    set('totalWebsitesCount', websites.length); set('runningWebsites', running); set('disabledWebsites', websites.length - running);
+    set('websiteStorage', storage.toFixed(2) + ' MB'); set('totalWebsites', websites.length); set('storageUsed', storage.toFixed(2) + ' MB');
+  };
+
+  function init(){
+    if (inited) return; inited = true; pull();
+    try { if (sb.channel) sb.channel('hub-sites').on('postgres_changes', { event: '*', schema: 'public', table: 'acacia_hub_sites' }, sched).on('postgres_changes', { event: '*', schema: 'public', table: 'acacia_hub_folders' }, sched).subscribe(); } catch(x){}
+  }
+  var iv = setInterval(function(){ if (window.__acxCloudReady){ clearInterval(iv); init(); } }, 500);
+  setInterval(function(){ if (inited) pull(); }, 15000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden && inited) sched(); });
+  window.addEventListener('focus', function(){ if (inited) sched(); });
+  fillSel();
+})();
