@@ -3749,3 +3749,203 @@ document.addEventListener("DOMContentLoaded", function(){
     });
     applyAppearance();
 });
+
+/* ---------- Language (Google Translate) & Currency conversion ---------- */
+var LANGUAGES = [
+  ["English","en"],["Swahili","sw"],["French","fr"],["Spanish","es"],["Portuguese","pt"],["German","de"],["Italian","it"],["Dutch","nl"],
+  ["Arabic","ar"],["Hindi","hi"],["Bengali","bn"],["Urdu","ur"],["Chinese (Simplified)","zh-CN"],["Chinese (Traditional)","zh-TW"],["Japanese","ja"],["Korean","ko"],
+  ["Russian","ru"],["Ukrainian","uk"],["Polish","pl"],["Turkish","tr"],["Greek","el"],["Hebrew","iw"],["Persian","fa"],["Indonesian","id"],
+  ["Vietnamese","vi"],["Thai","th"],["Amharic","am"],["Somali","so"],["Zulu","zu"],["Afrikaans","af"],["Yoruba","yo"],["Igbo","ig"],["Hausa","ha"],["Kinyarwanda","rw"]
+];
+// [code, name, decimals]
+var CURRENCIES = [
+  ["KES","Kenyan Shilling",0],["USD","US Dollar",2],["EUR","Euro",2],["GBP","British Pound",2],["UGX","Ugandan Shilling",0],["TZS","Tanzanian Shilling",0],
+  ["RWF","Rwandan Franc",0],["ETB","Ethiopian Birr",2],["ZAR","South African Rand",2],["NGN","Nigerian Naira",2],["GHS","Ghanaian Cedi",2],["EGP","Egyptian Pound",2],
+  ["MAD","Moroccan Dirham",2],["AED","UAE Dirham",2],["SAR","Saudi Riyal",2],["INR","Indian Rupee",2],["CNY","Chinese Yuan",2],["JPY","Japanese Yen",0],
+  ["CAD","Canadian Dollar",2],["AUD","Australian Dollar",2],["CHF","Swiss Franc",2]
+];
+// Approximate offline fallback (units per 1 KES). Live rates replace these when online.
+var FX_FALLBACK = {KES:1,USD:.0077,EUR:.0066,GBP:.0057,UGX:28,TZS:19.3,RWF:11.2,ETB:1.1,ZAR:.14,NGN:11.5,GHS:.1,EGP:.38,MAD:.075,AED:.0283,SAR:.0289,INR:.65,CNY:.055,JPY:1.16,CAD:.0106,AUD:.012,CHF:.0065};
+var FX_CACHE_KEY = "acacia_fx", FX_TTL = 12 * 3600 * 1000;
+var FX = { code: "KES", rates: FX_FALLBACK, live: false, updated: null };
+
+function _persistPref(k, v){
+    try { if (typeof settings !== "undefined" && settings) { settings[k] = v; localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } } catch (e) {}
+}
+function _pref(k, d){ try { return (typeof settings !== "undefined" && settings && settings[k]) || d; } catch (e) { return d; } }
+
+/* ----- currency ----- */
+function _decimals(code){ var c = CURRENCIES.find(function(x){ return x[0] === code; }); return c ? c[2] : 2; }
+function fmtMoney(kes){
+    var d = _decimals(FX.code), r = FX.rates[FX.code] || 1, v = kes * r;
+    return FX.code + " " + v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+var _PRICE_RE = /KES\s?(\d[\d,]*(?:\.\d+)?)/g;
+function convertText(s){
+    if (FX.code === "KES" || !s || s.indexOf("KES") < 0) return s;
+    return s.replace(_PRICE_RE, function(m, num){ return fmtMoney(parseFloat(num.replace(/,/g, ""))); });
+}
+var _fxNodes = new Map(), _fxObserver = null;
+function _fxProc(n){
+    var v = n.nodeValue, rec = _fxNodes.get(n);
+    if (rec && v === rec.shown) {
+        var ns = convertText(rec.orig);
+        if (ns !== rec.shown) { rec.shown = ns; n.nodeValue = ns; }
+        return;
+    }
+    _PRICE_RE.lastIndex = 0;
+    if (!v || v.indexOf("KES") < 0 || !_PRICE_RE.test(v)) { if (rec) _fxNodes.delete(n); return; }
+    var shown = convertText(v);
+    _fxNodes.set(n, { orig: v, shown: shown });
+    if (shown !== v) n.nodeValue = shown;
+}
+function _fxWalk(root){
+    var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: function(t){
+            var p = t.parentNode && t.parentNode.nodeName;
+            return (p === "SCRIPT" || p === "STYLE" || p === "TEXTAREA" || p === "NOSCRIPT") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+        }
+    });
+    var n; while ((n = w.nextNode())) _fxProc(n);
+}
+function _fxRestore(){
+    _fxNodes.forEach(function(rec, n){ if (n.nodeValue === rec.shown) n.nodeValue = rec.orig; });
+    _fxNodes.clear();
+}
+function _fxStatus(){
+    var el = document.getElementById("fxStatus"); if (!el) return;
+    if (FX.code === "KES") { el.textContent = "Showing amounts in KES (base currency)."; return; }
+    el.textContent = FX.live
+        ? "Live rates, updated " + (FX.updated ? new Date(FX.updated).toLocaleString() : "just now") + ". Display only - stored data stays in KES."
+        : "Approximate offline rates (live rates unavailable). Display only - stored data stays in KES.";
+}
+function applyCurrency(code, persist){
+    code = FX_FALLBACK[code] ? code : "KES";
+    if (persist) _persistPref("currency", code);
+    var sel = document.getElementById("currency"); if (sel && sel.value !== code) sel.value = code;
+    if (_fxObserver) { _fxObserver.disconnect(); _fxObserver = null; }
+    _fxRestore();
+    FX.code = code;
+    if (code !== "KES" && document.body) {
+        _fxWalk(document.body);
+        _fxObserver = new MutationObserver(function(muts){
+            muts.forEach(function(m){
+                if (m.type === "characterData") { _fxProc(m.target); return; }
+                m.addedNodes.forEach(function(a){
+                    if (a.nodeType === 3) _fxProc(a);
+                    else if (a.nodeType === 1) _fxWalk(a);
+                });
+            });
+        });
+        _fxObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    }
+    _fxStatus();
+}
+function setCurrency(code){
+    applyCurrency(code, true);
+    if (code !== "KES") loadRates(true);
+}
+function loadRates(force){
+    try {
+        var c = JSON.parse(localStorage.getItem(FX_CACHE_KEY) || "null");
+        if (c && c.rates) { FX.rates = Object.assign({}, FX_FALLBACK, c.rates); FX.live = true; FX.updated = c.t; }
+        if (c && !force && Date.now() - c.t < FX_TTL) { if (FX.code !== "KES") applyCurrency(FX.code, false); return; }
+    } catch (e) {}
+    if (!window.fetch) return;
+    fetch("https://open.er-api.com/v6/latest/KES").then(function(r){ return r.json(); }).then(function(j){
+        if (!j || !j.rates) return;
+        FX.rates = Object.assign({}, FX_FALLBACK, j.rates); FX.live = true; FX.updated = Date.now();
+        localStorage.setItem(FX_CACHE_KEY, JSON.stringify({ t: FX.updated, rates: j.rates }));
+        if (FX.code !== "KES") applyCurrency(FX.code, false); else _fxStatus();
+    }).catch(function(){ _fxStatus(); });
+}
+(function(){
+    var _alert = window.alert, _confirm = window.confirm;
+    window.alert = function(m){ return _alert.call(window, typeof m === "string" ? convertText(m) : m); };
+    window.confirm = function(m){ return _confirm.call(window, typeof m === "string" ? convertText(m) : m); };
+})();
+
+/* ----- language ----- */
+function _langCode(name){ var l = LANGUAGES.find(function(x){ return x[0] === name; }); return l ? l[1] : "en"; }
+function _setTransCookie(code){
+    var host = location.hostname, exp = "; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+    if (code === "en") {
+        document.cookie = "googtrans=" + exp;
+        document.cookie = "googtrans=" + exp + "; domain=" + host;
+    } else {
+        document.cookie = "googtrans=/en/" + code + "; path=/";
+        if (host.indexOf(".") > -1) document.cookie = "googtrans=/en/" + code + "; path=/; domain=" + host;
+    }
+}
+var _gtLoading = false;
+function _loadGoogleTranslate(cb){
+    if (window.google && window.google.translate && window.google.translate.TranslateElement && document.querySelector(".goog-te-combo")) { cb && cb(); return; }
+    if (cb) (window._gtQueue = window._gtQueue || []).push(cb);
+    if (_gtLoading) return; _gtLoading = true;
+    if (!document.getElementById("google_translate_element")) {
+        var d = document.createElement("div"); d.id = "google_translate_element"; d.className = "notranslate"; document.body.appendChild(d);
+    }
+    window.googleTranslateElementInit = function(){
+        new google.translate.TranslateElement({
+            pageLanguage: "en", autoDisplay: false,
+            includedLanguages: LANGUAGES.map(function(l){ return l[1]; }).join(",")
+        }, "google_translate_element");
+        var tries = 0, t = setInterval(function(){
+            if (document.querySelector(".goog-te-combo") || ++tries > 40) {
+                clearInterval(t); var q = window._gtQueue || []; window._gtQueue = []; q.forEach(function(f){ f(); });
+            }
+        }, 150);
+    };
+    var s = document.createElement("script");
+    s.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    s.async = true; s.onerror = function(){ _gtLoading = false; _langStatus("Could not load the translation service - check your internet connection."); };
+    document.head.appendChild(s);
+}
+function _langStatus(msg){ var el = document.getElementById("langStatus"); if (el) el.textContent = msg; }
+function _isTranslated(){ return /translated-(ltr|rtl)/.test(document.documentElement.className); }
+function applyLanguage(name, persist){
+    var code = _langCode(name);
+    if (persist) _persistPref("language", name);
+    var sel = document.getElementById("language"); if (sel && sel.value !== name) sel.value = name;
+    if (location.protocol === "file:") { _langStatus(code === "en" ? "" : "Translation needs the app opened from a web address (http/https), not a local file."); if (code === "en") return; }
+    if (code === "en") {
+        var was = _isTranslated();
+        _setTransCookie("en");
+        _langStatus("");
+        if (was && persist) location.reload();
+        return;
+    }
+    _setTransCookie(code);
+    _langStatus("Translating to " + name + "...");
+    _loadGoogleTranslate(function(){
+        var combo = document.querySelector(".goog-te-combo");
+        if (combo) {
+            combo.value = code;
+            combo.dispatchEvent(new Event("change"));
+            _langStatus("Translated to " + name + " (machine translation).");
+        } else if (persist) { location.reload(); }
+    });
+}
+function setLanguage(name){ applyLanguage(name, true); }
+
+/* ----- wire up the existing Preferences selects ----- */
+document.addEventListener("DOMContentLoaded", function(){
+    var cs = document.getElementById("currency"), ls = document.getElementById("language");
+    var curCode = _pref("currency", "KES"), curLang = _pref("language", "English");
+    if (cs) {
+        cs.innerHTML = CURRENCIES.map(function(c){ return '<option value="' + c[0] + '">' + c[0] + " (" + c[1] + ")</option>"; }).join("");
+        cs.value = curCode;
+        cs.addEventListener("change", function(){ setCurrency(this.value); });
+        var fx = document.createElement("p"); fx.id = "fxStatus"; fx.className = "text-xs text-gray-500 mt-1"; cs.parentNode.appendChild(fx);
+    }
+    if (ls) {
+        ls.classList.add("notranslate");
+        ls.innerHTML = LANGUAGES.map(function(l){ return '<option value="' + l[0] + '">' + l[0] + "</option>"; }).join("");
+        ls.value = curLang;
+        ls.addEventListener("change", function(){ setLanguage(this.value); });
+        var lp = document.createElement("p"); lp.id = "langStatus"; lp.className = "text-xs text-gray-500 mt-1"; ls.parentNode.appendChild(lp);
+    }
+    loadRates(false);
+    applyCurrency(curCode, false);
+    if (_langCode(curLang) !== "en") applyLanguage(curLang, false);
+});

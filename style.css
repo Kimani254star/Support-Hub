@@ -553,3 +553,10 @@ html.dark #homePage .hp-mi{background:rgba(255,255,255,.06);}
 @media (max-width:1279px){#homePage .hp-tiers6{grid-template-columns:repeat(3,1fr);}}
 @media (max-width:899px){#homePage .hp-tiers6{grid-template-columns:repeat(2,1fr);}}
 @media (max-width:639px){#homePage .hp-tiers6{grid-template-columns:1fr;}}
+
+/* ---------- Google Translate widget: hide its own UI ---------- */
+#google_translate_element{position:absolute;left:-9999px;top:0;height:0;overflow:hidden;}
+iframe.goog-te-banner-frame,.goog-te-banner-frame.skiptranslate{display:none!important;}
+body{top:0!important;}
+#goog-gt-tt,.goog-tooltip,.goog-tooltip:hover{display:none!important;}
+.goog-text-highlight{background:none!important;box-shadow:none!important;}
