@@ -3689,3 +3689,21 @@ function devAutoRefresh(){
   window.addEventListener('focus', function(){ if (inited) sched(); });
   fillSel();
 })();
+
+
+/* ---------- Right sidebar ---------- */
+function renderRightSidebar(){
+    try {
+        const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const u = document.getElementById('rsUsers'), c = document.getElementById('rsCompanies'), a = document.getElementById('rsActivity');
+        if (!u || !c || !a) return;
+        u.textContent = (typeof users !== 'undefined' && users) ? users.length : 0;
+        c.textContent = (typeof companies !== 'undefined' && companies) ? companies.length : 0;
+        const recent = (typeof logs !== 'undefined' && logs) ? logs.slice(0, 8) : [];
+        a.innerHTML = recent.length
+            ? recent.map(l => `<li>${esc(l.activity)}<small>${esc(l.user)} &middot; ${esc(l.date)}</small></li>`).join('')
+            : '<li class="rs-empty" style="border:0">No activity yet</li>';
+    } catch (e) { console.warn('right sidebar', e); }
+}
+document.addEventListener('DOMContentLoaded', renderRightSidebar);
+setInterval(renderRightSidebar, 4000);

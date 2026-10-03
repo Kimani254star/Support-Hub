@@ -2287,6 +2287,29 @@
     </div>
 </div>
 </div>
+<aside class="rsidebar" id="rightSidebar">
+  <div>
+    <h3>Overview</h3>
+    <div class="rs-stats">
+      <div class="rs-stat"><b id="rsUsers">0</b><span>Users</span></div>
+      <div class="rs-stat"><b id="rsCompanies">0</b><span>Companies</span></div>
+    </div>
+  </div>
+  <div>
+    <h3>Quick actions</h3>
+    <div class="rs-actions">
+      <button onclick="openPage('users')">+ Manage users</button>
+      <button onclick="openPage('companies')">Manage companies</button>
+      <button onclick="openPage('payments')">View payments</button>
+      <button onclick="openPage('support')">Support tickets</button>
+    </div>
+  </div>
+  <div>
+    <h3>Recent activity</h3>
+    <ul class="rs-activity" id="rsActivity"></ul>
+  </div>
+</aside>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="script.js"></script>
 
