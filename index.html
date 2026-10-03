@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+<script>(function(){try{var a=JSON.parse(localStorage.getItem("acacia_appearance")||"{}"),r=document.documentElement.style;if(a.sbBg)r.setProperty("--sb-bg",a.sbBg);if(a.sbText)r.setProperty("--sb-text",a.sbText);if(a.font)r.setProperty("--app-font",a.font);if(a.fs)r.setProperty("--app-fs",a.fs);}catch(e){}})();</script>
 </head>
 <body class="home-mode">
 
@@ -1889,6 +1890,87 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md" id="appearanceCard">
+            <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+                <h2 class="text-base font-bold text-gray-900 flex items-center gap-2">🎨 Appearance</h2>
+                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">Theme</span>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Sidebar colour</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="apSbBg" value="#0a1615" class="h-9 w-14 border border-gray-300 rounded cursor-pointer" oninput="setAppearance('sbBg', this.value)">
+                        <span id="apSbBgVal" class="text-xs text-gray-500"></span>
+                    </div>
+                    <div class="ap-swatches" id="apPresets"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Sidebar text colour</label>
+                    <div class="flex items-center gap-2">
+                        <input type="color" id="apSbText" value="#e7eceb" class="h-9 w-14 border border-gray-300 rounded cursor-pointer" oninput="setAppearance('sbText', this.value)">
+                        <span id="apSbTextVal" class="text-xs text-gray-500"></span>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Font</label>
+                    <select id="apFont" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="setAppearance('font', this.value)">
+                        <optgroup label="Default">
+                            <option value="Cambria, Georgia, 'Times New Roman', serif">Cambria (default)</option>
+                        </optgroup>
+                        <optgroup label="Sans-serif (web fonts)">
+                            <option value="'Inter', sans-serif">Inter</option>
+                            <option value="'Roboto', sans-serif">Roboto</option>
+                            <option value="'Open Sans', sans-serif">Open Sans</option>
+                            <option value="'Lato', sans-serif">Lato</option>
+                            <option value="'Poppins', sans-serif">Poppins</option>
+                            <option value="'Montserrat', sans-serif">Montserrat</option>
+                            <option value="'Nunito', sans-serif">Nunito</option>
+                            <option value="'Source Sans 3', sans-serif">Source Sans 3</option>
+                            <option value="'DM Sans', sans-serif">DM Sans</option>
+                            <option value="'Work Sans', sans-serif">Work Sans</option>
+                        </optgroup>
+                        <optgroup label="Serif (web fonts)">
+                            <option value="'Merriweather', serif">Merriweather</option>
+                            <option value="'Playfair Display', serif">Playfair Display</option>
+                            <option value="'Lora', serif">Lora</option>
+                            <option value="'PT Serif', serif">PT Serif</option>
+                            <option value="'Crimson Text', serif">Crimson Text</option>
+                        </optgroup>
+                        <optgroup label="Monospace (web fonts)">
+                            <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                            <option value="'Fira Code', monospace">Fira Code</option>
+                            <option value="'Source Code Pro', monospace">Source Code Pro</option>
+                        </optgroup>
+                        <optgroup label="System fonts">
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                            <option value="'Palatino Linotype', Palatino, serif">Palatino</option>
+                            <option value="Garamond, serif">Garamond</option>
+                            <option value="Arial, Helvetica, sans-serif">Arial</option>
+                            <option value="Verdana, Geneva, sans-serif">Verdana</option>
+                            <option value="Tahoma, Geneva, sans-serif">Tahoma</option>
+                            <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                            <option value="'Segoe UI', Roboto, sans-serif">Segoe UI</option>
+                            <option value="Calibri, Candara, sans-serif">Calibri</option>
+                            <option value="'Century Gothic', sans-serif">Century Gothic</option>
+                            <option value="system-ui, -apple-system, sans-serif">System default</option>
+                            <option value="'Courier New', monospace">Courier New</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Font size</label>
+                    <select id="apFs" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" onchange="setAppearance('fs', this.value)">
+                        <option value="0.8rem">Small</option>
+                        <option value="0.875rem">Medium (default)</option>
+                        <option value="1rem">Large</option>
+                        <option value="1.125rem">Extra large</option>
+                    </select>
+                </div>
+                <button class="w-full bg-white text-gray-700 font-medium text-sm px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50" onclick="resetAppearance()">Reset appearance</button>
+            </div>
+        </div>
+
         <div class="bg-white p-6 rounded-xl border border-gray-200 shadow-sm transition-all hover:shadow-md flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">

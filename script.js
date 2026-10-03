@@ -3707,3 +3707,45 @@ function renderRightSidebar(){
 }
 document.addEventListener('DOMContentLoaded', renderRightSidebar);
 setInterval(renderRightSidebar, 4000);
+
+
+/* ---------- Appearance settings (sidebar colour, text colour, font) ---------- */
+var APPEARANCE_KEY = "acacia_appearance";
+var APPEARANCE_PRESETS = ["#0A1615","#0E2B29","#22615D","#1e3a8a","#4c1d95","#7f1d1d","#374151","#ffffff"];
+function getAppearance(){ try { return JSON.parse(localStorage.getItem(APPEARANCE_KEY) || "{}"); } catch(e){ return {}; } }
+function applyAppearance(){
+    var a = getAppearance(), r = document.documentElement.style;
+    var map = { sbBg:"--sb-bg", sbText:"--sb-text", font:"--app-font", fs:"--app-fs" };
+    Object.keys(map).forEach(function(k){ if (a[k]) r.setProperty(map[k], a[k]); else r.removeProperty(map[k]); });
+    var set = function(id, v){ var el = document.getElementById(id); if (el && v) el.value = v; };
+    set("apSbBg", a.sbBg); set("apSbText", a.sbText); set("apFont", a.font); set("apFs", a.fs);
+    var l1 = document.getElementById("apSbBgVal"); if (l1) l1.textContent = a.sbBg || "default";
+    var l2 = document.getElementById("apSbTextVal"); if (l2) l2.textContent = a.sbText || "default";
+}
+function setAppearance(key, value){
+    var a = getAppearance(); a[key] = value;
+    localStorage.setItem(APPEARANCE_KEY, JSON.stringify(a));
+    applyAppearance();
+}
+function resetAppearance(){
+    localStorage.removeItem(APPEARANCE_KEY);
+    var el;
+    ["apSbBg","apSbText"].forEach(function(id){ el = document.getElementById(id); if (el) el.value = id === "apSbBg" ? "#0a1615" : "#e7eceb"; });
+    el = document.getElementById("apFont"); if (el) el.selectedIndex = 0;
+    el = document.getElementById("apFs"); if (el) el.value = "0.875rem";
+    applyAppearance();
+}
+document.addEventListener("DOMContentLoaded", function(){
+    var p = document.getElementById("apPresets");
+    if (p) APPEARANCE_PRESETS.forEach(function(c){
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "ap-swatch"; b.style.background = c; b.title = c;
+        b.onclick = function(){
+            setAppearance("sbBg", c);
+            var light = c.toLowerCase() === "#ffffff";
+            setAppearance("sbText", light ? "#0e2b29" : "#e7eceb");
+        };
+        p.appendChild(b);
+    });
+    applyAppearance();
+});
