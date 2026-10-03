@@ -1187,10 +1187,12 @@ function renderSupportTickets(){
 ${t.source === 'cloud' ? `
                     <button class="bg-emerald-700 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubOpenTicket('${t.id}')">Open &amp; reply</button>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="hubResolveTicket('${t.id}')">Resolve</button>
+                    <button class="bg-slate-600 text-white px-1 py-1 text-xs rounded mr-1" onclick="ticketHistory('${t.id}')">History</button>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="hubDeleteTicket('${t.id}')">Delete</button>
                     ` : `
                     ${t.contact && (t.source === 'whatsapp' || t.source === 'email') ? `<button class="${t.source === 'whatsapp' ? 'bg-emerald-600' : 'bg-amber-600'} text-white px-1 py-1 text-xs rounded mr-1" onclick="replyViaChannel('${t.id}')">${t.source === 'whatsapp' ? 'Reply on WhatsApp' : 'Reply by Email'}</button>` : ''}
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded mr-1" onclick="resolveTicket('${t.id}')">Resolve</button>
+                    <button class="bg-slate-600 text-white px-1 py-1 text-xs rounded mr-1" onclick="ticketHistory('${t.id}')">History</button>
                     <button class="bg-blue-900 text-white px-1 py-1 text-xs rounded" onclick="deleteTicket('${t.id}')">Delete</button>
                     `}
                 </td>
@@ -2913,7 +2915,7 @@ function devAutoRefresh(){
           subject: r.subject || 'Support request', priority: r.priority || 'Medium',
           status: r.status === 'resolved' ? 'Resolved' : 'Open', message: '', app: r.app || '',
           date: new Date(r.updated_at || r.created_at).toLocaleDateString(),
-          unread: r.status === 'open' && r.last_sender === 'customer', source: 'cloud' };
+          unread: r.status === 'open' && r.last_sender === 'customer', source: 'cloud', contact: r.user_email || '' };
       });
       supportTickets = local.concat(cloud);
       localStorage.setItem(SUPPORT_KEY, JSON.stringify(local));
@@ -2942,12 +2944,65 @@ function devAutoRefresh(){
       await refresh();
     }
   };
+  /* ---- Conversation history + automatic transcript email (cloud tickets) ---- */
+  function threadToMessages(t, msgs){
+    return (msgs || []).map(function(m){
+      return { from: m.sender === 'customer' ? 'customer' : 'support', name: m.sender === 'customer' ? t.customer : 'Support',
+               text: m.body, at: new Date(m.created_at).toLocaleString(), ts: m.created_at };
+    });
+  }
+  function emailedMap(){ try { return JSON.parse(localStorage.getItem('acacia_emailed_tickets') || '{}'); } catch(e){ return {}; } }
+  async function emailTranscript(t, manual){
+    if (!t.contact) { if (manual) alert('This ticket has no customer email address saved.'); return { ok: false, reason: 'no-email' }; }
+    var msgs = await ticketThread(t.sbId);
+    var last = msgs.length ? msgs[msgs.length - 1].created_at : '';
+    var done = emailedMap();
+    if (!manual && done[t.sbId] && done[t.sbId] === last) return { ok: true, reason: 'already-sent' };
+    try {
+      var r = await sb.functions.invoke('send-ticket-email', { body: { ticket_id: t.sbId } });
+      if (r.error) throw r.error;
+      if (r.data && r.data.error) throw new Error(r.data.error);
+      done[t.sbId] = last; localStorage.setItem('acacia_emailed_tickets', JSON.stringify(done));
+      try { addLog('Info', who(), 'Emailed conversation of ticket ' + t.ticket + ' to ' + t.contact, 'Support'); } catch(e){}
+      return { ok: true };
+    } catch(e){
+      console.warn('[hub cloud] transcript email failed', e);
+      if (manual) {
+        var body = threadToMessages(t, msgs).map(function(m){ return m.name + ' (' + m.at + '):\n' + m.text; }).join('\n\n');
+        window.location.href = 'mailto:' + t.contact + '?subject=' + encodeURIComponent('Conversation: ' + t.subject + ' [' + t.ticket + ']') + '&body=' + encodeURIComponent(body.slice(0, 1500));
+      }
+      return { ok: false, reason: 'send-failed', error: e };
+    }
+  }
+  window.hubTicketHistory = async function(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); });
+    if (!t || t.source !== 'cloud') return;
+    var msgs = await ticketThread(t.sbId);
+    showTicketHistoryModal({
+      subject: t.subject, ticketNo: t.ticket, customer: t.customer, contact: t.contact, status: t.status, company: t.company,
+      messages: threadToMessages(t, msgs),
+      onEmail: t.contact ? async function(btn){
+        btn.disabled = true; var old = btn.textContent; btn.textContent = 'Sending...';
+        var res = await emailTranscript(t, true);
+        btn.disabled = false; btn.textContent = old;
+        if (res.ok) showToast('Conversation emailed to ' + t.contact);
+      } : null
+    });
+  };
   window.hubResolveTicket = async function(id){
     var t = supportTickets.find(function(x){ return String(x.id) === String(id); }); if (!t || t.source !== 'cloud') return;
     var r = await sb.from('acacia_tickets').update({ status: 'resolved', updated_at: new Date().toISOString() }).eq('id', t.sbId);
     if (r.error) { alert('Failed: ' + r.error.message); return; }
     try { addLog('Info', who(), 'Resolved ticket ' + t.ticket, 'Support'); } catch(e){}
     await refresh();
+    if (typeof autoEmailEnabled === 'function' && autoEmailEnabled()) {
+      if (!t.contact) showToast('Ticket resolved. No customer email on file, so the conversation was not emailed.');
+      else {
+        var res = await emailTranscript(t, false);
+        if (res.ok) showToast(res.reason === 'already-sent' ? 'Ticket resolved (conversation already emailed).' : 'Ticket resolved. Conversation emailed to ' + t.contact);
+        else showToast('Ticket resolved, but the email could not be sent. Open History > Email transcript to retry. (Is the send-ticket-email function deployed?)', 7000);
+      }
+    }
   };
   window.hubDeleteTicket = async function(id){
     var t = supportTickets.find(function(x){ return String(x.id) === String(id); }); if (!t || t.source !== 'cloud') return;
@@ -3948,4 +4003,114 @@ document.addEventListener("DOMContentLoaded", function(){
     loadRates(false);
     applyCurrency(curCode, false);
     if (_langCode(curLang) !== "en") applyLanguage(curLang, false);
+});
+
+
+/* ---------- Support ticket history modal + toast + auto-email setting ---------- */
+function showToast(msg, ms){
+    var t = document.createElement("div");
+    t.textContent = msg;
+    t.style.cssText = "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#0E2B29;color:#fff;padding:10px 16px;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:100000;max-width:90vw;font-size:13px;";
+    document.body.appendChild(t);
+    setTimeout(function(){ t.remove(); }, ms || 4000);
+}
+function autoEmailEnabled(){ return _pref("autoEmailTranscript", true) !== false; }
+
+function localTicketMessages(t){
+    var out = [];
+    var id = String(t.id);
+    if (id.indexOf("chat-session:") === 0) {
+        var who = id.slice("chat-session:".length), want = "axSupport_history_" + who;
+        for (var i = 0; i < localStorage.length; i++) {
+            var key = localStorage.key(i);
+            if (!key || key.split(NS_SEP)[0] !== want) continue;
+            try {
+                (JSON.parse(localStorage.getItem(key) || "[]") || []).forEach(function(m){
+                    if (!m) return;
+                    var role = String(m.role || m.from || m.sender || "");
+                    var when = m.at || m.time || m.createdAt;
+                    out.push({
+                        from: /user|customer|guest/i.test(role) ? "customer" : "support",
+                        name: /user|customer|guest/i.test(role) ? t.customer : "Support",
+                        text: m.text || m.message || m.content || "",
+                        at: when ? new Date(when).toLocaleString() : ""
+                    });
+                });
+            } catch (e) {}
+            break;
+        }
+    }
+    if (!out.length && t.message) out.push({ from: "customer", name: t.customer, text: t.message, at: t.date || "" });
+    return out;
+}
+
+function ticketHistory(id){
+    var t = supportTickets.find(function(x){ return String(x.id) === String(id); });
+    if (!t) return;
+    if (t.source === "cloud" && window.hubTicketHistory) return window.hubTicketHistory(id);
+    var msgs = localTicketMessages(t);
+    var emailOk = t.contact && /^\S+@\S+\.\S+$/.test(t.contact);
+    showTicketHistoryModal({
+        subject: t.subject, ticketNo: t.ticket, customer: t.customer, contact: t.contact, status: t.status, messages: msgs,
+        onEmail: emailOk ? function(){
+            var body = msgs.map(function(m){ return m.name + (m.at ? " (" + m.at + ")" : "") + ":\n" + m.text; }).join("\n\n");
+            window.location.href = "mailto:" + t.contact + "?subject=" + encodeURIComponent("Conversation: " + t.subject + " [" + t.ticket + "]") + "&body=" + encodeURIComponent(body.slice(0, 1500));
+        } : null
+    });
+}
+
+function showTicketHistoryModal(o){
+    var old = document.getElementById("ticketHistoryModal"); if (old) old.remove();
+    var e = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]; }); };
+    var resolved = String(o.status).toLowerCase() === "resolved";
+    var bubbles = (o.messages && o.messages.length) ? o.messages.map(function(m){
+        var mine = m.from === "support";
+        return '<div class="flex ' + (mine ? "justify-end" : "justify-start") + '"><div class="rounded-2xl px-3 py-2 ' + (mine ? "bg-emerald-700 text-white" : "bg-gray-100 text-gray-900") + '" style="max-width:80%">' +
+            '<div style="font-size:11px;opacity:.7;margin-bottom:2px">' + e(m.name) + (m.at ? " &middot; " + e(m.at) : "") + '</div>' +
+            '<div style="white-space:pre-wrap;word-break:break-word">' + e(m.text) + '</div></div></div>';
+    }).join("") : '<p class="text-center text-gray-500 py-8">No messages were recorded for this ticket.</p>';
+
+    var box = document.createElement("div");
+    box.id = "ticketHistoryModal";
+    box.className = "fixed inset-0 flex items-center justify-center p-4";
+    box.style.cssText = "background:rgba(0,0,0,.5);z-index:99999;";
+    box.innerHTML =
+        '<div class="bg-white rounded-xl shadow-2xl w-full flex flex-col" style="max-width:680px;max-height:86vh">' +
+          '<div class="p-4 border-b border-gray-200 flex items-start justify-between gap-3">' +
+            '<div><h2 class="text-lg font-bold text-gray-900">' + e(o.subject) + '</h2>' +
+            '<p class="text-xs text-gray-500 mt-1">Ticket ' + e(o.ticketNo) + ' &middot; ' + e(o.customer) + (o.contact ? ' &lt;' + e(o.contact) + '&gt;' : '') + (o.company ? ' &middot; ' + e(o.company) : '') + '</p></div>' +
+            '<span class="text-xs font-semibold px-2 py-1 rounded-full ' + (resolved ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800") + '">' + e(o.status) + '</span>' +
+          '</div>' +
+          (resolved ? "" : '<div class="px-4 py-2 text-xs bg-amber-50 text-amber-800 border-b border-amber-100">This conversation is still open.</div>') +
+          '<div class="p-4 space-y-3 overflow-y-auto" style="flex:1">' + bubbles + '</div>' +
+          '<div class="p-3 border-t border-gray-200 flex flex-wrap justify-end gap-2">' +
+            (o.onEmail ? '<button id="thEmailBtn" class="bg-emerald-700 text-white px-3 py-2 text-sm rounded hover:bg-emerald-800">&#9993; Email transcript</button>' : '') +
+            '<button id="thDownloadBtn" class="bg-slate-600 text-white px-3 py-2 text-sm rounded hover:bg-slate-700">&#11015; Download</button>' +
+            '<button id="thCloseBtn" class="bg-gray-200 text-gray-800 px-3 py-2 text-sm rounded hover:bg-gray-300">Close</button>' +
+          '</div>' +
+        '</div>';
+    document.body.appendChild(box);
+
+    var close = function(){ box.remove(); document.removeEventListener("keydown", onKey); };
+    var onKey = function(ev){ if (ev.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
+    box.addEventListener("click", function(ev){ if (ev.target === box) close(); });
+    box.querySelector("#thCloseBtn").onclick = close;
+    var em = box.querySelector("#thEmailBtn"); if (em) em.onclick = function(){ o.onEmail(em); };
+    box.querySelector("#thDownloadBtn").onclick = function(){
+        var txt = "Ticket " + o.ticketNo + " - " + o.subject + "\nCustomer: " + o.customer + (o.contact ? " <" + o.contact + ">" : "") + "\nStatus: " + o.status + "\n\n" +
+            (o.messages || []).map(function(m){ return m.name + (m.at ? " (" + m.at + ")" : "") + ":\n" + m.text; }).join("\n\n---\n\n");
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" }));
+        a.download = "ticket-" + String(o.ticketNo).replace(/[^\w-]/g, "") + "-conversation.txt";
+        a.click();
+    };
+}
+
+document.addEventListener("DOMContentLoaded", function(){
+    var cb = document.getElementById("autoEmailTranscript");
+    if (cb) {
+        cb.checked = autoEmailEnabled();
+        cb.addEventListener("change", function(){ _persistPref("autoEmailTranscript", this.checked); });
+    }
 });
