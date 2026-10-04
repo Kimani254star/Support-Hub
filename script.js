@@ -2822,9 +2822,15 @@ function devAutoRefresh(){
     } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
     if (canWrite){
       var exp = rows.filter(function(r){ return r.status === 'active' && r.paid_until && new Date(r.paid_until) < new Date(); });
-      for (var i = 0; i < exp.length; i++){
-        var u = await sb.from('acacia_company_status').update({ status: 'suspended', note: 'Payment expired ' + fmt(exp[i].paid_until), updated_at: new Date().toISOString() }).eq('company_id', exp[i].company_id);
-        if (!u.error){ exp[i].status = 'suspended'; try { addLog('Warning', 'System', 'Auto-deactivated (payment expired): ' + (exp[i].company_name || exp[i].company_id), 'Companies'); } catch(e){} }
+      if (exp.length){
+        // Paid plan ended: move the company to the Free plan (it stays active, data is kept).
+        var dg = await sb.rpc('acx_downgrade_expired', { p_company: null });
+        if (dg.error){ console.warn('[hub cloud] auto-downgrade unavailable - run acacia_plan_expiry.sql in Supabase:', dg.error.message); }
+        else {
+          var st2 = await sb.from('acacia_company_status').select('*').order('created_at', { ascending: false });
+          if (!st2.error && st2.data) rows = st2.data;
+          exp.forEach(function(r){ try { addLog('Warning', 'System', 'Auto-downgraded to Free (paid plan expired ' + fmt(r.paid_until) + '): ' + (r.company_name || r.company_id), 'Companies'); } catch(e){} });
+        }
       }
     }
     applyTombstones();
