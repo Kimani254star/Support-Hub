@@ -87,6 +87,29 @@ const COMPANY_KEY = "acacia_companies";
 const WEBSITE_KEY = "acacia_websites";
 const PAYMENT_KEY = "acacia_payments";
 const NOTIFICATION_KEY = "acacia_notifications";
+/* ===== Acacia Mail is the default mailer: drafts are queued per company in Supabase ===== */
+window.acxMailTo = function(o){
+    o = o || {};
+    var SU = window.__SUPA_URL__ || "https://xglsampckermarjpczdf.supabase.co";
+    var SK = window.__SUPA_KEY__ || "sb_publishable_x-dPR7pzhvJgag9soW0I8w_yfKTmi6A";
+    var note = function(m){ try { if (typeof showToast === "function") return showToast(m, 6000); } catch(e){} try { alert(m); } catch(e){} };
+    var from = (function(){ try { return (JSON.parse(localStorage.getItem("developerSession") || "{}").fullName) || "Acacia Books Support"; } catch(e){ return "Acacia Books Support"; } })();
+    if (o.companyId) {
+        var bid = "sp_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+        fetch(SU + "/rest/v1/acacia_mail_queue", { method: "POST", keepalive: true,
+            headers: { apikey: SK, Authorization: "Bearer " + SK, "Content-Type": "application/json", Prefer: "resolution=ignore-duplicates,return=minimal" },
+            body: JSON.stringify({ bid: bid, company_id: String(o.companyId), from_name: from, from_email: "", to: o.to || "", cc: o.cc || "", bcc: o.bcc || "", subject: o.subject || "(No subject)", body: o.body || "" })
+        }).then(function(r){
+            if (r.ok) note("Draft saved to " + (o.company || "the company") + "'s Acacia Mail > Drafts.");
+            else note("Could not save the draft to Acacia Mail (run acacia_mail_queue.sql in Supabase).");
+        }).catch(function(){ note("Could not reach Supabase to save the draft."); });
+        return true;
+    }
+    var q = new URLSearchParams({ to: o.to || "", cc: o.cc || "", bcc: o.bcc || "", subject: o.subject || "", body: o.body || "", uid: "sp_" + Date.now() });
+    var w = window.open((window.__ACX_MAIL_URL__ || "acacia-mail.html") + "?" + q.toString(), "acaciaMail");
+    if (!w) alert("Your browser blocked the new tab. Allow pop-ups for this page, then try again.");
+    return true;
+};
 const SUPPORT_KEY = "acacia_support";
 const SETTINGS_KEY = "acacia_settings";
 const LOG_KEY = "acacia_logs";
@@ -1137,9 +1160,7 @@ function replyViaChannel(id){
     if (t.source === "whatsapp") {
         window.open("https://wa.me/" + normalizeWhatsappNumber(t.contact) + "?text=" + encodeURIComponent(greeting), "_blank", "noopener");
     } else if (t.source === "email") {
-        window.location.href = "mailto:" + encodeURIComponent(t.contact).replace("%40", "@") +
-            "?subject=" + encodeURIComponent("Re: " + t.subject + " [" + t.ticket + "]") +
-            "&body=" + encodeURIComponent("Hi " + t.customer + ",\n\n\n\nRegards,\n" + (settings.platformName || "Support"));
+        window.acxMailTo({ to: t.contact, subject: "Re: " + t.subject + " [" + t.ticket + "]", body: "Hi " + t.customer + ",\n\n\n\nRegards,\n" + (settings.platformName || "Support"), companyId: t.companyId, company: t.company });
     }
     if (t.status === "Open") { t.status = "In Progress"; localStorage.setItem(SUPPORT_KEY, JSON.stringify(supportTickets)); renderSupportTickets(); }
 }
@@ -2917,7 +2938,7 @@ function devAutoRefresh(){
       var local = supportTickets.filter(function(t){ return t.source !== 'cloud'; });
       var cloud = tix.map(function(r){
         return { id: 'sb:' + r.id, sbId: r.id, ticket: r.id.slice(0, 8).toUpperCase(),
-          customer: r.user_name || r.user_email || r.company_name || 'Customer', company: r.company_name || r.company_id || '',
+          customer: r.user_name || r.user_email || r.company_name || 'Customer', company: r.company_name || r.company_id || '', companyId: r.company_id || '',
           subject: r.subject || 'Support request', priority: r.priority || 'Medium',
           status: r.status === 'resolved' ? 'Resolved' : 'Open', message: '', app: r.app || '',
           date: new Date(r.updated_at || r.created_at).toLocaleDateString(),
@@ -2975,7 +2996,7 @@ function devAutoRefresh(){
       console.warn('[hub cloud] transcript email failed', e);
       if (manual) {
         var body = threadToMessages(t, msgs).map(function(m){ return m.name + ' (' + m.at + '):\n' + m.text; }).join('\n\n');
-        window.location.href = 'mailto:' + t.contact + '?subject=' + encodeURIComponent('Conversation: ' + t.subject + ' [' + t.ticket + ']') + '&body=' + encodeURIComponent(body.slice(0, 1500));
+        window.acxMailTo({ to: t.contact, subject: 'Conversation: ' + t.subject + ' [' + t.ticket + ']', body: body.slice(0, 1500), companyId: t.companyId, company: t.company });
       }
       return { ok: false, reason: 'send-failed', error: e };
     }
@@ -4060,7 +4081,7 @@ function ticketHistory(id){
         subject: t.subject, ticketNo: t.ticket, customer: t.customer, contact: t.contact, status: t.status, messages: msgs,
         onEmail: emailOk ? function(){
             var body = msgs.map(function(m){ return m.name + (m.at ? " (" + m.at + ")" : "") + ":\n" + m.text; }).join("\n\n");
-            window.location.href = "mailto:" + t.contact + "?subject=" + encodeURIComponent("Conversation: " + t.subject + " [" + t.ticket + "]") + "&body=" + encodeURIComponent(body.slice(0, 1500));
+            window.acxMailTo({ to: t.contact, subject: "Conversation: " + t.subject + " [" + t.ticket + "]", body: body.slice(0, 1500), companyId: t.companyId, company: t.company });
         } : null
     });
 }
