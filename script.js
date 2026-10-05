@@ -146,6 +146,13 @@ function devTitle(v, fallback){
     if (!str) return fallback;
     return str.charAt(0).toUpperCase() + str.slice(1);
 }
+function planLabel(v, fallback){
+    const raw = String(v == null ? "" : v).trim();
+    if (!raw) return fallback;
+    const k = raw.toLowerCase().replace(/[^a-z]/g, "");
+    const map = { free:"Free", trial:"Trial", starter:"Starter", pro:"Pro", business:"Business", enterprise:"Enterprise", allaccess:"All Access" };
+    return map[k] || (raw.charAt(0).toUpperCase() + raw.slice(1));
+}
 function devDate(v){
     if (!v) return "-";
     const d = new Date(v);
@@ -169,7 +176,7 @@ function normalizeCompanies(list){
             companyName: c.companyName || c.name || c.company || c.companyId || "-",
             ownerName: c.ownerName || c.fullName || c.owner || "-",
             email: c.email || "-",
-            plan: devTitle(c.plan, "Free"),
+            plan: planLabel(c.plan, "Free"),
             price: Number(c.price || 0),
             status: devTitle(c.status, "Active"),
             registered: devDate(c.registered || c.createdAt || c.date),
@@ -192,7 +199,7 @@ function normalizeUsers(list){
             username: realName || String(u.email).split("@")[0],
             email: u.email || "",
             company: u.company || u.companyName || u.companyId || "",
-            plan: devTitle(u.plan, "Free"),
+            plan: planLabel(u.plan, "Free"),
             role: devTitle(u.role, "Viewer"),
             status: devTitle(u.status, "Active")
         });
@@ -226,7 +233,7 @@ function loadUsersFromStores(){ return normalizeUsers(devCollect(USER_STORE_KEYS
 
 
 const PAYMENT_STORE_KEYS = ["acacia_payments"];
-const SIGNUP_PLAN_PRICES = { free:0, starter:1500, pro:3500, business:7500, enterprise:0, allaccess:15000 };
+const SIGNUP_PLAN_PRICES = { free:0, starter:2000, pro:4000, business:6000, enterprise:8000, allaccess:12000 };
 function planKeyOf(plan){ return String(plan || "free").toLowerCase().replace(/[^a-z]/g, ""); }
 
 function isYearly(b){ return /^y/i.test(String(b || "")); }
@@ -273,7 +280,7 @@ function normalizePayments(list){
 
 function buildSignupPayments(companyList){
     return (companyList || []).map(c => {
-        const plan = devTitle(c.plan, "Free");
+        const plan = planLabel(c.plan, "Free");
         const billing = c.billing || c.cycle || "Monthly";
         let amount = Number(c.amountDue || 0);
         if (!amount) {
@@ -327,7 +334,8 @@ function populateFilterOptionsLabeled(selectId, values, allLabel){
     let unique = Array.from(new Set(values.filter(Boolean))).sort();
     if (selectId === "companyPlanFilter") {
         const ALL_PLANS = ["Free", "Starter", "Pro", "Business", "Enterprise", "All Access"];
-        unique = ALL_PLANS.concat(unique.filter(v => ALL_PLANS.indexOf(v) < 0));
+        const extra = Array.from(new Set(unique.map(v => planLabel(v, "")).filter(v => v && ALL_PLANS.indexOf(v) < 0)));
+        unique = ALL_PLANS.concat(extra);
     }
     select.innerHTML = `<option value="">${allLabel}</option>` + unique.map(v => `<option value="${v}">${v}</option>`).join("");
     select.value = unique.includes(current) ? current : "";
@@ -578,11 +586,11 @@ function exportUsers() {
 
 const PRICING_PLANS = {
     free: { base: 0, label: "Free" },
-    starter: { base: 1500, label: "Starter" },
-    pro: { base: 3500, label: "Pro" },
-    business: { base: 7500, label: "Business" },
-    enterprise: { base: 0, label: "Enterprise", custom: true },
-    allaccess: { base: 15000, label: "All Access" }
+    starter: { base: 2000, label: "Starter" },
+    pro: { base: 4000, label: "Pro" },
+    business: { base: 6000, label: "Business" },
+    enterprise: { base: 8000, label: "Enterprise", custom: true },
+    allaccess: { base: 12000, label: "All Access" }
 };
 
 function calculateInvoiceAmount(p) {
@@ -593,7 +601,7 @@ function calculateInvoiceAmount(p) {
     const planKey = planKeyOf((p && p.plan) || 'free');
     const planConfig = PRICING_PLANS[planKey] || { base: signupPlanPrice(planKey) };
     
-    const base = planConfig.custom ? (Number(p && p.customAmount) || 0) : planConfig.base;
+    const base = planConfig.custom ? (Number(p && p.customAmount) || planConfig.base) : planConfig.base;
     let cost = base + ((Number(p && p.addonsCount) || 0) * 1500);
     if (p && isYearly(p.billing)) {
         cost = yearlyTotal(cost);
@@ -616,15 +624,15 @@ function openPaymentModal(payId = null) {
             
             <select id="modalPay_plan" class="w-full p-2 border rounded text-sm">
                 <option value="free" ${currentPlan === 'free' ? 'selected' : ''}>Free (KES 0)</option>
-                <option value="starter" ${currentPlan === 'starter' ? 'selected' : ''}>Starter (KES 1,500)</option>
-                <option value="pro" ${currentPlan === 'pro' ? 'selected' : ''}>Pro (KES 3,500)</option>
-                <option value="business" ${currentPlan === 'business' ? 'selected' : ''}>Business (KES 7,500)</option>
-                <option value="enterprise" ${currentPlan === 'enterprise' ? 'selected' : ''}>Enterprise (Custom pricing)</option>
-                <option value="allaccess" ${currentPlan === 'allaccess' ? 'selected' : ''}>All Access (KES 15,000)</option>
+                <option value="starter" ${currentPlan === 'starter' ? 'selected' : ''}>Starter (KES 2,000)</option>
+                <option value="pro" ${currentPlan === 'pro' ? 'selected' : ''}>Pro (KES 4,000)</option>
+                <option value="business" ${currentPlan === 'business' ? 'selected' : ''}>Business (KES 6,000)</option>
+                <option value="enterprise" ${currentPlan === 'enterprise' ? 'selected' : ''}>Enterprise (KES 8,000)</option>
+                <option value="allaccess" ${currentPlan === 'allaccess' ? 'selected' : ''}>All Access (KES 12,000)</option>
             </select>
 
             <input id="modalPay_addons" type="number" min="0" placeholder="Number of Premium Add-ons (+ KES 1,500/mo)" value="${payment ? (payment.addonsCount || 0) : 0}" class="w-full p-2 border rounded text-sm">
-            <input id="modalPay_custom" type="number" min="0" placeholder="Agreed monthly price in KES (Enterprise only)" value="${payment && payment.customAmount ? payment.customAmount : ''}" class="w-full p-2 border rounded text-sm">
+            <input id="modalPay_custom" type="number" min="0" placeholder="Agreed monthly price in KES (Enterprise only, optional - default 8,000)" value="${payment && payment.customAmount ? payment.customAmount : ''}" class="w-full p-2 border rounded text-sm">
             
             <select id="modalPay_billing" class="w-full p-2 border rounded text-sm">
                 <option value="Monthly" ${currentBilling === 'Monthly' ? 'selected' : ''}>Monthly Billing</option>
@@ -1870,7 +1878,7 @@ function renderCompanies(){
     populateFilterOptionsLabeled("companyPlanFilter", companies.map(c => c.plan), "All Plans");
     populateFilterOptionsLabeled("companyStatusFilter", companies.map(c => c.status), "All Statuses");
     let filtered = companies.filter(c => (c.companyName || "").toLowerCase().includes(search) || (c.ownerName || "").toLowerCase().includes(search) || (c.email || "").toLowerCase().includes(search));
-    if (planFilter) filtered = filtered.filter(c => c.plan === planFilter);
+    if (planFilter) filtered = filtered.filter(c => planLabel(c.plan, "") === planFilter);
     if (statusFilter) filtered = filtered.filter(c => c.status === statusFilter);
 
     const { pageItems, totalPages } = paginate(filtered, 'companies');
@@ -3062,7 +3070,7 @@ function devAutoRefresh(){
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
       return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
-        email: r.email || '-', plan: title(r.plan || 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
+        email: r.email || '-', plan: planLabel(r.plan, 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
         registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
     });
     var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
@@ -3159,7 +3167,7 @@ function devAutoRefresh(){
     populateFilterOptionsLabeled('companyPlanFilter', companies.map(function(c){ return c.plan; }), 'All Plans');
     populateFilterOptionsLabeled('companyStatusFilter', companies.map(function(c){ return c.status; }), 'All Statuses');
     var f = companies.filter(function(c){ return (c.companyName || '').toLowerCase().indexOf(search) > -1 || (c.ownerName || '').toLowerCase().indexOf(search) > -1 || (c.email || '').toLowerCase().indexOf(search) > -1; });
-    if (planFilter) f = f.filter(function(c){ return c.plan === planFilter; });
+    if (planFilter) f = f.filter(function(c){ return planLabel(c.plan, "") === planFilter; });
     if (statusFilter) f = f.filter(function(c){ return c.status === statusFilter; });
     var pg = paginate(f, 'companies'), html = '';
     if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
@@ -3212,7 +3220,7 @@ function devAutoRefresh(){
     var def = (cur && new Date(cur) > new Date()) ? fmt(cur) : plus(30);
     if (!confirm('Upgrade ' + (u.company_name || u.company_id) + ' from ' + (u.current_plan || 'Free') + ' to ' + u.requested_plan + ' (' + upMoney(u) + ')?')) return;
     var price = null;
-    if (/enterprise/i.test(u.requested_plan)){ var pv = prompt('Enterprise is custom-priced. Agreed monthly price in KES:', String(u.amount || '')); if (pv === null) return; price = Number(String(pv).replace(/[^0-9.]/g, '')); if (!(price >= 0)){ alert('Enter a valid amount'); return; } }
+    if (/enterprise/i.test(u.requested_plan)){ var pv = prompt('Enterprise monthly price in KES (standard price is 8,000; change it only for an agreed special price):', String(u.amount || 8000)); if (pv === null) return; price = Number(String(pv).replace(/[^0-9.]/g, '')); if (!(price >= 0)){ alert('Enter a valid amount'); return; } }
     var pu = askDate(def); if (pu === undefined) return;
     var r = await sb.rpc('acx_decide_upgrade', { p_id: id, p_approve: true, p_paid_until: pu, p_note: null, p_price: price });
     if (r.error){ alert('Failed: ' + r.error.message); return; }
