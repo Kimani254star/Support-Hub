@@ -54,6 +54,19 @@
     $('#relBody').innerHTML = R.length ? R.map(function(a){
       return '<tr><td class="p-4 font-medium">' + (a.pinned ? '📌 ' : '') + esc(a.title) + '</td><td class="p-4">' + esc(a.module || '-') + '</td><td class="p-4">' + aud(a.company_ids) + '</td><td class="p-4">' + pill(a.status, a.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700') + '</td><td class="p-4">' + fmt(a.published_at) + '</td><td class="p-4 text-right whitespace-nowrap"><button class="' + B + '" onclick="acxRel.edit(\'' + a.id + '\')">Edit</button> <button class="' + B + '" onclick="acxRel.toggle(\'' + a.id + '\')">' + (a.status === 'published' ? 'Unpublish' : 'Publish') + '</button> <button class="' + B + '" onclick="acxRel.mail(\'' + a.id + '\')">✉️ Email</button> <button class="' + B + ' text-rose-600" onclick="acxRel.del(\'' + a.id + '\')">Delete</button></td></tr>';
     }).join('') : '<tr><td colspan="6" class="p-8 text-center text-gray-500">No release notes yet.</td></tr>';
+    loadChanges();
+  }
+  var CH = [];
+  async function loadChanges(){
+    var host = $('#relBody') && $('#relBody').closest('.overflow-x-auto'); if (!host) return;
+    var box = $('#relChanges'); if (!box) { box = document.createElement('div'); box.id = 'relChanges'; host.parentNode.insertBefore(box, host); }
+    var r = await sb().from('acacia_books_changes').select('*').eq('status', 'new').order('seen_at', { ascending: false }).limit(300);
+    if (r.error) { box.innerHTML = /relation|permission|policy/i.test(r.error.message) ? '<p class="text-xs text-gray-400 mb-3">Books change tracking is off. Run books_change_tracking.sql in Supabase to turn it on.</p>' : ''; return; }
+    var g = {}; (r.data || []).forEach(function(x){ (g[x.seen_at] = g[x.seen_at] || []).push(x); });
+    CH = Object.keys(g).map(function(k){ return { at: k, rows: g[k] }; });
+    box.innerHTML = CH.length ? '<div class="mb-6 p-4 rounded-xl border border-amber-300 bg-amber-50"><div class="font-bold text-amber-900 mb-2">⚠ Books changed — not announced yet</div>' + CH.map(function(c, i){
+      return '<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 py-2 border-t border-amber-200"><div><div class="text-sm font-semibold text-gray-800">' + fmt(c.at) + '</div><div class="text-xs text-gray-600">' + c.rows.map(function(x){ return esc(x.file); }).join(', ') + '</div></div><div class="whitespace-nowrap"><button class="' + P + '" onclick="acxRel.edit()">Write release note</button> <button class="' + B + '" onclick="acxWeb.edit()">Schedule training</button> <button class="' + B + '" onclick="acxRel.chDone(' + i + ')">Mark done</button></div></div>';
+    }).join('') + '</div>' : '';
   }
   function editR(id){
     var a = R.find(function(x){ return x.id === id; }) || {};
@@ -80,6 +93,7 @@
   }
   window.acxRel = {
     load: loadR, edit: editR,
+    chDone: async function(i){ var c = CH[i]; if (!c) return; if (!can()) return alert('Only the hub admin can do this.'); var r = await sb().from('acacia_books_changes').update({ status: 'announced' }).in('id', c.rows.map(function(x){ return x.id; })); if (!fail(r, 'update')) loadChanges(); },
     toggle: async function(id){ var a = R.find(function(x){ return x.id === id; }); var pub = a.status !== 'published'; var r = await sb().from('acacia_announcements').update({ status: pub ? 'published' : 'draft', published_at: pub ? (a.published_at || new Date().toISOString()) : null }).eq('id', id); if (!fail(r, 'update')) loadR(); },
     del: async function(id){ if (!confirm('Delete this release note?')) return; var r = await sb().from('acacia_announcements').delete().eq('id', id); if (!fail(r, 'delete')) loadR(); },
     mail: function(id){ var a = R.find(function(x){ return x.id === id; }); mailTo(targets(a.company_ids), 'New in Acacia Books: ' + a.title, (a.module ? a.module + '\n\n' : '') + (a.summary || '') + ((a.steps || []).length ? '\n\nHow to use it:\n' + a.steps.map(function(s, i){ return (i + 1) + '. ' + s; }).join('\n') : '') + (a.link ? '\n\nGuide: ' + a.link : '') + (a.video_url ? '\nVideo: ' + a.video_url : '')); }
