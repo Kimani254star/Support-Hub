@@ -2968,16 +2968,19 @@ function devAutoRefresh(){
     var t = supportTickets.find(function(x){ return String(x.id) === String(id); });
     if (!t || t.source !== 'cloud') return;
     var msgs = await ticketThread(t.sbId);
-    var text = msgs.map(function(m){ return (m.sender === 'customer' ? t.customer : 'Support') + ' (' + new Date(m.created_at).toLocaleString() + '):\n' + m.body; }).join('\n\n---\n\n');
-    alert((t.subject) + '\n\n' + text);
-    var reply = prompt('Reply to ' + t.customer + ' (leave empty to just close this):', '');
-    if (reply && reply.trim()){
-      var r = await sb.from('acacia_ticket_messages').insert({ ticket_id: t.sbId, sender: 'support', body: reply.trim() });
-      if (r.error) { alert('Could not send: ' + r.error.message); return; }
-      await sb.from('acacia_tickets').update({ status: 'open', last_sender: 'support', updated_at: new Date().toISOString() }).eq('id', t.sbId);
-      try { addLog('Info', who(), 'Replied to ticket ' + t.ticket + ' (' + t.customer + ')', 'Support'); } catch(e){}
-      await refresh();
-    }
+    showTicketHistoryModal({
+      subject: t.subject, ticketNo: t.ticket, customer: t.customer, contact: t.contact, status: t.status, company: t.company,
+      messages: threadToMessages(t, msgs),
+      onReply: async function(text){
+        var r = await sb.from('acacia_ticket_messages').insert({ ticket_id: t.sbId, sender: 'support', body: text });
+        if (r.error) { alert('Could not send: ' + r.error.message); return false; }
+        await sb.from('acacia_tickets').update({ status: 'open', last_sender: 'support', updated_at: new Date().toISOString() }).eq('id', t.sbId);
+        try { addLog('Info', who(), 'Replied to ticket ' + t.ticket + ' (' + t.customer + ')', 'Support'); } catch(e){}
+        await refresh();
+        window.hubOpenTicket(id);
+        return true;
+      }
+    });
   };
   /* ---- Conversation history + automatic transcript email (cloud tickets) ---- */
   function threadToMessages(t, msgs){
@@ -4117,8 +4120,10 @@ function showTicketHistoryModal(o){
             '<span class="text-xs font-semibold px-2 py-1 rounded-full ' + (resolved ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800") + '">' + e(o.status) + '</span>' +
           '</div>' +
           (resolved ? "" : '<div class="px-4 py-2 text-xs bg-amber-50 text-amber-800 border-b border-amber-100">This conversation is still open.</div>') +
-          '<div class="p-4 space-y-3 overflow-y-auto" style="flex:1">' + bubbles + '</div>' +
+          '<div id="thBubbles" class="p-4 space-y-3 overflow-y-auto" style="flex:1">' + bubbles + '</div>' +
+          (o.onReply ? '<div class="p-3 border-t border-gray-200"><textarea id="thReplyText" rows="3" class="w-full p-2 border border-gray-300 rounded-lg text-sm" placeholder="Type your reply to ' + e(o.customer) + '... (Ctrl+Enter to send)"></textarea></div>' : '') +
           '<div class="p-3 border-t border-gray-200 flex flex-wrap justify-end gap-2">' +
+            (o.onReply ? '<button id="thSendBtn" class="bg-blue-600 text-white px-3 py-2 text-sm rounded hover:bg-blue-700">&#10148; Send reply</button>' : '') +
             (o.onEmail ? '<button id="thEmailBtn" class="bg-emerald-700 text-white px-3 py-2 text-sm rounded hover:bg-emerald-800">&#9993; Email transcript</button>' : '') +
             '<button id="thDownloadBtn" class="bg-slate-600 text-white px-3 py-2 text-sm rounded hover:bg-slate-700">&#11015; Download</button>' +
             '<button id="thCloseBtn" class="bg-gray-200 text-gray-800 px-3 py-2 text-sm rounded hover:bg-gray-300">Close</button>' +
@@ -4132,6 +4137,19 @@ function showTicketHistoryModal(o){
     box.addEventListener("click", function(ev){ if (ev.target === box) close(); });
     box.querySelector("#thCloseBtn").onclick = close;
     var em = box.querySelector("#thEmailBtn"); if (em) em.onclick = function(){ o.onEmail(em); };
+    var bub = box.querySelector("#thBubbles"); if (bub) bub.scrollTop = bub.scrollHeight;
+    var sd = box.querySelector("#thSendBtn"), ta = box.querySelector("#thReplyText");
+    if (sd && ta) {
+        var send = async function(){
+            var v = ta.value.trim(); if (!v) { ta.focus(); return; }
+            sd.disabled = true; var lbl = sd.innerHTML; sd.textContent = "Sending...";
+            var ok = false; try { ok = await o.onReply(v); } catch(err){ alert("Could not send: " + (err.message || err)); }
+            if (ok === false) { sd.disabled = false; sd.innerHTML = lbl; }
+        };
+        sd.onclick = send;
+        ta.addEventListener("keydown", function(ev){ if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); send(); } });
+        setTimeout(function(){ ta.focus(); }, 50);
+    }
     box.querySelector("#thDownloadBtn").onclick = function(){
         var txt = "Ticket " + o.ticketNo + " - " + o.subject + "\nCustomer: " + o.customer + (o.contact ? " <" + o.contact + ">" : "") + "\nStatus: " + o.status + "\n\n" +
             (o.messages || []).map(function(m){ return m.name + (m.at ? " (" + m.at + ")" : "") + ":\n" + m.text; }).join("\n\n---\n\n");

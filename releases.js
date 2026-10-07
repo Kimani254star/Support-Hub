@@ -44,7 +44,7 @@
   var targets = function(ids){ return CO.filter(function(c){ return !ids || !ids.length || ids.indexOf(c.company_id) > -1; }); };
 
   /* ---------- Releases ---------- */
-  function shellR(){ $('#releases').innerHTML = '<div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-5 mb-6"><div><h1 class="text-3xl font-extrabold text-gray-900">Releases</h1><p class="mt-2 text-sm text-gray-500">Announce new modules to Books users and show them how to use each one. Published notes appear in the Books "What\'s new" bell.</p></div><div class="flex gap-2 mt-4 md:mt-0"><button class="' + P + '" onclick="acxRel.edit()">➕ New release note</button><button class="' + B + '" onclick="acxRel.load()">🔄 Refresh</button></div></div><div class="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm"><table class="w-full text-left text-sm min-w-[800px]"><thead><tr class="bg-gray-50 text-xs uppercase text-gray-600"><th class="p-4">Title</th><th class="p-4">Module</th><th class="p-4">Audience</th><th class="p-4">Status</th><th class="p-4">Published</th><th class="p-4 text-right">Actions</th></tr></thead><tbody id="relBody" class="divide-y divide-gray-100"></tbody></table></div>'; }
+  function shellR(){ $('#releases').innerHTML = '<div class="flex flex-col md:flex-row md:items-center md:justify-between border-b border-gray-200 pb-5 mb-6"><div><h1 class="text-3xl font-extrabold text-gray-900">Releases</h1><p class="mt-2 text-sm text-gray-500">Announce new modules to Books users and show them how to use each one. Published notes appear in the Books "What\'s new" bell.</p></div><div class="flex gap-2 mt-4 md:mt-0"><button class="' + P + '" onclick="acxRel.edit()">➕ New release note</button><button class="' + B + '" onclick="acxRel.load()">🔄 Refresh</button><button class="' + B + '" onclick="acxRel.scan()">🔍 Check Books for changes</button></div></div><div class="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm"><table class="w-full text-left text-sm min-w-[800px]"><thead><tr class="bg-gray-50 text-xs uppercase text-gray-600"><th class="p-4">Title</th><th class="p-4">Module</th><th class="p-4">Audience</th><th class="p-4">Status</th><th class="p-4">Published</th><th class="p-4 text-right">Actions</th></tr></thead><tbody id="relBody" class="divide-y divide-gray-100"></tbody></table></div>'; }
   async function loadR(){
     if (!$('#relBody')) shellR();
     await loadCo();
@@ -55,6 +55,40 @@
       return '<tr><td class="p-4 font-medium">' + (a.pinned ? '📌 ' : '') + esc(a.title) + '</td><td class="p-4">' + esc(a.module || '-') + '</td><td class="p-4">' + aud(a.company_ids) + '</td><td class="p-4">' + pill(a.status, a.status === 'published' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700') + '</td><td class="p-4">' + fmt(a.published_at) + '</td><td class="p-4 text-right whitespace-nowrap"><button class="' + B + '" onclick="acxRel.edit(\'' + a.id + '\')">Edit</button> <button class="' + B + '" onclick="acxRel.toggle(\'' + a.id + '\')">' + (a.status === 'published' ? 'Unpublish' : 'Publish') + '</button> <button class="' + B + '" onclick="acxRel.mail(\'' + a.id + '\')">✉️ Email</button> <button class="' + B + ' text-rose-600" onclick="acxRel.del(\'' + a.id + '\')">Delete</button></td></tr>';
     }).join('') : '<tr><td colspan="6" class="p-8 text-center text-gray-500">No release notes yet.</td></tr>';
     loadChanges();
+    scanBooks(false).then(function(x){ if (x && x.changed) loadChanges(); });
+  }
+  /* ---------- Books change detection (runs here in Support, not in Books) ---------- */
+  var BOOKS_URL = window.__BOOKS_URL__ || 'https://acacia-books.vercel.app/';
+  async function sha(buf){ var h = await crypto.subtle.digest('SHA-256', buf); return Array.prototype.map.call(new Uint8Array(h), function(b){ return ('0' + b.toString(16)).slice(-2); }).join('').slice(0, 24); }
+  async function scanBooks(manual){
+    if (!sb() || !can()) { if (manual) alert('Only the hub admin can check Books for changes.'); return { skipped: true }; }
+    var TK = 'acx_books_scan_t';
+    if (!manual && Date.now() - Number(localStorage.getItem(TK) || 0) < 6 * 3600000) return { skipped: true };
+    try {
+      var ir = await fetch(BOOKS_URL, { cache: 'no-store' }); if (!ir.ok) throw new Error('Books returned ' + ir.status);
+      var html = await ir.text(), base = new URL(BOOKS_URL), doc = new DOMParser().parseFromString(html, 'text/html');
+      var refs = Array.prototype.map.call(doc.querySelectorAll('script[src],link[rel=stylesheet][href]'), function(e){ return e.getAttribute('src') || e.getAttribute('href'); });
+      var seen = {}, files = [{ file: 'index.html', sig: await sha(new TextEncoder().encode(html)), size: html.length }]; seen['index.html'] = 1;
+      for (var i = 0; i < refs.length; i++) {
+        var u; try { u = new URL(refs[i], base); } catch(e){ continue; }
+        if (u.origin !== base.origin) continue;
+        var name = u.pathname.replace(base.pathname, '') || 'index.html'; if (seen[name]) continue; seen[name] = 1;
+        var fr = await fetch(u.href.split('?')[0], { cache: 'no-store' }).catch(function(){ return null; }); if (!fr || !fr.ok) continue;
+        var buf = await fr.arrayBuffer(); files.push({ file: name, sig: await sha(buf), size: buf.byteLength });
+      }
+      var kn = await sb().from('acacia_books_files').select('file,sig'); if (kn.error) throw kn.error;
+      var known = {}; (kn.data || []).forEach(function(x){ known[x.file] = x.sig; });
+      var first = !(kn.data || []).length, now = new Date().toISOString();
+      var changed = first ? [] : files.filter(function(f){ return known[f.file] !== f.sig; });
+      if (changed.length) { var ins = await sb().from('acacia_books_changes').insert(changed.map(function(f){ return { file: f.file, sig: f.sig, size: f.size, seen_at: now, status: 'new' }; })); if (ins.error) throw ins.error; }
+      var up = await sb().from('acacia_books_files').upsert(files.map(function(f){ return { file: f.file, sig: f.sig, size: f.size, checked_at: now }; }), { onConflict: 'file' }); if (up.error) throw up.error;
+      localStorage.setItem(TK, String(Date.now()));
+      return { changed: changed.length, first: first, total: files.length };
+    } catch(e){
+      console.warn('[Releases] Books scan failed', e);
+      if (manual) alert('Could not check Books: ' + (e.message || e) + (/relation|policy|permission/i.test(e.message || '') ? '\n\nRun acacia_webinars_fix.sql in Supabase.' : '\n\n(Books must allow cross-site reads; GitHub Pages does.)'));
+      return { error: true };
+    }
   }
   var CH = [];
   async function loadChanges(){
@@ -93,6 +127,7 @@
   }
   window.acxRel = {
     load: loadR, edit: editR,
+    scan: async function(){ var x = await scanBooks(true); if (x && !x.error && !x.skipped) { alert(x.first ? 'Baseline saved (' + x.total + ' Books files). Future changes will be flagged here.' : (x.changed ? x.changed + ' Books file(s) changed. See the amber box to write a release note.' : 'No changes in Books since the last check.')); loadChanges(); } },
     chDone: async function(i){ var c = CH[i]; if (!c) return; if (!can()) return alert('Only the hub admin can do this.'); var r = await sb().from('acacia_books_changes').update({ status: 'announced' }).in('id', c.rows.map(function(x){ return x.id; })); if (!fail(r, 'update')) loadChanges(); },
     toggle: async function(id){ var a = R.find(function(x){ return x.id === id; }); var pub = a.status !== 'published'; var r = await sb().from('acacia_announcements').update({ status: pub ? 'published' : 'draft', published_at: pub ? (a.published_at || new Date().toISOString()) : null }).eq('id', id); if (!fail(r, 'update')) loadR(); },
     del: async function(id){ if (!confirm('Delete this release note?')) return; var r = await sb().from('acacia_announcements').delete().eq('id', id); if (!fail(r, 'delete')) loadR(); },
