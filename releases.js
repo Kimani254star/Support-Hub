@@ -128,8 +128,16 @@
     mail: function(id){ var w = W.find(function(x){ return x.id === id; }); mailTo(targets(w.company_ids), 'Training: ' + w.title, w.title + '\nWhen: ' + fmt(w.starts_at) + ' (' + w.duration_min + ' min)\n' + (w.host ? 'Host: ' + w.host + '\n' : '') + '\n' + (w.description || '') + '\n\nRegister inside Acacia Books > What\'s new > Training.'); },
     regs: function(id){
       var w = W.find(function(x){ return x.id === id; }), l = REG[id] || [];
-      var o = modal('Registrations: ' + esc(w.title), l.length ? '<table class="w-full text-sm"><tbody>' + l.map(function(x){ return '<tr class="border-b"><td class="py-2">' + esc(x.user_name || '-') + '</td><td>' + esc(x.login_id) + '</td><td class="text-gray-500">' + esc(x.company_id || '') + '</td></tr>'; }).join('') + '</tbody></table><button class="' + B + ' mt-3" data-copy>Copy emails</button>' : '<p class="text-gray-500">Nobody has registered yet.</p>');
+      var o = modal('Registrations: ' + esc(w.title), l.length ? '<table class="w-full text-sm"><tbody>' + l.map(function(x){ return '<tr class="border-b"><td class="py-2">' + esc(x.user_name || '-') + '</td><td>' + esc(x.login_id) + '</td><td class="text-gray-500">' + esc(x.company_id || '') + '</td></tr>'; }).join('') + '</tbody></table><button class="' + B + ' mt-3" data-copy>Copy emails</button> <button class="' + B + ' mt-3" data-remind>Remind registrants</button>' : '<p class="text-gray-500">Nobody has registered yet.</p>');
       var cp = $('[data-copy]', o); if (cp) cp.onclick = function(){ navigator.clipboard.writeText(l.map(function(x){ return x.login_id; }).join(', ')); cp.textContent = 'Copied'; };
+      var rm = $('[data-remind]', o); if (rm) rm.onclick = function(){
+        var g = {}; l.forEach(function(x){ var c = x.company_id || ''; if (!c) return; (g[c] = g[c] || []).push(x.login_id); });
+        var ids = Object.keys(g); if (!ids.length) return alert('No registrants are linked to a company.');
+        if (!confirm('Save a reminder draft in Acacia Mail for ' + ids.length + ' compan' + (ids.length > 1 ? 'ies' : 'y') + ' (' + l.length + ' registrants)?')) return;
+        var sub = 'Reminder: ' + w.title + ' - ' + fmt(w.starts_at);
+        var body = 'This is a reminder that you are registered for the training "' + w.title + '".\n\nWhen: ' + fmt(w.starts_at) + ' (' + w.duration_min + ' min)\n' + (w.host ? 'Host: ' + w.host + '\n' : '') + (w.join_url ? 'Join link: ' + w.join_url + '\n' : 'The join link opens 15 minutes before the start in Acacia Books > What\'s new > Training.\n') + '\nSee you there.';
+        ids.forEach(function(c){ var co = CO.find(function(x){ return x.company_id === c; }) || {}; window.acxMailTo({ companyId: c, company: co.company_name || c, to: g[c].join(', '), subject: sub, body: body }); });
+      };
     }
   };
 
