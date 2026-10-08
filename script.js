@@ -2877,7 +2877,7 @@ function devAutoRefresh(){
   }
 
   
-  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell' };
+  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell', expenses: '\uD83E\uDDFE Acacia Expenses', plans: '\uD83D\uDCCB Acacia Plans' };
   function appName(k){ k = String(k || ''); return APP_NAMES[k.toLowerCase()] || (k ? title(k) : 'Unknown'); }
   var appsView = [];
   window.renderAppsPage = function(){
@@ -3145,7 +3145,7 @@ function devAutoRefresh(){
   function planLine(c){
     var due = dueOf(c), yr = c.billing === 'Yearly';
     var h = '<div class="text-xs text-gray-500 mt-1">' + money(due) + (due > 0 ? (yr ? ' / year \u00b7 Full year (10% off)' : ' / month \u00b7 Monthly') : '') + '</div>';
-    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell' };
+    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell', expenses: 'Acacia Expenses', plans: 'Acacia Plans' };
     if (c.allApps) h += '<div class="text-xs text-emerald-700 font-semibold mt-1">\u2713 All apps</div>';
     else if (c.appList) h += '<div class="text-xs text-gray-500 mt-1">Apps: ' + String(c.appList).split(',').filter(Boolean).map(function(k){ return esc(names[k] || k); }).join(', ') + '</div>';
     return h;
