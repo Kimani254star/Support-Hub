@@ -150,7 +150,7 @@ function planLabel(v, fallback){
     const raw = String(v == null ? "" : v).trim();
     if (!raw) return fallback;
     const k = raw.toLowerCase().replace(/[^a-z]/g, "");
-    const map = { free:"Free", trial:"Trial", starter:"Starter", pro:"Pro", business:"Business", enterprise:"Enterprise", allaccess:"All Access" };
+    const map = { free:"Free", trial:"Trial", starter:"Starter", pro:"Pro", business:"Business", enterprise:"Enterprise", allaccess:"All Access", crmstarter:"CRM Starter", crmpro:"CRM Pro", crmbusiness:"CRM Business", expensesstandard:"Expenses", inventorystandard:"Inventory", sellstandard:"Sell", payrollstandard:"Payroll", projectsstandard:"Projects", plansstandard:"Plans" };
     return map[k] || (raw.charAt(0).toUpperCase() + raw.slice(1));
 }
 function devDate(v){
@@ -233,7 +233,7 @@ function loadUsersFromStores(){ return normalizeUsers(devCollect(USER_STORE_KEYS
 
 
 const PAYMENT_STORE_KEYS = ["acacia_payments"];
-const SIGNUP_PLAN_PRICES = { free:0, starter:2000, pro:4000, business:6000, enterprise:8000, allaccess:12000 };
+const SIGNUP_PLAN_PRICES = { free:0, starter:2000, pro:4000, business:6000, enterprise:8000, allaccess:12000, crmstarter:5000, crmpro:8000, crmbusiness:12000, expensesstandard:5000, inventorystandard:5000, sellstandard:5000, payrollstandard:5000, projectsstandard:5000, plansstandard:5000 };
 function planKeyOf(plan){ return String(plan || "free").toLowerCase().replace(/[^a-z]/g, ""); }
 
 function isYearly(b){ return /^y/i.test(String(b || "")); }
@@ -590,7 +590,16 @@ const PRICING_PLANS = {
     pro: { base: 4000, label: "Pro" },
     business: { base: 6000, label: "Business" },
     enterprise: { base: 8000, label: "Enterprise", custom: true },
-    allaccess: { base: 12000, label: "All Access" }
+    allaccess: { base: 12000, label: "All Access" },
+    crmstarter: { base: 5000, label: "CRM Starter" },
+    crmpro: { base: 8000, label: "CRM Pro" },
+    crmbusiness: { base: 12000, label: "CRM Business" },
+    expensesstandard: { base: 5000, label: "Expenses" },
+    inventorystandard: { base: 5000, label: "Inventory" },
+    sellstandard: { base: 5000, label: "Sell" },
+    payrollstandard: { base: 5000, label: "Payroll" },
+    projectsstandard: { base: 5000, label: "Projects" },
+    plansstandard: { base: 5000, label: "Plans" }
 };
 
 function calculateInvoiceAmount(p) {
@@ -629,6 +638,17 @@ function openPaymentModal(payId = null) {
                 <option value="business" ${currentPlan === 'business' ? 'selected' : ''}>Business (KES 6,000)</option>
                 <option value="enterprise" ${currentPlan === 'enterprise' ? 'selected' : ''}>Enterprise (KES 8,000)</option>
                 <option value="allaccess" ${currentPlan === 'allaccess' ? 'selected' : ''}>All Access (KES 12,000)</option>
+                <optgroup label="Standalone app plans">
+                    <option value="crmstarter" ${currentPlan === 'crmstarter' ? 'selected' : ''}>CRM Starter (KES 5,000)</option>
+                    <option value="crmpro" ${currentPlan === 'crmpro' ? 'selected' : ''}>CRM Pro (KES 8,000)</option>
+                    <option value="crmbusiness" ${currentPlan === 'crmbusiness' ? 'selected' : ''}>CRM Business (KES 12,000)</option>
+                    <option value="expensesstandard" ${currentPlan === 'expensesstandard' ? 'selected' : ''}>Expenses (KES 5,000)</option>
+                    <option value="inventorystandard" ${currentPlan === 'inventorystandard' ? 'selected' : ''}>Inventory (KES 5,000)</option>
+                    <option value="sellstandard" ${currentPlan === 'sellstandard' ? 'selected' : ''}>Sell (KES 5,000)</option>
+                    <option value="payrollstandard" ${currentPlan === 'payrollstandard' ? 'selected' : ''}>Payroll (KES 5,000)</option>
+                    <option value="projectsstandard" ${currentPlan === 'projectsstandard' ? 'selected' : ''}>Projects (KES 5,000)</option>
+                    <option value="plansstandard" ${currentPlan === 'plansstandard' ? 'selected' : ''}>Plans (KES 5,000)</option>
+                </optgroup>
             </select>
 
             <input id="modalPay_addons" type="number" min="0" placeholder="Number of Premium Add-ons (+ KES 1,500/mo)" value="${payment ? (payment.addonsCount || 0) : 0}" class="w-full p-2 border rounded text-sm">
@@ -2877,7 +2897,7 @@ function devAutoRefresh(){
   }
 
   
-  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell', expenses: '\uD83E\uDDFE Acacia Expenses', plans: '\uD83D\uDCCB Acacia Plans' };
+  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell', expenses: '\uD83E\uDDFE Acacia Expenses', plans: '\uD83D\uDCCB Acacia Plans', inventory: '\uD83D\uDCE6 Acacia Inventory' };
   function appName(k){ k = String(k || ''); return APP_NAMES[k.toLowerCase()] || (k ? title(k) : 'Unknown'); }
   var appsView = [];
   window.renderAppsPage = function(){
@@ -3145,7 +3165,7 @@ function devAutoRefresh(){
   function planLine(c){
     var due = dueOf(c), yr = c.billing === 'Yearly';
     var h = '<div class="text-xs text-gray-500 mt-1">' + money(due) + (due > 0 ? (yr ? ' / year \u00b7 Full year (10% off)' : ' / month \u00b7 Monthly') : '') + '</div>';
-    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell', expenses: 'Acacia Expenses', plans: 'Acacia Plans' };
+    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell', expenses: 'Acacia Expenses', plans: 'Acacia Plans', inventory: 'Acacia Inventory' };
     if (c.allApps) h += '<div class="text-xs text-emerald-700 font-semibold mt-1">\u2713 All apps</div>';
     else if (c.appList) h += '<div class="text-xs text-gray-500 mt-1">Apps: ' + String(c.appList).split(',').filter(Boolean).map(function(k){ return esc(names[k] || k); }).join(', ') + '</div>';
     return h;
