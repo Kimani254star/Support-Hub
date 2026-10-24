@@ -2368,7 +2368,7 @@ function sortUsers(field){
     renderUsers();
 }
 function sortCompanies(field){
-    const map = { company: 'companyName', owner: 'ownerName', email: 'email', registered: 'createdAt' };
+    const map = { company: 'companyName', owner: 'ownerName', email: 'email', registered: 'createdAt', orgcode: 'orgCode' };
     genericSort(companies, map[field] || field, 'companies');
     renderCompanies();
 }
@@ -2885,6 +2885,7 @@ function devAutoRefresh(){
     applyTombstones();
     window.__acxCloudReady = true;
     merge(); mergeTickets(); mergePayments(); try { var __ap = document.getElementById('apps'); if (__ap && __ap.classList.contains('active')) window.renderAppsPage(); } catch(e){} renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
+    try { sweepIdleTickets(); } catch(e){}
   }
 
   function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
@@ -3062,6 +3063,35 @@ function devAutoRefresh(){
       }
     }
   };
+  /* ---- Auto-close: a conversation with no new message for 30 minutes is resolved and its transcript is emailed ---- */
+  var AUTO_CLOSE_MS = 30 * 60 * 1000, sweeping = false;
+  async function sweepIdleTickets(){
+    if (sweeping || !canWrite || !cloudOK) return;
+    sweeping = true;
+    var closed = 0;
+    try {
+      var now = Date.now();
+      var idle = tix.filter(function(r){ return r.status === 'open' && now - new Date(r.updated_at || r.created_at).getTime() > AUTO_CLOSE_MS; });
+      for (var i = 0; i < idle.length; i++){
+        var r = idle[i], msgs = await ticketThread(r.id);
+        var lastAt = msgs.length ? new Date(msgs[msgs.length - 1].created_at).getTime() : 0;
+        if (lastAt && now - lastAt <= AUTO_CLOSE_MS) continue;          /* still active */
+        /* only the browser that actually flips open -> resolved sends the email, so two admins never double-send */
+        var up = await sb.from('acacia_tickets').update({ status: 'resolved', updated_at: new Date().toISOString() }).eq('id', r.id).eq('status', 'open').select();
+        if (up.error || !up.data || !up.data.length) continue;
+        closed++;
+        var no = String(r.id).slice(0, 8).toUpperCase();
+        try { addLog('Info', 'System', 'Auto-closed ticket ' + no + ' after 30 minutes of no activity', 'Support'); } catch(e){}
+        if (r.user_email && msgs.length && autoEmailEnabled()){
+          var res = await emailTranscript({ sbId: r.id, ticket: no, contact: r.user_email, subject: r.subject || 'Support request', companyId: r.company_id || '', company: r.company_name || r.company_id || '' }, false);
+          if (res.ok) showToast('Conversation ' + no + ' closed after 30 min. Transcript emailed to ' + r.user_email);
+          else showToast('Conversation ' + no + ' closed after 30 min, but the transcript email failed. Open History > Email transcript to retry.', 7000);
+        }
+      }
+    } catch(e){ console.warn('[hub cloud] auto-close failed', e); }
+    sweeping = false;
+    if (closed) refresh();
+  }
   window.hubDeleteTicket = async function(id){
     var t = supportTickets.find(function(x){ return String(x.id) === String(id); }); if (!t || t.source !== 'cloud') return;
     if (!confirm('Delete this conversation permanently?')) return;
@@ -3092,7 +3122,7 @@ function devAutoRefresh(){
       return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'), source: 'cloud' }; });
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
-      return { id: r.company_id, companyId: r.company_id, companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
+      return { id: r.company_id, companyId: r.company_id, orgCode: r.org_code || '', companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
         email: r.email || '-', plan: planLabel(r.plan, 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
         registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
     });
@@ -3189,14 +3219,14 @@ function devAutoRefresh(){
     var statusFilter = (document.getElementById('companyStatusFilter') || {}).value || '';
     populateFilterOptionsLabeled('companyPlanFilter', companies.map(function(c){ return c.plan; }), 'All Plans');
     populateFilterOptionsLabeled('companyStatusFilter', companies.map(function(c){ return c.status; }), 'All Statuses');
-    var f = companies.filter(function(c){ return (c.companyName || '').toLowerCase().indexOf(search) > -1 || (c.ownerName || '').toLowerCase().indexOf(search) > -1 || (c.email || '').toLowerCase().indexOf(search) > -1; });
+    var f = companies.filter(function(c){ return (c.companyName || '').toLowerCase().indexOf(search) > -1 || (c.orgCode || '').toLowerCase().indexOf(search) > -1 || (c.ownerName || '').toLowerCase().indexOf(search) > -1 || (c.email || '').toLowerCase().indexOf(search) > -1; });
     if (planFilter) f = f.filter(function(c){ return planLabel(c.plan, "") === planFilter; });
     if (statusFilter) f = f.filter(function(c){ return c.status === statusFilter; });
     var pg = paginate(f, 'companies'), html = '';
-    if (!f.length) html = '<tr><td colspan="8" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
+    if (!f.length) html = '<tr><td colspan="9" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
     pg.pageItems.forEach(function(c){
       html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
-        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + planLine(c) + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
+        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td class="font-mono text-xs whitespace-nowrap">' + (c.orgCode ? esc(c.orgCode) : '<span class="text-gray-400">-</span>') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + planLine(c) + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
         '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
         (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
         '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';

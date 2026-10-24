@@ -982,6 +982,7 @@
                         <input type="checkbox" id="selectAllCompanies" onclick="toggleSelectAllCompanies(this)" class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                     </th>
                     <th class="p-4 cursor-pointer hover:bg-gray-100" onclick="sortCompanies('company')">Company ↕</th>
+                    <th class="p-4 cursor-pointer hover:bg-gray-100" onclick="sortCompanies('orgcode')">Company ID ↕</th>
                     <th class="p-4 cursor-pointer hover:bg-gray-100" onclick="sortCompanies('owner')">Owner ↕</th>
                     <th class="p-4 cursor-pointer hover:bg-gray-100" onclick="sortCompanies('email')">Email ↕</th>
                     <th class="p-4">Plan</th>
@@ -2039,7 +2040,7 @@
                     <div>
                         <label class="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
                             <input type="checkbox" id="autoEmailTranscript" class="mt-1 rounded border-gray-300" checked>
-                            <span>Automatically email the conversation to the customer when a support ticket is resolved</span>
+                            <span>Automatically email the conversation to the customer when a support ticket is resolved or closes after 30 minutes with no new message</span>
                         </label>
                     </div>
                     <div>
