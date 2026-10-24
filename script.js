@@ -2886,6 +2886,7 @@ function devAutoRefresh(){
     window.__acxCloudReady = true;
     merge(); mergeTickets(); mergePayments(); try { var __ap = document.getElementById('apps'); if (__ap && __ap.classList.contains('active')) window.renderAppsPage(); } catch(e){} renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
     try { sweepIdleTickets(); } catch(e){}
+    try { backfillOrgCodes(); } catch(e){}
   }
 
   function ago(d){ var m = Math.round((Date.now() - new Date(d).getTime()) / 60000); if (m < 2) return 'just now'; if (m < 90) return m + ' min ago'; var h = Math.round(m / 60); if (h < 36) return h + ' h ago'; return Math.round(h / 24) + ' d ago'; }
@@ -3100,6 +3101,25 @@ function devAutoRefresh(){
     await refresh();
   };
 
+  /* Company ID (ACC-000123) saved by Books on the company's user accounts - a second source when the company row has none yet */
+  function acctOrgCode(id){
+    for (var i = 0; i < accts.length; i++){
+      var a = accts[i]; if (String(a.company_id) !== String(id)) continue;
+      var v = a.data && a.data.orgCode; if (/^ACC-\d{6}$/.test(String(v || ''))) return v;
+    }
+    return '';
+  }
+  async function backfillOrgCodes(){
+    if (!canWrite || !cloudOK) return;
+    var todo = rows.filter(function(r){ return !r.org_code && acctOrgCode(r.company_id); }).slice(0, 20);
+    for (var i = 0; i < todo.length; i++){
+      var r = todo[i], code = acctOrgCode(r.company_id);
+      var u = await sb.from('acacia_company_status').update({ org_code: code }).eq('company_id', r.company_id).is('org_code', null);
+      if (!u.error) r.org_code = code;
+    }
+    if (todo.length) { try { merge(); } catch(e){} }
+  }
+
   function merge(){
     var __prevCompanies = (typeof companies !== 'undefined' && companies) ? companies.slice() : [];
     var __prevUsers = (typeof users !== 'undefined' && users) ? users.slice() : [];
@@ -3122,14 +3142,14 @@ function devAutoRefresh(){
       return { username: x.user_key, email: /@/.test(x.user_key) ? x.user_key : '', companyId: x.company_id, company: (r && r.company_name) || x.company_id, role: x.role || 'User', app: x.app, status: e === 'active' ? 'Active' : (e === 'pending' ? 'Pending' : 'Suspended'), source: 'cloud' }; });
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
-      return { id: r.company_id, companyId: r.company_id, orgCode: r.org_code || '', companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
+      return { id: r.company_id, companyId: r.company_id, orgCode: r.org_code || acctOrgCode(r.company_id), companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
         email: r.email || '-', plan: planLabel(r.plan, 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
         registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
     });
     var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
     var extra = normalizeCompanies(companiesFromUsers(users).concat(devCollect(COMPANY_STORE_KEYS)))
       .filter(function(c){ return !known[String(c.companyId).toLowerCase()]; })
-      .map(function(c){ c.status = 'Untracked'; return c; });
+      .map(function(c){ c.status = 'Untracked'; c.orgCode = acctOrgCode(c.companyId); return c; });
     companies = cs.concat(extra);
     var n = rows.filter(function(r){ return r.status === 'pending'; }).length;
     var btn = document.querySelector("button[onclick=\"openPage('companies')\"]");
@@ -3173,7 +3193,7 @@ function devAutoRefresh(){
   window.hubTrack = async function(id){
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     var c = co(id);
-    var r = await sb.from('acacia_company_status').insert({ company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' });
+    var r = await sb.from('acacia_company_status').insert(Object.assign({ company_id: c.companyId, company_name: c.companyName, owner_name: c.ownerName, email: c.email === '-' ? '' : c.email, plan: c.plan, price: Number(c.price || 0), status: 'active', approved_at: new Date().toISOString(), note: 'Existing customer' }, c.orgCode ? { org_code: c.orgCode } : {}));
     if (r.error) alert('Failed: ' + r.error.message); await refresh(); };
 
   
