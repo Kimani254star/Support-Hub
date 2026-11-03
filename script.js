@@ -2899,7 +2899,7 @@ function devAutoRefresh(){
   }
 
   
-  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell', expenses: '\uD83E\uDDFE Acacia Expenses', plans: '\uD83D\uDCCB Acacia Plans', inventory: '\uD83D\uDCE6 Acacia Inventory' };
+  var APP_NAMES = { books: '\uD83D\uDCDA Acacia Books', mail: '\uD83D\uDCEC Acacia Mail', crm: '\uD83E\uDD1D Acacia Books CRM', projects: '\uD83D\uDDC2\uFE0F Acacia Projects', payroll: '\uD83D\uDCB5 Acacia Payroll', sell: '\uD83D\uDED2 Acacia Sell', expenses: '\uD83E\uDDFE Acacia Expenses', plans: '\uD83D\uDCCB Acacia Plans', inventory: '\uD83D\uDCE6 Acacia Inventory', pos: '\uD83E\uDDFE Acacia POS' };
   function appName(k){ k = String(k || ''); return APP_NAMES[k.toLowerCase()] || (k ? title(k) : 'Unknown'); }
   var appsView = [];
   window.renderAppsPage = function(){
@@ -3143,7 +3143,7 @@ function devAutoRefresh(){
     users = normalizeUsers(loadUsersFromStores().concat(cu, uu));
     var cs = rows.map(function(r){
       return { id: r.company_id, companyId: r.company_id, orgCode: r.org_code || acctOrgCode(r.company_id), companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
-        email: r.email || '-', plan: planLabel(r.plan, 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
+        email: r.email || '-', plan: planLabel(r.plan, 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', posMode: r.pos_mode || '', posPrice: Number(r.pos_price || 0), posUntil: r.pos_until || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
         registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
     });
     var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
@@ -3197,6 +3197,46 @@ function devAutoRefresh(){
     if (r.error) alert('Failed: ' + r.error.message); await refresh(); };
 
   
+  /* ---- Acacia POS add-on: needs a Books company first. KES 2,500/month on Free Books, KES 500/month on a paid Books plan ---- */
+  var POS_PRICE = { linked: 500, free: 2500 };
+  async function posMutate(companyId, fn){
+    for (var i = 0; i < 6; i++){
+      var g = await sb.from('company_state').select('value,updated_at').eq('company_id', companyId).eq('key', 'appAddons').limit(1);
+      if (g.error) throw g.error;
+      var row = g.data && g.data[0], cur = {};
+      if (row){ try { cur = typeof row.value === 'string' ? JSON.parse(row.value) : (row.value || {}); } catch(e){ cur = {}; } if (!cur || typeof cur !== 'object') cur = {}; }
+      var nv = JSON.stringify(fn(cur)), now = new Date().toISOString(), ok = false;
+      if (row){ var u = await sb.from('company_state').update({ value: nv, updated_at: now }).eq('company_id', companyId).eq('key', 'appAddons').eq('updated_at', row.updated_at).select(); if (u.error) throw u.error; ok = !!(u.data && u.data.length); }
+      else { var ins = await sb.from('company_state').insert({ company_id: companyId, key: 'appAddons', value: nv, updated_at: now }); if (ins.error) throw ins.error; ok = true; }
+      if (ok) return true;
+      await new Promise(function(z){ setTimeout(z, 200 + Math.random() * 500 * (i + 1)); });
+    }
+    throw new Error('Could not save (busy). Try again.');
+  }
+  window.hubSetPos = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var c = co(id), r = c._row || {}, name = c.companyName || id, k = planKeyOf(r.plan);
+    var paid = ['starter','pro','business','enterprise','allaccess'].indexOf(k) >= 0, free = ['free','trial'].indexOf(k) >= 0;
+    var mode = '', until = null;
+    if (r.pos_mode){
+      if (!confirm('Turn Acacia POS OFF for ' + name + '? POS will lock for all its users and the POS charge stops.')) return;
+    } else {
+      if (!paid && !free){ alert('POS needs an Acacia Books company first (the Free Books plan is enough). ' + name + ' is on the "' + (r.plan || '-') + '" plan, so POS cannot be switched on.'); return; }
+      mode = paid ? 'linked' : 'free';
+      if (!confirm('Turn Acacia POS ON for ' + name + '?\n' + (paid ? 'Paid Books plan' : 'Free Books plan') + ': KES ' + POS_PRICE[mode].toLocaleString() + ' per month.')) return;
+      until = askDate(r.pos_until ? String(r.pos_until).slice(0, 10) : plus(30)); if (until === undefined) return;
+    }
+    var untilDay = until ? until.slice(0, 10) : null, price = mode ? POS_PRICE[mode] : 0;
+    try {
+      await posMutate(id, function(cur){
+        var a = Object.assign({}, cur);
+        a.pos = mode ? { active: true, until: untilDay || '', mode: mode, price: price, setBy: 'hub', setAt: new Date().toISOString() } : Object.assign({}, a.pos || {}, { active: false, mode: '', price: 0 });
+        return a;
+      });
+    } catch(e){ alert('Could not update POS access: ' + (e.message || e)); return; }
+    await patch(id, { pos_mode: mode || null, pos_price: price, pos_until: untilDay }, mode ? ('POS ' + mode + ' (KES ' + price + '/month) for ' + name) : ('POS switched off for ' + name));
+  };
+
   window.hubSetExtraUsers = async function(id){
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
     var c = co(id), cur = Number((c._row || {}).extra_users || 0);
@@ -3215,7 +3255,8 @@ function devAutoRefresh(){
   function planLine(c){
     var due = dueOf(c), yr = c.billing === 'Yearly';
     var h = '<div class="text-xs text-gray-500 mt-1">' + money(due) + (due > 0 ? (yr ? ' / year \u00b7 Full year (10% off)' : ' / month \u00b7 Monthly') : '') + '</div>';
-    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell', expenses: 'Acacia Expenses', plans: 'Acacia Plans', inventory: 'Acacia Inventory' };
+    var names = { mail: 'Acacia Mail', crm: 'Acacia Books CRM', projects: 'Acacia Projects', payroll: 'Acacia Payroll', sell: 'Acacia Sell', expenses: 'Acacia Expenses', plans: 'Acacia Plans', inventory: 'Acacia Inventory', pos: 'Acacia POS' };
+    if (c.posMode) h += '<div class="text-xs text-indigo-700 font-semibold mt-1">POS ' + (c.posMode === 'linked' ? 'on a paid Books plan' : 'on Free Books') + ' \u00b7 KES ' + Number(c.posPrice || POS_PRICE[c.posMode] || 0).toLocaleString() + ' / month' + (c.posUntil ? ' \u00b7 until ' + esc(String(c.posUntil).slice(0, 10)) : '') + '</div>';
     if (c.allApps) h += '<div class="text-xs text-emerald-700 font-semibold mt-1">\u2713 All apps</div>';
     else if (c.appList) h += '<div class="text-xs text-gray-500 mt-1">Apps: ' + String(c.appList).split(',').filter(Boolean).map(function(k){ return esc(names[k] || k); }).join(', ') + '</div>';
     return h;
@@ -3229,6 +3270,7 @@ function devAutoRefresh(){
     else if (s === 'Suspended' || s === 'Expired' || s === 'Rejected') out += b('Reactivate', "hubReactivate('" + id + "')", 'bg-green-600');
     else if (s === 'Untracked') out += b('Start tracking', "hubTrack('" + id + "')", 'bg-blue-900');
     if (s !== 'Untracked') out += b('Users', "hubSetExtraUsers('" + id + "')", 'bg-indigo-600');
+    if (s !== 'Untracked') out += b('POS', "hubSetPos('" + id + "')", 'bg-teal-700');
     if (s !== 'Untracked') out += b('Rename', "hubRenameCompany('" + id + "')", 'bg-slate-600');
     return out;
   }
