@@ -150,6 +150,12 @@
       return '<tr><td class="p-4 whitespace-nowrap">' + fmt(w.starts_at) + '<div class="text-xs text-gray-500">' + w.duration_min + ' min</div></td><td class="p-4 font-medium">' + esc(w.title) + '<div class="text-xs text-gray-500">' + esc(w.module || '') + '</div></td><td class="p-4">' + aud(w.company_ids) + '</td><td class="p-4"><button class="underline" onclick="acxWeb.regs(\'' + w.id + '\')">' + n + (w.capacity ? ' / ' + w.capacity : '') + '</button></td><td class="p-4">' + pill(ended ? 'ended' : w.status, c) + '</td><td class="p-4 text-right whitespace-nowrap"><button class="' + B + '" onclick="acxWeb.edit(\'' + w.id + '\')">Edit</button> <button class="' + B + '" onclick="acxWeb.mail(\'' + w.id + '\')">✉️ Invite</button> <button class="' + B + ' text-rose-600" onclick="acxWeb.del(\'' + w.id + '\')">Delete</button></td></tr>';
     }).join('') : '<tr><td colspan="6" class="p-8 text-center text-gray-500">No webinars scheduled.</td></tr>';
   }
+  /* Acacia Meet link: same meeting room format as meet.html (acacia-####-topic). Anyone with the link can join. */
+  function meetLink(title){
+    var slug = String(title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+    var code = 'acacia-' + Math.floor(1000 + Math.random() * 9000) + (slug ? '-' + slug : '');
+    return location.href.replace(/[?#].*$/, '').replace(/[^\/]*$/, '') + 'meet.html?room=' + encodeURIComponent(code);
+  }
   function editW(id){
     var w = W.find(function(x){ return x.id === id; }) || {};
     var o = modal(id ? 'Edit webinar' : 'Schedule webinar',
@@ -157,7 +163,7 @@
       field('Module / topic', '<input id="w_m" class="' + I + '" value="' + esc(w.module) + '">') +
       field('Description', '<textarea id="w_d" rows="3" class="' + I + '">' + esc(w.description) + '</textarea>') +
       '<div class="grid grid-cols-2 gap-3">' + '<div>' + field('Starts (your local time)', '<input id="w_s" type="datetime-local" class="' + I + '" value="' + (w.starts_at ? loc(w.starts_at) : '') + '">') + '</div><div>' + field('Duration (minutes)', '<input id="w_du" type="number" min="5" class="' + I + '" value="' + (w.duration_min || 60) + '">') + '</div></div>' +
-      field('Meeting link (Zoom / Meet / Teams)', '<input id="w_u" class="' + I + '" value="' + esc(w.join_url) + '" placeholder="https://">') +
+      field('Meeting link (Zoom / Meet / Teams)', '<div class="flex gap-2"><input id="w_u" class="' + I + '" value="' + esc(w.join_url) + '" placeholder="https:// (or click Create Meet link)"><button type="button" id="w_mk" class="' + B + ' whitespace-nowrap">📹 Create Meet link</button></div>') +
       '<div class="grid grid-cols-2 gap-3"><div>' + field('Host', '<input id="w_h" class="' + I + '" value="' + esc(w.host) + '">') + '</div><div>' + field('Seats (blank = unlimited)', '<input id="w_c" type="number" min="1" class="' + I + '" value="' + (w.capacity || '') + '">') + '</div></div>' +
       audience('w_', w.company_ids) +
       field('Status', '<select id="w_st" class="' + I + '">' + ['scheduled', 'completed', 'cancelled'].map(function(s){ return '<option' + (w.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>') +
@@ -165,11 +171,18 @@
       async function(o){
         if (!can()) { alert('Only the hub admin can schedule webinars.'); return false; }
         var t = $('#w_t', o).value.trim(), s = $('#w_s', o).value; if (!t || !s) { alert('Title and start time are required.'); return false; }
-        var row = { title: t, module: $('#w_m', o).value.trim(), description: $('#w_d', o).value.trim(), starts_at: new Date(s).toISOString(), duration_min: parseInt($('#w_du', o).value, 10) || 60, join_url: url($('#w_u', o).value), host: $('#w_h', o).value.trim(), capacity: parseInt($('#w_c', o).value, 10) || null, company_ids: readAud(o, 'w_'), status: $('#w_st', o).value, recording_url: url($('#w_r', o).value), updated_at: new Date().toISOString() };
+        var status0 = $('#w_st', o).value;
+        var row = { title: t, module: $('#w_m', o).value.trim(), description: $('#w_d', o).value.trim(), starts_at: new Date(s).toISOString(), duration_min: parseInt($('#w_du', o).value, 10) || 60, join_url: url($('#w_u', o).value) || (status0 !== 'cancelled' ? meetLink($('#w_t', o).value) : ''), host: $('#w_h', o).value.trim(), capacity: parseInt($('#w_c', o).value, 10) || null, company_ids: readAud(o, 'w_'), status: $('#w_st', o).value, recording_url: url($('#w_r', o).value), updated_at: new Date().toISOString() };
         var r = id ? await sb().from('acacia_webinars').update(row).eq('id', id) : await sb().from('acacia_webinars').insert(Object.assign(row, { created_by: who() }));
         if (fail(r, 'save')) return false; loadW();
       });
     bindAud(o, 'w_');
+    var mk = $('#w_mk', o);
+    if (mk) mk.onclick = function(){
+      var inp = $('#w_u', o);
+      if (inp.value.trim() && !confirm('Replace the existing link with a new Acacia Meet link?')) return;
+      inp.value = meetLink($('#w_t', o).value); inp.select();
+    };
   }
   window.acxWeb = {
     load: loadW, edit: editW,
