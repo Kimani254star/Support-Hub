@@ -34,6 +34,13 @@
     if (!iso) return 'Never'; var s = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
     if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 86400) return Math.floor(s / 3600) + ' h ago'; return Math.floor(s / 86400) + ' d ago';
   }
+  function useUrl(p, htmls) { return !!p.url && (S.prevMode !== 'files' || !htmls.length); }
+  function sizeInfo(p) {
+    var l = S.files[p.id];
+    if (l) return { n: l.reduce(function (a, r) { return a + (Number(r.size) || 0); }, 0), c: l.length };
+    return (S.sizes && S.sizes[p.id]) || { n: 0, c: 0 };
+  }
+  function sizeCell(p) { var z = sizeInfo(p); return z.c ? '<b>' + fmtSize(z.n) + '</b><div class="st-mut">' + z.c + ' file' + (z.c === 1 ? '' : 's') + '</div>' : '<span class="st-mut">' + (p.url ? 'Live URL only' : 'Empty') + '</span>'; }
   function proj(id) { id = id || S.pid; return S.projects.find(function (p) { return p.id === id; }); }
   function toast(msg, bad) {
     var t = document.createElement('div'); t.className = 'st-toast' + (bad ? ' bad' : ''); t.textContent = msg; document.body.appendChild(t);
@@ -82,6 +89,7 @@
     var f = await sb.from('acacia_studio_folders').select('*').order('name'); if (f.error) throw f.error;
     var p = await sb.from('acacia_studio_projects').select('*').order('name'); if (p.error) throw p.error;
     var h = await sb.from('acacia_studio_history').select('*').order('created_at', { ascending: false }).limit(80); if (h.error) throw h.error;
+    try { var fl = await fetchAll(function (a, b) { return sb.from('acacia_studio_files').select('project_id,size').order('id').range(a, b); }); S.sizes = {}; fl.forEach(function (r) { var x = S.sizes[r.project_id] || (S.sizes[r.project_id] = { n: 0, c: 0 }); x.n += Number(r.size) || 0; x.c++; }); } catch (e) { S.sizes = S.sizes || {}; }
     S.folders = f.data || []; S.projects = p.data || []; S.history = h.data || []; S.loaded = true; S.err = null; S.loadedAt = Date.now();
   }
   async function loadFiles(pid, force) {
@@ -338,11 +346,11 @@
   function viewOverview() {
     var live = S.projects.filter(function (p) { return p.monitor_state === 'online' && p.stage !== 'archived'; }).length;
     var dev = S.projects.filter(function (p) { return p.stage === 'development'; }).length;
-    var h = '<div class="st-cards"><div class="st-stat"><span>Total projects</span><b>' + S.projects.length + '</b></div><div class="st-stat"><span>Online websites</span><b class="g">' + live + '</b></div><div class="st-stat"><span>In development</span><b class="a">' + dev + '</b></div><div class="st-stat"><span>Folders</span><b>' + S.folders.length + '</b></div></div>';
+    var h = '<div class="st-cards"><div class="st-stat"><span>Total projects</span><b>' + S.projects.length + '</b></div><div class="st-stat"><span>Online websites</span><b class="g">' + live + '</b></div><div class="st-stat"><span>In development</span><b class="a">' + dev + '</b></div><div class="st-stat"><span>Folders</span><b>' + S.folders.length + '</b></div><div class="st-stat"><span>Total size</span><b>' + fmtSize(S.projects.reduce(function (a, p) { return a + sizeInfo(p).n; }, 0)) + '</b></div></div>';
     h += '<div class="st-card"><div class="st-ch"><h3>Project list</h3>' + (canW() ? '<button class="st-b pri" data-a="newproj">＋ New project</button>' : '') + '</div>';
     if (!S.projects.length) h += '<p class="st-mut">No projects yet. Create one, or upload a ZIP / folder from the Projects tab.</p>';
-    else h += '<div class="st-scroll"><table class="st-t"><thead><tr><th>Project</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + S.projects.map(function (p) {
-      return '<tr><td><b>' + esc(p.name) + '</b><div class="st-mut">' + esc(p.category) + (p.folder_id ? ' · ' + esc(fpath(p.folder_id).map(function (f) { return f.name; }).join(' / ')) : '') + '</div></td><td>' + statusPill(p) + '</td><td class="st-act"><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="preview">Preview</button><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="files">Open</button></td></tr>';
+    else h += '<div class="st-scroll"><table class="st-t"><thead><tr><th>Project</th><th>Status</th><th>Size</th><th>Actions</th></tr></thead><tbody>' + S.projects.map(function (p) {
+      return '<tr><td><b>' + esc(p.name) + '</b><div class="st-mut">' + esc(p.category) + (p.folder_id ? ' · ' + esc(fpath(p.folder_id).map(function (f) { return f.name; }).join(' / ')) : '') + '</div></td><td>' + statusPill(p) + '</td><td>' + sizeCell(p) + '</td><td class="st-act"><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="preview">Preview</button><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="files">Open</button></td></tr>';
     }).join('') + '</tbody></table></div>';
     h += '</div><div class="st-card"><h3>Recent activity</h3>' + historyList(S.history.slice(0, 12), true) + '</div>';
     return h;
@@ -370,8 +378,8 @@
     }
     var list = S.projects.filter(function (p) { return q ? (p.name + ' ' + p.description + ' ' + p.category).toLowerCase().indexOf(q) >= 0 : (p.folder_id || null) === (cur || null); });
     if (!list.length) h += '<div class="st-card"><p class="st-mut">' + (q ? 'No projects match your search.' : 'No projects here yet.') + '</p></div>';
-    else h += '<div class="st-card"><div class="st-scroll"><table class="st-t"><thead><tr><th>Project</th><th>Category</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead><tbody>' + list.map(function (p) {
-      return '<tr><td><a class="st-lnk" data-a="openproj" data-id="' + p.id + '" data-tab="files"><b>' + esc(p.name) + '</b></a><div class="st-mut">' + esc(p.description || '') + '</div></td><td>' + esc(p.category) + '</td><td>' + statusPill(p) + '</td><td class="st-mut">' + ago(p.updated_at) + '</td><td class="st-act"><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="files">Open</button><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="preview">Preview</button>' +
+    else h += '<div class="st-card"><div class="st-scroll"><table class="st-t"><thead><tr><th>Project</th><th>Category</th><th>Status</th><th>Size</th><th>Updated</th><th>Actions</th></tr></thead><tbody>' + list.map(function (p) {
+      return '<tr><td><a class="st-lnk" data-a="openproj" data-id="' + p.id + '" data-tab="files"><b>' + esc(p.name) + '</b></a><div class="st-mut">' + esc(p.description || '') + '</div></td><td>' + esc(p.category) + '</td><td>' + statusPill(p) + '</td><td>' + sizeCell(p) + '</td><td class="st-mut">' + ago(p.updated_at) + '</td><td class="st-act"><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="files">Open</button><button class="st-b sm" data-a="openproj" data-id="' + p.id + '" data-tab="preview">Preview</button>' +
         (canW() ? '<button class="st-b sm" data-a="editproj" data-id="' + p.id + '">Edit</button><button class="st-b sm" data-a="moveproj" data-id="' + p.id + '">Move</button><button class="st-b sm dng" data-a="delproj" data-id="' + p.id + '">Delete</button>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div></div>';
     return h;
@@ -390,7 +398,7 @@
   /* ---- workspace ---- */
   async function openProject(id, tab) {
     if (S.dirty && !confirm('You have unsaved changes. Leave without saving?')) return;
-    S.dirty = false; S.pid = id; S.tab = tab || 'files'; S.sel = null; S.hits = null; S.q = ''; S.curDir = ''; S.prevPath = null;
+    S.dirty = false; S.pid = id; S.tab = tab || 'files'; S.sel = null; S.hits = null; S.q = ''; S.curDir = ''; S.prevPath = null; S.prevMode = null;
     var root = $('stRoot'); root.innerHTML = head() + '<p class="st-mut" style="padding:20px">Opening project…</p>';
     try { await loadFiles(id); } catch (e) { toast(e.message || String(e), true); }
     renderWorkspace();
@@ -410,11 +418,11 @@
       var htmls = (S.files[p.id] || []).filter(function (r) { return /\.html?$/i.test(r.path); });
       var cur = S.prevPath || (findRow(p.id, p.entry_path) ? p.entry_path : pickEntry((S.files[p.id] || []).map(function (r) { return r.path; })));
       root.innerHTML = h + '<div class="st-bar">' + [['desktop', '🖥 Desktop'], ['tablet', '▭ Tablet'], ['mobile', '📱 Mobile']].map(function (d) { return '<button class="st-b sm' + (S.device === d[0] ? ' pri' : '') + '" data-a="device" data-d="' + d[0] + '">' + d[1] + '</button>'; }).join('') +
-        (htmls.length ? '<select id="stPage">' + htmls.map(function (r) { return '<option value="' + esc(r.path) + '"' + (r.path === cur ? ' selected' : '') + '>' + esc(r.path) + '</option>'; }).join('') + '</select>' : '') +
+        (p.url && htmls.length ? '<select id="stSrc"><option value="url"' + (useUrl(p, htmls) ? ' selected' : '') + '>Live site (' + esc(p.url.replace(/^https?:\/\//, '')) + ')</option><option value="files"' + (useUrl(p, htmls) ? '' : ' selected') + '>Uploaded files</option></select>' : '') + (htmls.length && !useUrl(p, htmls) ? '<select id="stPage">' + htmls.map(function (r) { return '<option value="' + esc(r.path) + '"' + (r.path === cur ? ' selected' : '') + '>' + esc(r.path) + '</option>'; }).join('') + '</select>' : '') +
         '<button class="st-b sm" data-a="prevrefresh">⟳ Refresh</button><button class="st-b sm" data-a="newtab">↗ Open in new tab</button></div>' +
         '<div id="stPrevErr" class="st-err hidden"></div><div class="st-fw ' + S.device + '"><iframe id="stFrame" sandbox="allow-scripts allow-forms allow-popups allow-modals" title="Website preview"></iframe></div>' +
-        '<p class="st-mut" style="margin-top:8px">The preview runs in an isolated sandbox: it cannot see your dashboard, your login or any other project.</p>';
-      loadPreview(htmls.length ? cur : null);
+        '<p class="st-mut" style="margin-top:8px">' + (useUrl(p, htmls) ? 'Showing your live site. If it stays blank, the site does not allow being shown inside another page - use “Visit site” instead.' : 'The preview runs in an isolated sandbox: it cannot see your dashboard, your login or any other project.') + '</p>';
+      loadPreview(useUrl(p, htmls) ? null : (htmls.length ? cur : null));
     } else if (S.tab === 'monitor') {
       root.innerHTML = h + '<div id="stMon"><p class="st-mut">Loading…</p></div>'; renderMonitorTab();
     } else {
@@ -551,10 +559,16 @@
   async function loadPreview(path) {
     var fr = $('stFrame'); if (!fr) return; var p = proj(), er = $('stPrevErr'); if (er) { er.classList.add('hidden'); er.textContent = ''; }
     if (!path) {
-      if (p.url) { fr.removeAttribute('srcdoc'); fr.src = p.url; return; }
+      if (p.url) {
+        var same = true; try { same = new URL(p.url, location.href).origin === location.origin; } catch (e) { }
+        /* a live site on its own domain (e.g. Vercel) may keep its cookies/storage; same-origin URLs stay fully sandboxed */
+        fr.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals' + (same ? '' : ' allow-same-origin'));
+        fr.removeAttribute('srcdoc'); fr.src = p.url; return;
+      }
+      fr.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals');
       fr.srcdoc = '<body style="font-family:sans-serif;padding:40px;color:#555"><h3>Nothing to preview yet</h3><p>Upload files (with an index.html) or set a website URL in Details.</p></body>'; return;
     }
-    S.prevPath = path; fr.srcdoc = '<body style="font-family:sans-serif;padding:40px;color:#888">Building preview…</body>';
+    S.prevPath = path; fr.setAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-modals'); fr.removeAttribute('src'); fr.srcdoc = '<body style="font-family:sans-serif;padding:40px;color:#888">Building preview…</body>';
     try { fr.srcdoc = await buildPage(p.id, path); } catch (e) { fr.srcdoc = '<body style="font-family:sans-serif;padding:40px;color:#b91c1c"><h3>Preview failed</h3><p>' + esc(e.message) + '</p></body>'; }
     var sel = $('stPage'); if (sel) sel.value = S.prevPath;
   }
@@ -565,7 +579,8 @@
   });
   async function openNewTab() {
     var p = proj(), rows = S.files[p.id] || [], htmls = rows.filter(function (r) { return /\.html?$/i.test(r.path); });
-    if (!htmls.length) { if (p.url) window.open(p.url, '_blank', 'noopener'); else toast('Nothing to open yet.', true); return; }
+    if (useUrl(p, htmls)) { window.open(p.url, '_blank', 'noopener'); return; }
+    if (!htmls.length) { toast('Nothing to open yet.', true); return; }
     var w = window.open('about:blank', '_blank'); if (!w) return toast('Your browser blocked the new tab. Allow pop-ups for this page.', true);
     w.document.write('<body style="font-family:sans-serif;padding:40px;color:#888">Building website…</body>');
     try {
@@ -768,6 +783,7 @@
       else if (t.id === 'stDir') { handleImport(t.files, 'dir'); t.value = ''; }
       else if (t.id === 'stUp') { uploadFiles(Array.from(t.files)).catch(function (er) { toast(er.message || String(er), true); }); t.value = ''; }
       else if (t.id === 'stPage') loadPreview(t.value);
+      else if (t.id === 'stSrc') { S.prevMode = t.value; renderWorkspace(); }
       else if (t.id === 'stAuto') { S.auto = Number(t.value); localStorage.setItem('acacia_studio_auto', String(S.auto)); }
       else if (t.id === 'stFm') { S.qmode = t.value; S.hits = null; renderTree(); }
     });
