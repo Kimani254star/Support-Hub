@@ -2400,10 +2400,20 @@
     </div>
   </div>
   <div>
+    <h3>Collaborate</h3>
+    <div class="rs-actions">
+      <button id="commToggle" onclick="toggleCommPanel()">🌳 Team Status</button>
+      <button id="gmeetToggle" onclick="window.open('meet.html','_blank')">📹 Meet</button>
+      <button id="gdocsToggle" onclick="openGDocs()">📝 Docs</button>
+      <button id="gsheetsToggle" onclick="openGSheets()">📊 Sheets</button>
+    </div>
+  </div>
+  <div>
     <h3>Recent activity</h3>
     <ul class="rs-activity" id="rsActivity"></ul>
   </div>
 </aside>
+<div id="commPanel" class="hidden fixed bottom-20 right-4 w-[760px] max-w-[95vw] h-[80vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden" role="dialog" aria-label="Team chat"><div class="tc-head"><div><h3>💬 Team Chat</h3><p id="tcSub">Click a teammate to start a conversation</p></div><button type="button" onclick="toggleCommPanel()" aria-label="Close chat">✕</button></div><div id="tcBody" class="tc-body"><aside class="tc-side"><div class="tc-me"><div id="tcMeAv" class="tc-av"></div><div style="min-width:0"><div id="tcMeName" class="tc-me-name"></div><button id="tcStatusBtn" type="button" aria-haspopup="true"><span id="tcMeDot" class="tc-dot"></span><span id="tcMeLabel"></span><span style="font-size:10px">▾</span></button></div><div id="tcMenu" class="tc-menu tc-hide" role="menu"></div></div><div class="tc-search"><input id="tcSearch" type="search" placeholder="Search teammates…" autocomplete="off"></div><div id="tcList" class="tc-list"></div></aside><section id="tcMain" class="tc-main"><div id="tcEmpty" class="tc-empty">💬<br>Select a teammate on the left to open a conversation.</div><div id="tcConv" class="tc-conv tc-hide"><div class="tc-chead"><button id="tcBack" type="button" class="tc-back" aria-label="Back to contacts">←</button><div id="tcPeerAv" class="tc-av sm"></div><div style="min-width:0"><div id="tcPeerName" class="tc-peer"></div><div class="tc-peers"><span id="tcPeerDot" class="tc-dot"></span><span id="tcPeerStatus"></span></div></div></div><div id="tcMsgs" class="tc-msgs"></div><div id="tcErr" class="tc-err tc-hide" role="alert"></div><div id="tcReplyBar" class="tc-replybar tc-hide"><div class="tc-rq"><b id="tcReplyWho"></b><span id="tcReplyTxt"></span></div><button id="tcReplyX" type="button" aria-label="Cancel reply">✕</button></div><div class="tc-comp"><input id="tcFile" type="file" class="tc-hide"> <button id="tcAttach" type="button" class="tc-iconbtn" title="Attach a file (max 400 KB)" aria-label="Attach a file">📎</button> <textarea id="tcInput" rows="1" placeholder="Type a message" aria-label="Message"></textarea> <button id="tcSend" type="button" class="tc-send">Send</button></div></div><div id="tcMsgMenu" class="tc-mmenu tc-hide" role="menu"></div></section></div></div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="script.js"></script>
