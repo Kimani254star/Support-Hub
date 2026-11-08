@@ -15,8 +15,9 @@
   var CATEGORIES = ['Website', 'Web app', 'Dashboard', 'E-commerce', 'Landing page', 'Portfolio', 'API / Backend', 'Other'];
   var STAGES = { development: 'In development', live: 'Live', maintenance: 'Maintenance', archived: 'Archived' };
 
+  var CH_COLS = 'id,project_id,kind,path,added,removed,files,bytes,created_by,created_at';
   var sb = null;
-  var S = { folders: [], projects: [], history: [], files: {}, cache: {}, loaded: false, err: null, view: 'overview', folder: null, pid: null, tab: 'files', sel: null, dirty: false, open: {}, shown: {}, curDir: '', q: '', qmode: 'name', hits: null, device: 'desktop', prevPath: null, search: '', auto: Number(localStorage.getItem('acacia_studio_auto') || 0) };
+  var S = { folders: [], projects: [], history: [], files: {}, cache: {}, loaded: false, err: null, changes: [], view: 'overview', folder: null, pid: null, tab: 'files', sel: null, dirty: false, open: {}, shown: {}, curDir: '', q: '', qmode: 'name', hits: null, device: 'desktop', prevPath: null, search: '', auto: Number(localStorage.getItem('acacia_studio_auto') || 0) };
 
   /* ---------------- utils ---------------- */
   function $(id) { return document.getElementById(id); }
@@ -60,7 +61,7 @@
   function modal(title, body, okLabel, onOk, wide) {
     closeModal();
     var d = document.createElement('div'); d.className = 'st-ov'; d.id = 'stModal';
-    d.innerHTML = '<div class="st-md' + (wide ? ' wide' : '') + '"><h3>' + esc(title) + '</h3><div class="st-mb">' + body + '</div><div class="st-mf"><button class="st-b" data-x>' + (onOk ? 'Cancel' : 'Close') + '</button>' + (onOk ? '<button class="st-b pri" data-ok>' + esc(okLabel || 'Save') + '</button>' : '') + '</div></div>';
+    d.innerHTML = '<div class="st-md' + (wide ? (wide === 'xl' ? ' xl' : ' wide') : '') + '"><h3>' + esc(title) + '</h3><div class="st-mb">' + body + '</div><div class="st-mf"><button class="st-b" data-x>' + (onOk ? 'Cancel' : 'Close') + '</button>' + (onOk ? '<button class="st-b pri" data-ok>' + esc(okLabel || 'Save') + '</button>' : '') + '</div></div>';
     document.body.appendChild(d);
     d.querySelector('[data-x]').onclick = closeModal;
     var ok = d.querySelector('[data-ok]');
@@ -94,6 +95,7 @@
       var h2 = await sb.from('acacia_studio_history').select('project_id,kind,created_at').gte('created_at', new Date(Date.now() - 30 * 864e5).toISOString()).order('created_at', { ascending: false }).limit(1000); S.act = h2.data || [];
       var c2 = await sb.from('acacia_studio_checks').select('project_id,ok,ms,checked_at').gte('checked_at', new Date(Date.now() - 14 * 864e5).toISOString()).limit(3000); S.chk = c2.data || [];
     } catch (e) { S.act = S.act || []; S.chk = S.chk || []; }
+    try { var c3 = await sb.from('acacia_studio_changes').select(CH_COLS).order('created_at', { ascending: false }).limit(60); S.changes = c3.data || []; } catch (e) { S.changes = S.changes || []; }
     S.folders = f.data || []; S.projects = p.data || []; S.history = h.data || []; S.loaded = true; S.err = null; S.loadedAt = Date.now();
   }
   async function loadFiles(pid, force) {
@@ -151,6 +153,73 @@
   }
   function needW() { if (canW()) return false; toast('Read-only: only hub admins can change the Studio.', true); return true; }
 
+
+  /* ---------------- code change tracking ---------------- */
+  function makeDiff(o, n) {
+    var a = o === '' ? [] : o.split('\n'), b = n === '' ? [] : n.split('\n'), ops = [], i, j, s0 = 0;
+    while (s0 < a.length && s0 < b.length && a[s0] === b[s0]) s0++;
+    var ea = a.length, eb = b.length; while (ea > s0 && eb > s0 && a[ea - 1] === b[eb - 1]) { ea--; eb--; }
+    for (i = 0; i < s0; i++) ops.push([' ', a[i]]);
+    var A = a.slice(s0, ea), B = b.slice(s0, eb);
+    if (A.length * B.length > 4e6) { A.forEach(function (x) { ops.push(['-', x]); }); B.forEach(function (x) { ops.push(['+', x]); }); }
+    else {
+      var n1 = A.length, m1 = B.length, w = m1 + 1, L = new Int32Array((n1 + 1) * w);
+      for (i = n1 - 1; i >= 0; i--) for (j = m1 - 1; j >= 0; j--) L[i * w + j] = A[i] === B[j] ? L[(i + 1) * w + j + 1] + 1 : Math.max(L[(i + 1) * w + j], L[i * w + j + 1]);
+      i = 0; j = 0;
+      while (i < n1 && j < m1) { if (A[i] === B[j]) { ops.push([' ', A[i]]); i++; j++; } else if (L[(i + 1) * w + j] >= L[i * w + j + 1]) ops.push(['-', A[i++]]); else ops.push(['+', B[j++]]); }
+      while (i < n1) ops.push(['-', A[i++]]); while (j < m1) ops.push(['+', B[j++]]);
+    }
+    for (i = ea; i < a.length; i++) ops.push([' ', a[i]]);
+    var added = 0, removed = 0, keep = new Array(ops.length).fill(false), k, d;
+    ops.forEach(function (x, idx) { if (x[0] === '+') added++; else if (x[0] === '-') removed++; if (x[0] !== ' ') for (d = -3; d <= 3; d++) if (idx + d >= 0 && idx + d < ops.length) keep[idx + d] = true; });
+    var out = [], ol = 1, nl = 1; k = 0;
+    while (k < ops.length) {
+      if (!keep[k]) { if (ops[k][0] !== '+') ol++; if (ops[k][0] !== '-') nl++; k++; continue; }
+      var os = ol, ns = nl, oc = 0, nc = 0, lines = [];
+      while (k < ops.length && keep[k]) { var t = ops[k][0]; lines.push(t + String(ops[k][1]).slice(0, 400)); if (t !== '+') { oc++; ol++; } if (t !== '-') { nc++; nl++; } k++; }
+      out.push('@@ -' + os + ',' + oc + ' +' + ns + ',' + nc + ' @@'); out = out.concat(lines);
+    }
+    if (out.length > 1500) { out = out.slice(0, 1500); out.push('… diff truncated (too long to store in full)'); }
+    return { text: out.join('\n'), added: added, removed: removed };
+  }
+  async function logChange(pid, rec) {
+    if (!canW()) return;
+    try {
+      var r = await sb.from('acacia_studio_changes').insert(Object.assign({ project_id: pid, created_by: who() }, rec)).select(CH_COLS).single();
+      if (r.data) S.changes.unshift(r.data);
+    } catch (e) { console.warn('[studio] change not logged (run the latest acacia_studio.sql)', e); }
+  }
+  var KIND_ICON = { edit: '✏️', add: '＋', delete: '🗑', rename: '↔', upload: '⇪' };
+  function changeList(list, attr, withProject) {
+    if (!list.length) return '<p class="st-mut">No code changes recorded yet. Edit a file in the Studio and every change shows up here with the exact lines.</p>';
+    return '<ul class="st-hl st-clk">' + list.map(function (c) {
+      var pp = proj(c.project_id);
+      return '<li ' + attr + '="change" data-id="' + c.id + '"><span class="st-k ' + (c.kind === 'delete' ? 'delete' : c.kind === 'add' || c.kind === 'upload' ? 'created' : 'edit') + '">' + esc(c.kind) + '</span><div style="flex:1;min-width:0"><b>' + (withProject && pp ? esc(pp.name) + ' · ' : '') + esc(c.path || '') + '</b><div class="st-mut">' + (c.kind === 'upload' ? c.files + ' file' + (c.files === 1 ? '' : 's') + ' · ' + fmtSize(c.bytes) : '<span class="st-add">+' + c.added + '</span> <span class="st-del">−' + c.removed + '</span>') + ' · ' + ago(c.created_at) + (c.created_by ? ' · ' + esc(c.created_by) : '') + '</div></div><span class="st-mut">View ›</span></li>';
+    }).join('') + '</ul>';
+  }
+  function diffHtml(t) {
+    if (!t) return '<span class="st-mut">(empty file)</span>';
+    return t.split('\n').map(function (l) { var c = l.charAt(0), cls = l.indexOf('@@') === 0 ? 'h' : c === '+' ? 'a' : c === '-' ? 'd' : 'c'; return '<span class="' + cls + '">' + esc(l || ' ') + '</span>'; }).join('');
+  }
+  async function showChange(id) {
+    var r = await sb.from('acacia_studio_changes').select('*').eq('id', Number(id)).maybeSingle();
+    if (r.error || !r.data) return toast('Could not load this change.', true);
+    var c = r.data, p = proj(c.project_id), body, head = '<p class="st-mut">' + esc(p ? p.name : 'Project') + ' · ' + when(c.created_at) + (c.created_by ? ' · ' + esc(c.created_by) : '') + '</p>';
+    if (c.kind === 'upload') {
+      var m = []; try { m = JSON.parse(c.diff || '[]'); } catch (e) { }
+      body = head + '<p><b>' + esc(c.path || 'Upload') + '</b> · ' + c.files + ' file(s) · ' + fmtSize(c.bytes) + '</p><div class="st-scroll" style="max-height:50vh"><table class="st-t"><thead><tr><th>File</th><th>Size</th><th></th></tr></thead><tbody>' + (m.length ? m.map(function (x) { return '<tr><td>' + esc(x.p) + '</td><td>' + fmtSize(x.s) + '</td><td>' + (x.r ? '<span class="st-bd amber">replaced</span>' : '<span class="st-bd green">new</span>') + '</td></tr>'; }).join('') : '<tr><td colspan="3" class="st-mut">No file list stored.</td></tr>') + '</tbody></table></div>' + (c.files > m.length ? '<p class="st-mut">Showing the first ' + m.length + ' files.</p>' : '');
+    } else if (c.kind === 'rename') body = head + '<p><b>' + esc(c.path) + '</b></p>';
+    else body = head + '<p><b>' + esc(c.path || '') + '</b> <span class="st-add">+' + c.added + '</span> <span class="st-del">−' + c.removed + '</span></p><pre class="st-diff">' + diffHtml(c.diff) + '</pre>';
+    var d = modal((KIND_ICON[c.kind] || '') + ' ' + (c.kind === 'upload' ? 'Uploaded website' : 'Code change'), body, null, null, 'xl');
+    var mf = d.querySelector('.st-mf'), hasFile = c.kind !== 'upload' && c.kind !== 'rename' && c.kind !== 'delete' && p && findRow(p.id, c.path || '');
+    mf.insertAdjacentHTML('afterbegin', (p ? '<button class="st-b" data-g="preview">Preview</button><button class="st-b" data-g="project">Open project</button>' : '') + (hasFile ? '<button class="st-b pri" data-g="file">Open file</button>' : ''));
+    mf.addEventListener('click', function (e) {
+      var g = e.target.closest('[data-g]'); if (!g || !p) return; closeModal(); window.openPage('studio'); S.view = 'projects';
+      if (g.dataset.g === 'file') openProject(p.id, 'files').then(function () { return selectFile(c.path); });
+      else openProject(p.id, g.dataset.g === 'preview' ? 'preview' : 'files');
+    });
+  }
+
   /* ---------------- folder helpers ---------------- */
   function kids(parent) { return S.folders.filter(function (f) { return (f.parent_id || null) === (parent || null); }); }
   function fpath(id) { var out = [], f; while (id && (f = S.folders.find(function (x) { return x.id === id; }))) { out.unshift(f); id = f.parent_id; } return out; }
@@ -195,10 +264,15 @@
     var top = paths.filter(function (p) { return /\.html?$/i.test(p) && p.indexOf('/') < 0; })[0];
     return top || paths.filter(function (p) { return /\.html?$/i.test(p); })[0] || 'index.html';
   }
-  async function importInto(pid, entries, title) {
-    var pg = progress(title), res;
+  async function importInto(pid, entries, title, label) {
+    var pg = progress(title), res, before = {}; (S.files[pid] || []).forEach(function (r) { before[r.path] = 1; });
     try { res = await putMany(pid, entries, function (d, t) { pg.set('Uploading ' + d + ' of ' + t + ' files…', d / t * 100); }); }
     finally { pg.done(); }
+    if (res.ok) {
+      var want = {}; entries.forEach(function (e) { want[e.path] = 1; });
+      var man = (S.files[pid] || []).filter(function (r) { return want[r.path]; }).map(function (r) { return { p: r.path, s: r.size, r: before[r.path] ? 1 : 0 }; });
+      await logChange(pid, { kind: 'upload', path: label || 'Upload', files: res.ok, bytes: man.reduce(function (a, x) { return a + (x.s || 0); }, 0), diff: JSON.stringify(man.slice(0, 500)) });
+    }
     return res;
   }
   async function createProject(f) {
@@ -409,7 +483,7 @@
   }
   function renderWorkspace() {
     var p = proj(); if (!p) { S.pid = null; return render(); }
-    var tabs = [['files', 'Files'], ['preview', 'Preview'], ['monitor', 'Monitor & history'], ['details', 'Details']];
+    var tabs = [['files', 'Files'], ['preview', 'Preview'], ['changes', 'Code changes'], ['monitor', 'Monitor & history'], ['details', 'Details']];
     var h = '<div class="st-hd"><div class="st-tt"><button class="st-b" data-a="back">← Projects</button><h1>' + esc(p.name) + '</h1>' + statusPill(p) + '</div><div class="st-ha">' + (p.url ? '<button class="st-b" data-a="visit">Visit site ↗</button>' : '') + '</div></div>' +
       (!canW() ? '<div class="st-warn">Read-only mode: only hub admins can change projects.</div>' : '') +
       '<div class="st-tabs">' + tabs.map(function (t) { return '<button class="' + (S.tab === t[0] ? 'on' : '') + '" data-a="wtab" data-t="' + t[0] + '">' + t[1] + '</button>'; }).join('') + '</div>';
@@ -427,6 +501,9 @@
         '<div id="stPrevErr" class="st-err hidden"></div><div class="st-fw ' + S.device + '"><iframe id="stFrame" sandbox="allow-scripts allow-forms allow-popups allow-modals" title="Website preview"></iframe></div>' +
         '<p class="st-mut" style="margin-top:8px">' + (useUrl(p, htmls) ? 'Showing your live site. If it stays blank, the site does not allow being shown inside another page - use “Visit site” instead.' : 'The preview runs in an isolated sandbox: it cannot see your dashboard, your login or any other project.') + '</p>';
       loadPreview(useUrl(p, htmls) ? null : (htmls.length ? cur : null));
+    } else if (S.tab === 'changes') {
+      root.innerHTML = h + '<div class="st-card"><h3>Code changes</h3><div id="stChg"><p class="st-mut">Loading…</p></div></div>';
+      sb.from('acacia_studio_changes').select(CH_COLS).eq('project_id', p.id).order('created_at', { ascending: false }).limit(100).then(function (r) { var el = $('stChg'); if (el) el.innerHTML = r.error ? '<p class="st-err">Run the latest acacia_studio.sql to switch this on.</p>' : changeList(r.data || [], 'data-a', false); });
     } else if (S.tab === 'monitor') {
       root.innerHTML = h + '<div id="stMon"><p class="st-mut">Loading…</p></div>'; renderMonitorTab();
     } else {
@@ -490,9 +567,12 @@
   }
   async function saveFile() {
     if (needW()) return; var p = proj(), ta = $('stEd'), row = S.sel && findRow(p.id, S.sel); if (!ta || !row) return;
+    var oldText = ''; try { oldText = await getText(row); } catch (e) { }
+    if (oldText === ta.value) { markDirty(false); return toast('No changes to save.'); }
     var r = await putMany(p.id, [{ path: row.path, blob: new Blob([ta.value], { type: row.mime || 'text/plain' }) }]);
     if (r.errs.length) return toast('Save failed: ' + r.errs[0], true);
-    markDirty(false); await touch(p.id); await hist(p.id, 'edit', row.path); toast('Saved ' + base(row.path));
+    var df = makeDiff(oldText, ta.value);
+    markDirty(false); await touch(p.id); await hist(p.id, 'edit', row.path); await logChange(p.id, { kind: 'edit', path: row.path, added: df.added, removed: df.removed, diff: df.text }); toast('Saved ' + base(row.path));
   }
   async function searchCode(q) {
     var p = proj(), rows = (S.files[p.id] || []).filter(function (r) { return r.is_text && r.size < 1.5 * 1048576; }).slice(0, 2000), list = [], low = q.toLowerCase(), i = 0, done = 0;
@@ -508,7 +588,7 @@
     if (!path) return; path = norm(path.replace(/\\/g, '/')); if (!path) return;
     if (findRow(p.id, path)) return toast('A file with that path already exists.', true);
     var r = await putMany(p.id, [{ path: path, blob: new Blob([''], { type: mimeOf(path) }) }]); if (r.errs.length) return toast(r.errs[0], true);
-    await touch(p.id); await hist(p.id, 'edit', 'Created ' + path); S.sel = path; renderTree(); renderEditor();
+    await touch(p.id); await hist(p.id, 'edit', 'Created ' + path); await logChange(p.id, { kind: 'add', path: path, diff: '' }); S.sel = path; renderTree(); renderEditor();
   }
   async function renamePath(path, isDir) {
     if (needW()) return; var p = proj(), np = prompt((isDir ? 'New folder path' : 'New file path') + ' (change the name or move it by editing the path):', path); if (!np) return;
@@ -521,18 +601,19 @@
     try { await Promise.all([w(), w(), w(), w()]); } catch (e) { return toast(e.message || String(e), true); }
     rows.sort(function (a, b) { return a.path < b.path ? -1 : 1; });
     if (S.sel && (S.sel === path || S.sel.indexOf(path + '/') === 0)) S.sel = isDir ? np + S.sel.slice(path.length) : np;
-    await touch(p.id); await hist(p.id, 'rename', path + ' → ' + np); renderTree(); renderEditor();
+    await touch(p.id); await hist(p.id, 'rename', path + ' → ' + np); await logChange(p.id, { kind: 'rename', path: path + ' → ' + np, files: targets.length }); renderTree(); renderEditor();
   }
   async function deletePath(path, isDir) {
     if (needW()) return; var p = proj(), rows = S.files[p.id], targets = isDir ? rows.filter(function (r) { return r.path.indexOf(path + '/') === 0; }) : rows.filter(function (r) { return r.path === path; });
     if (!targets.length) return;
     if (!confirm(isDir ? 'Delete the folder "' + path + '" and its ' + targets.length + ' file(s)? This cannot be undone.' : 'Delete "' + path + '"? This cannot be undone.')) return;
+    var delDiff = null; if (!isDir && targets[0].is_text && targets[0].size < 400000) { try { delDiff = makeDiff(await getText(targets[0]), ''); } catch (e) { } }
     try {
       for (var k = 0; k < targets.length; k += 100) { var ch = targets.slice(k, k + 100), rm = await sb.storage.from(BUCKET).remove(ch.map(function (r) { return p.id + '/' + r.id; })); if (rm.error) throw rm.error; var d = await sb.from('acacia_studio_files').delete().in('id', ch.map(function (r) { return r.id; })); if (d.error) throw d.error; }
     } catch (e) { return toast(e.message || String(e), true); }
     S.files[p.id] = rows.filter(function (r) { return targets.indexOf(r) < 0; }); targets.forEach(function (r) { delete S.cache[r.id]; });
     if (S.sel && targets.some(function (r) { return r.path === S.sel; })) { S.sel = null; markDirty(false); }
-    await touch(p.id); await hist(p.id, 'delete', path + (isDir ? '/ (' + targets.length + ' files)' : '')); renderTree(); renderEditor();
+    await touch(p.id); await hist(p.id, 'delete', path + (isDir ? '/ (' + targets.length + ' files)' : '')); await logChange(p.id, { kind: 'delete', path: path + (isDir ? '/ (' + targets.length + ' files)' : ''), files: targets.length, removed: delDiff ? delDiff.removed : 0, diff: delDiff ? delDiff.text : '' }); renderTree(); renderEditor();
   }
   async function downloadFile() { var p = proj(), row = S.sel && findRow(p.id, S.sel); if (!row) return; try { download(await getBlob(row), base(row.path)); } catch (e) { toast(e.message, true); } }
   async function downloadProject() {
@@ -553,7 +634,7 @@
       } else items.push({ path: prefix + f.name, blob: f });
     }
     if (!items.length) return;
-    var r = await importInto(p.id, items, 'Uploading to ' + p.name);
+    var r = await importInto(p.id, items, 'Uploading to ' + p.name, Array.from(files).map(function (f) { return f.name; }).slice(0, 3).join(', '));
     await touch(p.id); await hist(p.id, 'upload', r.ok + ' file(s) uploaded' + (r.errs.length ? ', ' + r.errs.length + ' failed' : ''));
     if (r.errs.length) toast(r.errs[0], true); else toast(r.ok + ' file(s) uploaded');
     renderTree(); renderEditor();
@@ -653,6 +734,7 @@
       case 'newtab': return openNewTab();
       case 'logdeploy': return logDeploy();
       case 'savedet': return saveDetails();
+      case 'change': return showChange(d.id);
     }
   }
   async function newFolder() {
@@ -739,7 +821,7 @@
     modal('Import as a new project', '<p class="st-mut">' + entries.length + ' files found' + (tot ? ' · ' + fmtSize(tot) : '') + '. This creates a brand-new project; no existing project is changed.</p>' + projForm({ name: def, folder_id: S.folder }), 'Upload', async function (d) {
       var f = readForm(d); if (!f.name) { toast('Give the project a name.', true); return false; }
       closeModal(); var p = await createProject(f);
-      var r = await importInto(p.id, entries, 'Uploading ' + p.name);
+      var r = await importInto(p.id, entries, 'Uploading ' + p.name, (kind === 'zip' ? 'ZIP: ' : 'Folder: ') + def);
       var paths = (S.files[p.id] || []).map(function (x) { return x.path; });
       await touch(p.id, { entry_path: pickEntry(paths) }); await hist(p.id, 'upload', r.ok + ' file(s) imported from ' + (kind === 'zip' ? 'ZIP' : 'folder') + (r.errs.length ? ', ' + r.errs.length + ' failed' : ''));
       if (r.errs.length) toast(r.errs.length + ' file(s) failed: ' + r.errs[0], true);
@@ -757,7 +839,7 @@
         for (var i = 0; i < picks.length; i++) {
           var s = picks[i]; pg.set('Importing ' + s.name + '…', i / picks.length * 100);
           var p = await createProject({ name: s.name, description: 'Imported from Website Manager', category: 'Web app', stage: 'live', url: s.url || (s.file && s.file !== '#' && /^https?:/i.test(s.file) ? s.file : null), folder_id: S.folder });
-          if (s.hasSource) { var r = await sb.from('acacia_hub_sites').select('source').eq('id', s.id).maybeSingle(); var src = (r.data && r.data.source) || (window.getSiteSource && window.getSiteSource(s.id)); if (src) { await putMany(p.id, [{ path: 'index.html', blob: new Blob([src], { type: 'text/html' }) }]); await touch(p.id); } }
+          if (s.hasSource) { var r = await sb.from('acacia_hub_sites').select('source').eq('id', s.id).maybeSingle(); var src = (r.data && r.data.source) || (window.getSiteSource && window.getSiteSource(s.id)); if (src) { await putMany(p.id, [{ path: 'index.html', blob: new Blob([src], { type: 'text/html' }) }]); await touch(p.id); await logChange(p.id, { kind: 'upload', path: 'Imported from Website Manager', files: 1, bytes: src.length, diff: JSON.stringify([{ p: 'index.html', s: src.length, r: 0 }]) }); } }
           if (p.url) checkProject(p); n++;
         }
       } catch (e) { toast(e.message || String(e), true); } finally { pg.done(); }
@@ -827,6 +909,9 @@
       return '<li><span class="st-dot ' + x.lvl + '"></span><div style="flex:1"><b>' + esc(x.p.name) + '</b><div class="st-mut">' + esc(x.msg) + '</div></div>' + (x.act === 'check' ? '<button class="st-b sm" data-h="check" data-id="' + x.p.id + '">Check</button>' : '') + '<button class="st-b sm" data-h="open" data-id="' + x.p.id + '" data-tab="' + (x.act === 'check' ? 'monitor' : 'files') + '">Open</button></li>';
     }).join('') + '</ul>' + (al.length > 7 ? '<p class="st-mut">+ ' + (al.length - 7) + ' more</p>' : '') : '<p class="st-mut">✅ Nothing needs attention right now.</p>') + '</div>' +
       '<div class="st-card"><h3>Recent deployments</h3>' + (dep.length ? '<ul class="st-hl">' + dep.map(function (x) { var pp = proj(x.project_id); return '<li><span class="st-k deploy">deploy</span><div><b>' + (pp ? esc(pp.name) : 'Project') + (x.version ? ' · v' + esc(x.version) : '') + '</b><div class="st-mut">' + esc(x.note || 'Deployment') + ' · ' + ago(x.created_at) + '</div></div></li>'; }).join('') + '</ul>' : '<p class="st-mut">No deployments logged yet. Use “Log deployment” in a project’s Monitor &amp; history tab after each release.</p>') + '</div></div>';
+    var chs = S.changes.filter(function (c) { return c.kind !== 'upload'; }).slice(0, 8), ups = S.changes.filter(function (c) { return c.kind === 'upload'; }).slice(0, 6);
+    var upHtml = ups.length ? changeList(ups, 'data-h', true) : (function () { var wf = S.projects.filter(function (p) { return sizeInfo(p).c; }).slice(0, 6); return wf.length ? '<ul class="st-hl">' + wf.map(function (p) { var z = sizeInfo(p); return '<li><span class="st-k created">site</span><div style="flex:1"><b>' + esc(p.name) + '</b><div class="st-mut">' + z.c + ' files · ' + fmtSize(z.n) + ' · updated ' + ago(p.updated_at) + '</div></div><button class="st-b sm" data-h="open" data-id="' + p.id + '" data-tab="files">Files</button></li>'; }).join('') + '</ul>' : '<p class="st-mut">No websites uploaded yet. Use Upload ZIP or Upload folder.</p>'; })();
+    h += '<div class="st-cols"><div class="st-card"><h3>Code changes</h3>' + changeList(chs, 'data-h', true) + '</div><div class="st-card"><h3>Uploaded websites</h3>' + upHtml + '</div></div>';
     h += '<div class="st-card"><div class="st-ch"><h3>Projects</h3><input class="st-q" id="stHq" placeholder="Search projects…" value="' + esc(S.hq || '') + '"></div><div class="st-chips">' + [['all', 'All'], ['online', 'Online'], ['offline', 'Offline'], ['development', 'Development'], ['other', 'Live / other'], ['archived', 'Archived']].map(function (c) { return '<button class="st-chip" data-h="chip" data-f="' + c[0] + '">' + c[1] + '</button>'; }).join('') + '</div><div id="stHomeList"></div></div>';
     h += '<div class="st-card"><h3>Recent activity</h3>' + historyList(S.history.slice(0, 8), true) + '</div>';
     el.innerHTML = h; renderHomeList(); drawHomeCharts();
@@ -881,6 +966,7 @@
   function homeClick(e) {
     var t = e.target.closest('[data-h]'); if (!t) return; var a = t.dataset.h, pr = t.dataset.id && proj(t.dataset.id);
     if (a === 'retry' || a === 'refresh') { S.err = null; if (a === 'retry') S.loaded = false; return homeRefresh(true); }
+    if (a === 'change') return showChange(t.dataset.id);
     if (a === 'chip') { S.hf = t.dataset.f; S.hall = false; return renderHomeList(); }
     if (a === 'showall') { S.hall = true; return renderHomeList(); }
     if (a === 'visit') { if (pr && pr.url) window.open(pr.url, '_blank', 'noopener'); return; }
@@ -906,6 +992,7 @@
     if (h1) h1.textContent = dev ? 'Developer Dashboard' : 'Books Platform Overview';
     if (p) p.textContent = dev ? 'Everything you build and run, in one place: your websites and applications, their status and size.' : 'Users, companies, revenue, support and usage across Acacia Books.';
     Array.from(document.querySelectorAll('#stSwitch button')).forEach(function (b) { b.classList.toggle('on', b.dataset.m === m); });
+    try { window.dispatchEvent(new CustomEvent('acx-dash-mode', { detail: m })); } catch (e) { }
     if (dev) setTimeout(function () { try { renderHome(); } catch (e) { } }, 0);
     if (!dev && save && typeof window.loadDashboard === 'function') setTimeout(window.loadDashboard, 0);
   }
@@ -913,7 +1000,7 @@
   /* ---------------- boot ---------------- */
   function css() {
     var s = document.createElement('style'); s.id = 'stCss';
-    s.textContent = '#studio{padding:4px}#studio *,.st-scope *{box-sizing:border-box}.st-hd{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px}.st-tt{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.st-tt h1{font-size:22px;font-weight:700;margin:0}.st-ha{display:flex;gap:8px;align-items:center;margin-left:auto}.st-mut{color:#6b7280;font-size:12px}.st-b{border:1px solid #d1d5db;background:#fff;color:#111827;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer}.st-b:hover{background:#f3f4f6}.st-b.pri{background:#22615D;border-color:#22615D;color:#fff}.st-b.pri:hover{background:#1A4B48}.st-b.sm{padding:4px 9px;font-size:12px}.st-b.dng{color:#b91c1c;border-color:#fecaca}.st-b:disabled{opacity:.5;cursor:default}.st-tabs{display:flex;gap:4px;border-bottom:1px solid #e5e7eb;margin-bottom:14px;overflow-x:auto}.st-tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:9px 14px;font-size:14px;font-weight:600;color:#6b7280;cursor:pointer;white-space:nowrap}.st-tabs button.on{color:#22615D;border-bottom-color:#22615D}.st-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}.st-stat{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px}.st-stat span{display:block;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}.st-stat b{font-size:30px;color:#0E2B29}.st-stat b.g{color:#15803d}.st-stat b.a{color:#b45309}.st-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:14px}.st-card h3{margin:0 0 8px;font-size:16px;font-weight:700}.st-card h4{margin:14px 0 6px;font-size:13px;font-weight:700}.st-ch{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.st-ch h3{margin:0}.st-scroll{overflow-x:auto}.st-t{width:100%;border-collapse:collapse;font-size:14px}.st-t th{text-align:left;font-size:12px;color:#6b7280;padding:8px;border-bottom:1px solid #e5e7eb;background:transparent!important;color:#6b7280!important}.st-t td{padding:10px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top}.st-act{white-space:nowrap}.st-act .st-b{margin-right:4px}.st-bd{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600}.st-bd.green{background:#dcfce7;color:#166534}.st-bd.amber{background:#fef3c7;color:#92400e}.st-bd.red{background:#fee2e2;color:#991b1b}.st-bd.blue{background:#dbeafe;color:#1e40af}.st-bd.gray{background:#e5e7eb;color:#374151}.st-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.st-q,#studio input,#studio select,#studio textarea{border:1px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;color:#111827}.st-q{min-width:200px}.st-crumb{font-size:13px;margin-bottom:10px;color:#6b7280}.st-crumb a,.st-lnk{color:#22615D;cursor:pointer;text-decoration:none}.st-crumb a:hover,.st-lnk:hover{text-decoration:underline}.st-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px}.st-fold{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:6px}.st-fold a{cursor:pointer;flex:1}.st-fa button{background:none;border:0;cursor:pointer;opacity:.5;font-size:13px}.st-fa button:hover{opacity:1}.st-warn{background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}.st-note{background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}.st-err{color:#b91c1c;font-size:13px}div.st-err{background:#fef2f2;border-radius:8px;padding:8px 12px;margin:8px 0}.hidden{display:none!important}.st-hl{list-style:none;margin:0;padding:0}.st-hl li{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px}.st-k{flex:0 0 64px;text-align:center;border-radius:6px;font-size:11px;font-weight:700;padding:2px 0;height:20px;background:#e5e7eb;color:#374151;text-transform:uppercase}.st-k.created,.st-k.deploy{background:#dcfce7;color:#166534}.st-k.upload,.st-k.move,.st-k.rename{background:#dbeafe;color:#1e40af}.st-k.edit{background:#fef3c7;color:#92400e}.st-k.delete{background:#fee2e2;color:#991b1b}.st-k.status{background:#ede9fe;color:#5b21b6}.st-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}.st-ex{display:grid;grid-template-columns:300px 1fr;gap:12px;min-height:70vh}@media(max-width:820px){.st-ex{grid-template-columns:1fr}}.st-side,.st-edit{background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;max-height:78vh}.st-sbar{display:flex;gap:6px;padding:8px;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}.st-sbar .st-q{min-width:0;flex:1}.st-tgt{padding:4px 10px}.st-tree{overflow:auto;flex:1;padding-bottom:10px;font-size:13px}.st-ti{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;cursor:pointer;white-space:nowrap;gap:6px}.st-ti span{overflow:hidden;text-overflow:ellipsis}.st-ti:hover{background:#f3f4f6}.st-ti.on{background:#e0f2f1;font-weight:600}.st-ti.cur{background:#f0fdfa}.st-ti em{display:none;font-style:normal}.st-ti:hover em{display:inline}.st-ti em button{background:none;border:0;cursor:pointer;font-size:12px}.st-ti.hit{display:block;white-space:normal}.st-edh{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}.st-dirty{color:#b45309;font-size:12px;font-weight:600}#stEd{flex:1;width:100%;min-height:55vh;border:0!important;border-radius:0!important;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:18px;padding:12px;resize:none;tab-size:2;white-space:pre;overflow:auto}#stEd:focus{outline:0}.st-foot{display:flex;justify-content:space-between;padding:6px 12px;border-top:1px solid #f1f5f9;font-size:12px;color:#6b7280}.st-empty,.st-img{padding:40px 20px;text-align:center;color:#6b7280}.st-img img{max-width:100%;max-height:60vh}.st-fw{margin:0 auto;border:1px solid #d1d5db;border-radius:10px;overflow:hidden;background:#fff}.st-fw iframe{width:100%;height:100%;border:0;display:block;background:#fff}.st-fw.desktop{width:100%;height:72vh}.st-fw.tablet{width:768px;max-width:100%;height:72vh}.st-fw.mobile{width:390px;max-width:100%;height:72vh;border-radius:24px;border-width:6px;border-color:#1f2937}.st-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px}.st-md{background:#fff;color:#111827;border-radius:14px;padding:20px;width:100%;max-width:460px;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)}.st-md.wide{max-width:560px}.st-md h3{margin:0 0 10px;font-size:18px}.st-mb label{display:block;font-size:12px;font-weight:600;margin:10px 0 4px;color:#374151}.st-mb input,.st-mb select,.st-mb textarea{width:100%}.st-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.st-mf{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.st-pt{font-size:13px;margin-bottom:8px}.st-pb{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden}.st-pb i{display:block;height:100%;background:#22615D;transition:width .2s}.st-pick{max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:6px}.st-chk{display:flex!important;gap:8px;align-items:center;margin:0!important;padding:6px;font-weight:400!important}.st-chk input{width:auto!important}.st-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:14px}.st-charts .st-card{margin-bottom:0}.st-cv{position:relative;height:240px}.st-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-radius:12px;padding:12px 16px;margin-bottom:12px;border:1px solid}.st-banner.green{background:#f0fdf4;border-color:#bbf7d0;color:#166534}.st-banner.red{background:#fef2f2;border-color:#fecaca;color:#991b1b}.st-banner.gray{background:#f9fafb;border-color:#e5e7eb;color:#374151}.st-banner .st-mut{color:inherit;opacity:.75}.st-quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.st-stat b.r{color:#dc2626}.st-chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}.st-chip{border:1px solid #d1d5db;background:#fff;border-radius:99px;padding:3px 12px;font-size:12px;font-weight:600;color:#4b5563;cursor:pointer}.st-chip.on{background:#22615D;border-color:#22615D;color:#fff}.st-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 10px;background:#9ca3af}.st-dot.red{background:#dc2626}.st-dot.amber{background:#f59e0b}.st-dot.blue{background:#3b82f6}body.dark-mode .st-banner.green{background:#0f2a1a;border-color:#14532d;color:#86efac}body.dark-mode .st-banner.red{background:#2a1212;border-color:#7f1d1d;color:#fca5a5}body.dark-mode .st-banner.gray{background:#0F201F;border-color:#1c2f2d;color:#cbd5e1}body.dark-mode .st-chip{background:#0A1615;border-color:#1c2f2d;color:#cbd5e1}body.dark-mode .st-chip.on{background:#22615D;color:#fff}.st-seg{display:inline-flex;background:#e5e7eb;border-radius:10px;padding:3px;margin:0 0 18px;gap:2px}.st-seg button{border:0;background:none;padding:7px 18px;border-radius:8px;font-size:13px;font-weight:600;color:#4b5563;cursor:pointer}.st-seg button.on{background:#fff;color:#22615D;box-shadow:0 1px 3px rgba(0,0,0,.15)}body.dark-mode .st-seg{background:#12302d}body.dark-mode .st-seg button{color:#9ca3af}body.dark-mode .st-seg button.on{background:#0F201F;color:#579A97}.st-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#0E2B29;color:#fff;padding:10px 18px;border-radius:10px;z-index:100002;font-size:13px;transition:opacity .4s;max-width:90vw}.st-toast.bad{background:#991b1b}.st-toast.out{opacity:0}body.dark-mode .st-scope .st-stat,body.dark-mode .st-scope .st-card,body.dark-mode .st-scope .st-fold,body.dark-mode .st-scope .st-side,body.dark-mode .st-scope .st-edit{background:#0F201F;border-color:#1c2f2d;color:#e5e7eb}body.dark-mode .st-scope .st-stat b{color:#579A97}body.dark-mode .st-scope .st-b{background:#0A1615;border-color:#1c2f2d;color:#e5e7eb}body.dark-mode .st-scope .st-b.pri{background:#22615D}body.dark-mode .st-scope input,body.dark-mode .st-scope select,body.dark-mode .st-scope textarea{background:#0A1615!important;color:#e5e7eb!important;border-color:#1c2f2d!important}body.dark-mode .st-scope .st-t td,body.dark-mode .st-scope .st-t th{border-color:#1c2f2d;background:transparent}body.dark-mode .st-scope .st-ti:hover{background:#12302d}body.dark-mode .st-scope .st-ti.on{background:#1A4B48}body.dark-mode .st-md{background:#0F201F;color:#e5e7eb}body.dark-mode .st-mb label{color:#cbd5e1}body.dark-mode .st-scope .st-tabs{border-color:#1c2f2d}';
+    s.textContent = '#studio{padding:4px}#studio *,.st-scope *{box-sizing:border-box}.st-hd{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px}.st-tt{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.st-tt h1{font-size:22px;font-weight:700;margin:0}.st-ha{display:flex;gap:8px;align-items:center;margin-left:auto}.st-mut{color:#6b7280;font-size:12px}.st-b{border:1px solid #d1d5db;background:#fff;color:#111827;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer}.st-b:hover{background:#f3f4f6}.st-b.pri{background:#22615D;border-color:#22615D;color:#fff}.st-b.pri:hover{background:#1A4B48}.st-b.sm{padding:4px 9px;font-size:12px}.st-b.dng{color:#b91c1c;border-color:#fecaca}.st-b:disabled{opacity:.5;cursor:default}.st-tabs{display:flex;gap:4px;border-bottom:1px solid #e5e7eb;margin-bottom:14px;overflow-x:auto}.st-tabs button{background:none;border:0;border-bottom:3px solid transparent;padding:9px 14px;font-size:14px;font-weight:600;color:#6b7280;cursor:pointer;white-space:nowrap}.st-tabs button.on{color:#22615D;border-bottom-color:#22615D}.st-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}.st-stat{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px}.st-stat span{display:block;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}.st-stat b{font-size:30px;color:#0E2B29}.st-stat b.g{color:#15803d}.st-stat b.a{color:#b45309}.st-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:14px}.st-card h3{margin:0 0 8px;font-size:16px;font-weight:700}.st-card h4{margin:14px 0 6px;font-size:13px;font-weight:700}.st-ch{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.st-ch h3{margin:0}.st-scroll{overflow-x:auto}.st-t{width:100%;border-collapse:collapse;font-size:14px}.st-t th{text-align:left;font-size:12px;color:#6b7280;padding:8px;border-bottom:1px solid #e5e7eb;background:transparent!important;color:#6b7280!important}.st-t td{padding:10px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top}.st-act{white-space:nowrap}.st-act .st-b{margin-right:4px}.st-bd{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:600}.st-bd.green{background:#dcfce7;color:#166534}.st-bd.amber{background:#fef3c7;color:#92400e}.st-bd.red{background:#fee2e2;color:#991b1b}.st-bd.blue{background:#dbeafe;color:#1e40af}.st-bd.gray{background:#e5e7eb;color:#374151}.st-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.st-q,#studio input,#studio select,#studio textarea{border:1px solid #d1d5db;border-radius:8px;padding:7px 10px;font-size:13px;background:#fff;color:#111827}.st-q{min-width:200px}.st-crumb{font-size:13px;margin-bottom:10px;color:#6b7280}.st-crumb a,.st-lnk{color:#22615D;cursor:pointer;text-decoration:none}.st-crumb a:hover,.st-lnk:hover{text-decoration:underline}.st-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:14px}.st-fold{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:6px}.st-fold a{cursor:pointer;flex:1}.st-fa button{background:none;border:0;cursor:pointer;opacity:.5;font-size:13px}.st-fa button:hover{opacity:1}.st-warn{background:#fef3c7;color:#92400e;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}.st-note{background:#eff6ff;color:#1e3a8a;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:13px}.st-err{color:#b91c1c;font-size:13px}div.st-err{background:#fef2f2;border-radius:8px;padding:8px 12px;margin:8px 0}.hidden{display:none!important}.st-hl{list-style:none;margin:0;padding:0}.st-hl li{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px}.st-k{flex:0 0 64px;text-align:center;border-radius:6px;font-size:11px;font-weight:700;padding:2px 0;height:20px;background:#e5e7eb;color:#374151;text-transform:uppercase}.st-k.created,.st-k.deploy{background:#dcfce7;color:#166534}.st-k.upload,.st-k.move,.st-k.rename{background:#dbeafe;color:#1e40af}.st-k.edit{background:#fef3c7;color:#92400e}.st-k.delete{background:#fee2e2;color:#991b1b}.st-k.status{background:#ede9fe;color:#5b21b6}.st-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}.st-ex{display:grid;grid-template-columns:300px 1fr;gap:12px;min-height:70vh}@media(max-width:820px){.st-ex{grid-template-columns:1fr}}.st-side,.st-edit{background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;max-height:78vh}.st-sbar{display:flex;gap:6px;padding:8px;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}.st-sbar .st-q{min-width:0;flex:1}.st-tgt{padding:4px 10px}.st-tree{overflow:auto;flex:1;padding-bottom:10px;font-size:13px}.st-ti{display:flex;justify-content:space-between;align-items:center;padding:4px 8px;cursor:pointer;white-space:nowrap;gap:6px}.st-ti span{overflow:hidden;text-overflow:ellipsis}.st-ti:hover{background:#f3f4f6}.st-ti.on{background:#e0f2f1;font-weight:600}.st-ti.cur{background:#f0fdfa}.st-ti em{display:none;font-style:normal}.st-ti:hover em{display:inline}.st-ti em button{background:none;border:0;cursor:pointer;font-size:12px}.st-ti.hit{display:block;white-space:normal}.st-edh{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f1f5f9;flex-wrap:wrap}.st-dirty{color:#b45309;font-size:12px;font-weight:600}#stEd{flex:1;width:100%;min-height:55vh;border:0!important;border-radius:0!important;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:18px;padding:12px;resize:none;tab-size:2;white-space:pre;overflow:auto}#stEd:focus{outline:0}.st-foot{display:flex;justify-content:space-between;padding:6px 12px;border-top:1px solid #f1f5f9;font-size:12px;color:#6b7280}.st-empty,.st-img{padding:40px 20px;text-align:center;color:#6b7280}.st-img img{max-width:100%;max-height:60vh}.st-fw{margin:0 auto;border:1px solid #d1d5db;border-radius:10px;overflow:hidden;background:#fff}.st-fw iframe{width:100%;height:100%;border:0;display:block;background:#fff}.st-fw.desktop{width:100%;height:72vh}.st-fw.tablet{width:768px;max-width:100%;height:72vh}.st-fw.mobile{width:390px;max-width:100%;height:72vh;border-radius:24px;border-width:6px;border-color:#1f2937}.st-ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px}.st-md{background:#fff;color:#111827;border-radius:14px;padding:20px;width:100%;max-width:460px;max-height:90vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)}.st-md.wide{max-width:560px}.st-md h3{margin:0 0 10px;font-size:18px}.st-mb label{display:block;font-size:12px;font-weight:600;margin:10px 0 4px;color:#374151}.st-mb input,.st-mb select,.st-mb textarea{width:100%}.st-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.st-mf{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.st-pt{font-size:13px;margin-bottom:8px}.st-pb{height:8px;background:#e5e7eb;border-radius:99px;overflow:hidden}.st-pb i{display:block;height:100%;background:#22615D;transition:width .2s}.st-pick{max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;padding:6px}.st-chk{display:flex!important;gap:8px;align-items:center;margin:0!important;padding:6px;font-weight:400!important}.st-chk input{width:auto!important}.st-charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:14px}.st-charts .st-card{margin-bottom:0}.st-cv{position:relative;height:240px}.st-banner{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-radius:12px;padding:12px 16px;margin-bottom:12px;border:1px solid}.st-banner.green{background:#f0fdf4;border-color:#bbf7d0;color:#166534}.st-banner.red{background:#fef2f2;border-color:#fecaca;color:#991b1b}.st-banner.gray{background:#f9fafb;border-color:#e5e7eb;color:#374151}.st-banner .st-mut{color:inherit;opacity:.75}.st-quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.st-stat b.r{color:#dc2626}.st-chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}.st-chip{border:1px solid #d1d5db;background:#fff;border-radius:99px;padding:3px 12px;font-size:12px;font-weight:600;color:#4b5563;cursor:pointer}.st-chip.on{background:#22615D;border-color:#22615D;color:#fff}.st-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 10px;background:#9ca3af}.st-dot.red{background:#dc2626}.st-dot.amber{background:#f59e0b}.st-dot.blue{background:#3b82f6}body.dark-mode .st-banner.green{background:#0f2a1a;border-color:#14532d;color:#86efac}body.dark-mode .st-banner.red{background:#2a1212;border-color:#7f1d1d;color:#fca5a5}body.dark-mode .st-banner.gray{background:#0F201F;border-color:#1c2f2d;color:#cbd5e1}body.dark-mode .st-chip{background:#0A1615;border-color:#1c2f2d;color:#cbd5e1}body.dark-mode .st-chip.on{background:#22615D;color:#fff}.st-md.xl{max-width:920px}.st-diff{background:#0b1220;color:#e5e7eb;border-radius:8px;padding:10px 0;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;max-height:55vh;overflow:auto;white-space:pre;margin:8px 0 0}.st-diff span{display:block;padding:0 12px}.st-diff .a{background:rgba(22,163,74,.28);color:#bbf7d0}.st-diff .d{background:rgba(220,38,38,.28);color:#fecaca}.st-diff .h{color:#93c5fd;background:rgba(59,130,246,.12);margin-top:6px}.st-add{color:#16a34a;font-weight:700}.st-del{color:#dc2626;font-weight:700}.st-clk li{cursor:pointer;align-items:center}.st-clk li:hover{background:rgba(34,97,93,.07)}.st-seg{display:inline-flex;background:#e5e7eb;border-radius:10px;padding:3px;margin:0 0 18px;gap:2px}.st-seg button{border:0;background:none;padding:7px 18px;border-radius:8px;font-size:13px;font-weight:600;color:#4b5563;cursor:pointer}.st-seg button.on{background:#fff;color:#22615D;box-shadow:0 1px 3px rgba(0,0,0,.15)}body.dark-mode .st-seg{background:#12302d}body.dark-mode .st-seg button{color:#9ca3af}body.dark-mode .st-seg button.on{background:#0F201F;color:#579A97}.st-toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#0E2B29;color:#fff;padding:10px 18px;border-radius:10px;z-index:100002;font-size:13px;transition:opacity .4s;max-width:90vw}.st-toast.bad{background:#991b1b}.st-toast.out{opacity:0}body.dark-mode .st-scope .st-stat,body.dark-mode .st-scope .st-card,body.dark-mode .st-scope .st-fold,body.dark-mode .st-scope .st-side,body.dark-mode .st-scope .st-edit{background:#0F201F;border-color:#1c2f2d;color:#e5e7eb}body.dark-mode .st-scope .st-stat b{color:#579A97}body.dark-mode .st-scope .st-b{background:#0A1615;border-color:#1c2f2d;color:#e5e7eb}body.dark-mode .st-scope .st-b.pri{background:#22615D}body.dark-mode .st-scope input,body.dark-mode .st-scope select,body.dark-mode .st-scope textarea{background:#0A1615!important;color:#e5e7eb!important;border-color:#1c2f2d!important}body.dark-mode .st-scope .st-t td,body.dark-mode .st-scope .st-t th{border-color:#1c2f2d;background:transparent}body.dark-mode .st-scope .st-ti:hover{background:#12302d}body.dark-mode .st-scope .st-ti.on{background:#1A4B48}body.dark-mode .st-md{background:#0F201F;color:#e5e7eb}body.dark-mode .st-mb label{color:#cbd5e1}body.dark-mode .st-scope .st-tabs{border-color:#1c2f2d}';
     document.head.appendChild(s);
   }
   function mount() {

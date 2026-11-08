@@ -1609,19 +1609,20 @@ function triggerImport(acceptTypes) {
     const fileInput = document.getElementById('universalFileInput');
     if (fileInput) {
         fileInput.accept = acceptTypes;
+        fileInput.multiple = true;
         fileInput.click();
     }
     document.getElementById('importDropdown')?.classList.add('hidden');
 }
 
-function handleImportSelection(event) {
-    const file = event.target.files[0];
-    if (!file) return;
+// unique ids even when many files are imported in the same millisecond
+var __lastSiteId = 0;
+function nextSiteId() { var n = Date.now(); if (n <= __lastSiteId) n = __lastSiteId + 1; __lastSiteId = n; return n; }
 
+function importOneFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
-
     if (ext === 'zip') {
-        uploadWebsite(event);
+        uploadWebsite(file);
     } else if (['html', 'htm'].includes(ext)) {
         processHtmlImport(file);
     } else if (['xlsx', 'xls', 'csv'].includes(ext)) {
@@ -1629,11 +1630,22 @@ function handleImportSelection(event) {
     }
 }
 
+function handleImportSelection(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';           // lets you pick the same files again later
+    if (!files.length) return;
+    if (files.length === 1) return importOneFile(files[0]);
+    // several files at once: ask where to keep them (one new folder, an existing folder, or none)
+    if (window.hubImportMany) window.hubImportMany(files, importOneFile);
+    else files.forEach(importOneFile);
+}
+
 function uploadWebsite(event) {
     const file = event.target ? event.target.files[0] : event;
     if (!file) return;
     websites.push({
-        id: Date.now(),
+        id: nextSiteId(),
+        folderId: window.__importTarget || undefined,
         name: file.name.replace(/\.[^/.]+$/, ""),
         file: "#",
         version: "1.0",
@@ -1647,12 +1659,14 @@ function uploadWebsite(event) {
 }
 
 function processHtmlImport(file) {
+    const target = window.__importTarget || undefined;
+    const newId = nextSiteId();
     const reader = new FileReader();
     reader.onload = function(e) {
-        const newId = Date.now();
         saveSiteSource(newId, String(e.target.result || ""));
         websites.push({
             id: newId,
+            folderId: target,
             name: file.name.replace(".html", "").replace(".htm", ""),
             file: "#",
             hasSource: true,
@@ -1670,7 +1684,8 @@ function processHtmlImport(file) {
 
 function processExcelImport(file) {
     websites.push({
-        id: Date.now(),
+        id: nextSiteId(),
+        folderId: window.__importTarget || undefined,
         name: file.name.replace(/\.[^/.]+$/, ""),
         file: "#",
         version: "1.0",
@@ -2806,7 +2821,7 @@ function devAutoRefresh(){
 
   
   var hubRole = '';
-  var ROLE_PAGES = { hub_accounts: ['payments', 'companies'], hub_support: ['support'] };
+  var ROLE_PAGES = { hub_accounts: ['payments', 'companies'], hub_support: ['support', 'contacts'] };
   var ROLE_NAME = { hub_admin: 'Admin', hub_viewer: 'Viewer (read-only)', hub_accounts: 'Accounts', hub_support: 'Customer Care' };
   var ROLE_CSS = { hub_admin: 'text-emerald-700 bg-emerald-50', hub_viewer: 'text-blue-700 bg-blue-50', hub_accounts: 'text-purple-700 bg-purple-50', hub_support: 'text-amber-700 bg-amber-50' };
   (function(){
@@ -3829,6 +3844,31 @@ function devAutoRefresh(){
     fillSel(selectIt ? String(id) : null);
     window.saveWebsites(); renderWebsites();
   }
+  async function createFolderId(name){
+    var id = Date.now(), r = await sb.from('acacia_hub_folders').insert({ id: id, name: name });
+    if (r.error){ alert('Could not create folder: ' + r.error.message + '\n\nRun the website sync SQL in Supabase first.'); return null; }
+    folders.push({ id: id, name: name }); fillSel(); return id;
+  }
+  window.hubImportMany = function(files, importOne){
+    if (!canW()) return ro();
+    var names = files.slice(0, 8).map(function(f){ return '<li>' + e(f.name) + '</li>'; }).join('') + (files.length > 8 ? '<li>+ ' + (files.length - 8) + ' more</li>' : '');
+    var opts = folders.map(function(f){ return '<option value="' + f.id + '">\uD83D\uDCC1 ' + e(f.name) + '</option>'; }).join('');
+    var def = 'Import ' + new Date().toLocaleDateString();
+    openModal('Import ' + files.length + ' files',
+      '<p class="text-sm mb-2">Where should these ' + files.length + ' files go?</p>' +
+      '<label class="flex items-center gap-2 text-sm"><input type="radio" name="hubImpMode" value="new" checked> Together in a <b>new folder</b></label>' +
+      '<input id="hubImpName" type="text" value="' + e(def) + '" class="w-full p-2 border rounded text-sm my-1">' +
+      (opts ? '<label class="flex items-center gap-2 text-sm mt-2"><input type="radio" name="hubImpMode" value="existing"> Add to an <b>existing folder</b></label><select id="hubImpFolder" class="w-full p-2 border rounded text-sm my-1">' + opts + '</select>' : '') +
+      '<label class="flex items-center gap-2 text-sm mt-2"><input type="radio" name="hubImpMode" value="none"> No folder (keep them separate)</label>' +
+      '<ul class="text-xs text-gray-500 list-disc pl-5 mt-3">' + names + '</ul>',
+      async function(){
+        var mode = (document.querySelector('input[name="hubImpMode"]:checked') || {}).value || 'none', target = null;
+        if (mode === 'new'){ var nm = (document.getElementById('hubImpName').value || '').trim() || def; target = await createFolderId(nm); if (target == null) return; }
+        else if (mode === 'existing'){ target = Number((document.getElementById('hubImpFolder') || {}).value) || null; }
+        window.__importTarget = target;
+        try { files.forEach(importOne); } finally { window.__importTarget = null; }
+      });
+  };
   window.hubRenameFolder = async function(id){
     if (!canW()) return ro();
     var f = folders.find(function(x){ return x.id === id; }); if (!f) return;
