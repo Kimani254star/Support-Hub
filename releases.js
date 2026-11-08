@@ -35,7 +35,7 @@
   function aud(ids){ return ids && ids.length ? ids.length + ' compan' + (ids.length > 1 ? 'ies' : 'y') : 'All companies'; }
   async function loadCo(){ if (CO.length || !sb()) return; var r = await sb().from('acacia_company_status').select('company_id,company_name,email'); CO = r.data || []; }
   var url = function(u){ u = (u || '').trim(); return /^https?:\/\//i.test(u) ? u : ''; };
-  function fail(r, what){ if (r.error){ alert('Could not ' + what + ': ' + r.error.message + (/relation|policy|permission/i.test(r.error.message) ? '\n\nRun acacia_announcements_webinars.sql in Supabase and sign in as hub admin.' : '')); return true; } return false; }
+  function fail(r, what){ if (r.error){ alert('Could not ' + what + ': ' + r.error.message + (/relation|policy|permission/i.test(r.error.message) ? '\n\nRun acacia_webinar_invites.sql in Supabase and sign in as hub admin.' : '')); return true; } return false; }
   function mailTo(targets, subject, body){
     if (!targets.length) return alert('No companies to email.');
     if (!confirm('Save a draft in Acacia Mail for ' + targets.length + ' compan' + (targets.length > 1 ? 'ies' : 'y') + '?')) return;
@@ -237,7 +237,7 @@
     $('#webBody').innerHTML = W.length ? W.map(function(w){
       var n = (REG[w.id] || []).length, ended = w.status === 'scheduled' && new Date(w.starts_at).getTime() + w.duration_min * 60000 < Date.now();
       var c = w.status === 'cancelled' ? 'bg-rose-100 text-rose-800' : w.status === 'completed' || ended ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-800';
-      return '<tr><td class="p-4 whitespace-nowrap">' + fmt(w.starts_at) + '<div class="text-xs text-gray-500">' + w.duration_min + ' min</div></td><td class="p-4 font-medium">' + esc(w.title) + '<div class="text-xs text-gray-500">' + esc(w.module || '') + '</div></td><td class="p-4">' + aud(w.company_ids) + '</td><td class="p-4"><button class="underline" onclick="acxWeb.regs(\'' + w.id + '\')">' + n + (w.capacity ? ' / ' + w.capacity : '') + '</button></td><td class="p-4">' + pill(ended ? 'ended' : w.status, c) + '</td><td class="p-4 text-right whitespace-nowrap"><button class="' + B + '" onclick="acxWeb.edit(\'' + w.id + '\')">Edit</button> <button class="' + B + '" onclick="acxWeb.mail(\'' + w.id + '\')">✉️ Invite</button> <button class="' + B + ' text-rose-600" onclick="acxWeb.del(\'' + w.id + '\')">Delete</button></td></tr>';
+      return '<tr><td class="p-4 whitespace-nowrap">' + fmt(w.starts_at) + '<div class="text-xs text-gray-500">' + w.duration_min + ' min</div></td><td class="p-4 font-medium">' + esc(w.title) + '<div class="text-xs text-gray-500">' + esc(w.module || '') + '</div></td><td class="p-4">' + aud(w.company_ids) + '</td><td class="p-4"><button class="underline" onclick="acxWeb.regs(\'' + w.id + '\')">' + n + (w.capacity ? ' / ' + w.capacity : '') + '</button></td><td class="p-4">' + pill(ended ? 'ended' : w.status, c) + (w.invited_at ? '<div class="text-xs text-gray-500 mt-1">Invited ' + fmt(w.invited_at) + (w.invite_count > 1 ? ' (' + w.invite_count + 'x)' : '') + '</div>' : '<div class="text-xs text-amber-600 mt-1">Not invited yet</div>') + '</td><td class="p-4 text-right whitespace-nowrap"><button class="' + B + '" onclick="acxWeb.edit(\'' + w.id + '\')">Edit</button> <button class="' + B + '" onclick="acxWeb.invite(\'' + w.id + '\')">📣 Invite</button> ' + (w.join_url ? '<a class="' + B + '" href="' + esc(w.join_url) + '" target="_blank" rel="noopener">📹 Host</a>' : '') + ' <button class="' + B + ' text-rose-600" onclick="acxWeb.del(\'' + w.id + '\')">Delete</button></td></tr>';
     }).join('') : '<tr><td colspan="6" class="p-8 text-center text-gray-500">No webinars scheduled.</td></tr>';
   }
   /* Acacia Meet link: same meeting room format as meet.html (acacia-####-topic). Anyone with the link can join. */
@@ -288,6 +288,22 @@
   window.acxWeb = {
     load: loadW, edit: editW,
     del: async function(id){ if (!confirm('Delete this webinar and its registrations?')) return; var r = await sb().from('acacia_webinars').delete().eq('id', id); if (!fail(r, 'delete')) loadW(); },
+    invite: function(id){
+      var w = W.find(function(x){ return x.id === id; }); if (!w) return;
+      if (!can()) return alert('Only the hub admin can send invites.');
+      var n = targets(w.company_ids).length;
+      modal('Invite to: ' + esc(w.title),
+        '<p class="text-sm text-gray-600">This sends a notification into the Acacia apps of <b>' + (w.company_ids && w.company_ids.length ? n + ' selected compan' + (n === 1 ? 'y' : 'ies') : 'all companies') + '</b>. They see it on the bell with a Register button. After they register, they can join from the bell or from <b>Meet</b> in the sidebar.</p>' +
+        field('Message to users (optional)', '<textarea id="iv_n" rows="3" class="' + I + '" placeholder="e.g. Learn Recurring Bills in 30 minutes. Seats are limited.">' + esc(w.invite_note) + '</textarea>') +
+        '<label class="flex items-center gap-2 mt-3 text-sm"><input type="checkbox" id="iv_m"> Also save an email draft in Acacia Mail</label>',
+        async function(o){
+          var note = $('#iv_n', o).value.trim(), mail = $('#iv_m', o).checked;
+          var r = await sb().from('acacia_webinars').update({ invited_at: new Date().toISOString(), invite_note: note, invite_count: (w.invite_count || 0) + 1, updated_at: new Date().toISOString() }).eq('id', id);
+          if (fail(r, 'send the invite')) return false;
+          if (mail) mailTo(targets(w.company_ids), 'Training: ' + w.title, w.title + '\nWhen: ' + fmt(w.starts_at) + ' (' + w.duration_min + ' min)\n' + (w.host ? 'Host: ' + w.host + '\n' : '') + (note ? '\n' + note + '\n' : '') + '\n' + (w.description || '') + '\n\nRegister inside Acacia Books > bell > Training.');
+          loadW();
+        }, 'Send invite');
+    },
     mail: function(id){ var w = W.find(function(x){ return x.id === id; }); mailTo(targets(w.company_ids), 'Training: ' + w.title, w.title + '\nWhen: ' + fmt(w.starts_at) + ' (' + w.duration_min + ' min)\n' + (w.host ? 'Host: ' + w.host + '\n' : '') + '\n' + (w.description || '') + '\n\nRegister inside Acacia Books > What\'s new > Training.'); },
     regs: function(id){
       var w = W.find(function(x){ return x.id === id; }), l = REG[id] || [];
