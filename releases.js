@@ -257,6 +257,7 @@
       field('Meeting link (Zoom / Meet / Teams)', '<div class="flex gap-2"><input id="w_u" class="' + I + '" value="' + esc(w.join_url) + '" placeholder="https:// (or click Create Meet link)"><button type="button" id="w_mk" class="' + B + ' whitespace-nowrap">📹 Create Meet link</button></div>') +
       '<div class="grid grid-cols-2 gap-3"><div>' + field('Host', '<input id="w_h" class="' + I + '" value="' + esc(w.host) + '">') + '</div><div>' + field('Seats (blank = unlimited)', '<input id="w_c" type="number" min="1" class="' + I + '" value="' + (w.capacity || '') + '">') + '</div></div>' +
       audience('w_', w.company_ids) +
+      (id ? '' : field('Notify users', '<label class="flex items-center gap-2 text-sm"><input type="checkbox" id="w_inv" checked> Send the invite to the 🔔 bell of these companies as soon as I save (they can register there)</label>')) +
       field('Status', '<select id="w_st" class="' + I + '">' + ['scheduled', 'completed', 'cancelled'].map(function(s){ return '<option' + (w.status === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>') +
       field('Recording link (add after the session)', '<input id="w_r" class="' + I + '" value="' + esc(w.recording_url) + '" placeholder="https://">'),
       async function(o){
@@ -264,7 +265,7 @@
         var t = $('#w_t', o).value.trim(), s = $('#w_s', o).value; if (!t || !s) { alert('Title and start time are required.'); return false; }
         var status0 = $('#w_st', o).value;
         var row = { title: t, module: $('#w_m', o).value.trim(), description: $('#w_d', o).value.trim(), starts_at: new Date(s).toISOString(), duration_min: parseInt($('#w_du', o).value, 10) || 60, join_url: url($('#w_u', o).value) || (status0 !== 'cancelled' ? meetLink($('#w_t', o).value) : ''), host: $('#w_h', o).value.trim(), capacity: parseInt($('#w_c', o).value, 10) || null, company_ids: readAud(o, 'w_'), status: $('#w_st', o).value, recording_url: url($('#w_r', o).value), updated_at: new Date().toISOString() };
-        var r = id ? await sb().from('acacia_webinars').update(row).eq('id', id) : await sb().from('acacia_webinars').insert(Object.assign(row, { created_by: who() }));
+        var r = id ? await sb().from('acacia_webinars').update(row).eq('id', id) : await sb().from('acacia_webinars').insert(Object.assign(row, { created_by: who() }, (($('#w_inv', o) && $('#w_inv', o).checked && row.status === 'scheduled') ? { invited_at: new Date().toISOString(), invite_count: 1 } : {})));
         if (fail(r, 'save')) return false; loadW();
       });
     bindAud(o, 'w_');

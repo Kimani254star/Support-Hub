@@ -88,6 +88,7 @@ const WEBSITE_KEY = "acacia_websites";
 const PAYMENT_KEY = "acacia_payments";
 const NOTIFICATION_KEY = "acacia_notifications";
 /* ===== Acacia Mail is the default mailer: drafts are queued per company in Supabase ===== */
+window.__ACX_MAIL_URL__ = window.__ACX_MAIL_URL__ || "https://acacia-mail.vercel.app/";
 window.acxMailTo = function(o){
     o = o || {};
     var SU = window.__SUPA_URL__ || "https://xglsampckermarjpczdf.supabase.co";
@@ -106,7 +107,7 @@ window.acxMailTo = function(o){
         return true;
     }
     var q = new URLSearchParams({ to: o.to || "", cc: o.cc || "", bcc: o.bcc || "", subject: o.subject || "", body: o.body || "", uid: "sp_" + Date.now() });
-    var w = window.open((window.__ACX_MAIL_URL__ || "acacia-mail.html") + "?" + q.toString(), "acaciaMail");
+    var w = window.open((window.__ACX_MAIL_URL__ || "https://acacia-mail.vercel.app/") + "?" + q.toString(), "acaciaMail");
     if (!w) alert("Your browser blocked the new tab. Allow pop-ups for this page, then try again.");
     return true;
 };
@@ -2218,7 +2219,7 @@ function emailReport(key) {
         (function(){ try { return (JSON.parse(localStorage.getItem("developerSession") || "{}").fullName) || "Acacia Books Support"; } catch (e) { return "Acacia Books Support"; } })()
     ].join("\n");
     const __q = new URLSearchParams({ to: r.email || "", subject: "Acacia Books \u2013 " + r.name + " Report (" + __when + ")", body: __body, uid: "sp_" + key + "_" + Date.now() });
-    const __mailUrl = (window.__ACX_MAIL_URL__ || "acacia-mail.html") + "?" + __q.toString();
+    const __mailUrl = (window.__ACX_MAIL_URL__ || "https://acacia-mail.vercel.app/") + "?" + __q.toString();
     const __w = window.open(__mailUrl, "acaciaMail");
     if (!__w) alert("Your browser blocked the new tab. Allow pop-ups for this page, then click Email again.");
     try { addLog("Info", "Developer", "Opened " + r.name + " report email draft in Acacia Mail", "Reports"); } catch (e) {}
