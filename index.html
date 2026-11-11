@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<head><script src="acacia-session.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Spear Developer Panel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Figtree:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 <script>(function(){try{var a=JSON.parse(localStorage.getItem("acacia_appearance")||"{}"),r=document.documentElement.style;if(a.sbBg)r.setProperty("--sb-bg",a.sbBg);if(a.sbText)r.setProperty("--sb-text",a.sbText);if(a.font)r.setProperty("--app-font",a.font);if(a.fs)r.setProperty("--app-fs",a.fs);}catch(e){}})();</script>
@@ -2415,7 +2415,7 @@
 </aside>
 <div id="commPanel" class="hidden fixed bottom-20 right-4 w-[760px] max-w-[95vw] h-[80vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-gray-200 z-50 overflow-hidden" role="dialog" aria-label="Team chat"><div class="tc-head"><div><h3>💬 Team Chat</h3><p id="tcSub">Click a teammate to start a conversation</p></div><button type="button" onclick="toggleCommPanel()" aria-label="Close chat">✕</button></div><div id="tcBody" class="tc-body"><aside class="tc-side"><div class="tc-me"><div id="tcMeAv" class="tc-av"></div><div style="min-width:0"><div id="tcMeName" class="tc-me-name"></div><button id="tcStatusBtn" type="button" aria-haspopup="true"><span id="tcMeDot" class="tc-dot"></span><span id="tcMeLabel"></span><span style="font-size:10px">▾</span></button></div><div id="tcMenu" class="tc-menu tc-hide" role="menu"></div></div><div class="tc-search"><input id="tcSearch" type="search" placeholder="Search teammates…" autocomplete="off"></div><div id="tcList" class="tc-list"></div></aside><section id="tcMain" class="tc-main"><div id="tcEmpty" class="tc-empty">💬<br>Select a teammate on the left to open a conversation.</div><div id="tcConv" class="tc-conv tc-hide"><div class="tc-chead"><button id="tcBack" type="button" class="tc-back" aria-label="Back to contacts">←</button><div id="tcPeerAv" class="tc-av sm"></div><div style="min-width:0"><div id="tcPeerName" class="tc-peer"></div><div class="tc-peers"><span id="tcPeerDot" class="tc-dot"></span><span id="tcPeerStatus"></span></div></div></div><div id="tcMsgs" class="tc-msgs"></div><div id="tcErr" class="tc-err tc-hide" role="alert"></div><div id="tcReplyBar" class="tc-replybar tc-hide"><div class="tc-rq"><b id="tcReplyWho"></b><span id="tcReplyTxt"></span></div><button id="tcReplyX" type="button" aria-label="Cancel reply">✕</button></div><div class="tc-comp"><input id="tcFile" type="file" class="tc-hide"> <button id="tcAttach" type="button" class="tc-iconbtn" title="Attach a file (max 400 KB)" aria-label="Attach a file">📎</button> <textarea id="tcInput" rows="1" placeholder="Type a message" aria-label="Message"></textarea> <button id="tcSend" type="button" class="tc-send">Send</button></div></div><div id="tcMsgMenu" class="tc-mmenu tc-hide" role="menu"></div></section></div></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
 <script src="script.js"></script>
 <script src="releases.js"></script>
 <script src="studio.js"></script>
