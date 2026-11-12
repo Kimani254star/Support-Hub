@@ -3205,6 +3205,16 @@ function devAutoRefresh(){
 
   window.hubApprove = async function(id){ var c = co(id); var pu = askDate(Number(c.price || 0) > 0 ? plus(30) : ''); if (pu === undefined) return;
     await patch(id, { status: 'active', paid_until: pu, approved_at: new Date().toISOString(), note: 'Approved' }, 'Approved ' + (c.companyName || id)); };
+  /* Trace payment: every payment recorded for this company, found by company ID, owner email or company name, so Support
+     can see whether a new account (in Books or any other app) has paid before approving it. */
+  window.hubTracePayments = function(id){
+    var c = co(id) || {}, em = low(c.email === '-' ? '' : c.email), nm = low(c.companyName), cid = String(c.companyId || id);
+    var hit = (pays || []).filter(function(r){ return String(r.company_id) === cid || (em && low(r.email) === em) || (nm && low(r.customer) === nm); });
+    if (!hit.length){ alert('No payment found for ' + (c.companyName || cid) + '.\n\nSearched by company ID (' + cid + ')' + (em ? ', email (' + em + ')' : '') + ' and company name.\nIf the customer says they paid, check the M-Pesa / bank statement, then record it with Payments > renew.'); return; }
+    var tot = hit.reduce(function(a, r){ return a + (Number(r.amount) || 0); }, 0);
+    alert(hit.length + ' payment' + (hit.length === 1 ? '' : 's') + ' for ' + (c.companyName || cid) + ' (total KES ' + tot.toLocaleString() + '):\n\n' + hit.slice(0, 12).map(function(r){
+      return new Date(r.created_at).toLocaleDateString() + '  KES ' + (Number(r.amount) || 0).toLocaleString() + '  ' + (r.method || '') + '  ' + (r.status || '') + '  ' + (r.plan || '') + (r.invoice ? '  #' + r.invoice : ''); }).join('\n'));
+  };
   window.hubReject = async function(id){ if (!confirm('Reject this registration?')) return;
     await patch(id, { status: 'rejected', note: 'Rejected by admin' }, 'Rejected ' + (co(id).companyName || id)); };
   window.hubSuspend = async function(id){ if (!confirm('Deactivate this company? Its users will be locked out.')) return;
@@ -3293,6 +3303,7 @@ function devAutoRefresh(){
     else if (s === 'Active') out += b('+30d', "hubExtend('" + id + "',30)", 'bg-blue-900') + b('+1y', "hubExtend('" + id + "',365)", 'bg-blue-900') + b('Deactivate', "hubSuspend('" + id + "')", 'bg-red-600');
     else if (s === 'Suspended' || s === 'Expired' || s === 'Rejected') out += b('Reactivate', "hubReactivate('" + id + "')", 'bg-green-600');
     else if (s === 'Untracked') out += b('Start tracking', "hubTrack('" + id + "')", 'bg-blue-900');
+    if (s !== 'Untracked') out += b('Payments', "hubTracePayments('" + id + "')", 'bg-amber-600');
     if (s !== 'Untracked') out += b('Users', "hubSetExtraUsers('" + id + "')", 'bg-indigo-600');
     if (s !== 'Untracked') out += b('POS', "hubSetPos('" + id + "')", 'bg-teal-700');
     if (s !== 'Untracked') out += b('Rename', "hubRenameCompany('" + id + "')", 'bg-slate-600');
