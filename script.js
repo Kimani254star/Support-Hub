@@ -505,6 +505,7 @@ function renderUsers() {
     let filtered = users.filter(u =>
         u.username.toLowerCase().includes(search) ||
         (u.company && u.company.toLowerCase().includes(search)) ||
+        String(u.companyId || '').toLowerCase().includes(search) ||
         (u.email && u.email.toLowerCase().includes(search))
     );
     if (roleFilter) filtered = filtered.filter(u => u.role === roleFilter);
@@ -519,7 +520,7 @@ function renderUsers() {
     const { pageItems, totalPages } = paginate(filtered, 'users');
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-center p-6 text-gray-500">No users found</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center p-6 text-gray-500">No users found</td></tr>`;
     } else {
         pageItems.forEach(u => {
             tbody.innerHTML += `
@@ -528,6 +529,7 @@ function renderUsers() {
                 <td>${u.username}</td>
                 <td>${u.email || '-'}</td>
                 <td>${u.company || '-'}</td>
+                <td class="font-mono text-xs whitespace-nowrap">${(function(){ var co = (typeof companies !== 'undefined' ? companies : []).find(function(c){ return String(c.companyId).toLowerCase() === String(u.companyId || '').toLowerCase(); }); return (co && (co.orgCode || co.companyId)) || u.companyId || '-'; })()}</td>
                 <td>${u.role || '-'}</td>
                 <td><span class="${u.status === 'Active' ? 'text-green-600 font-bold' : 'text-red-500'}">${u.status || 'Active'}</span></td>
                 <td>
@@ -2898,6 +2900,12 @@ function devAutoRefresh(){
         }
       }
     }
+    try {
+      if (canWrite){
+        var rmv = await sb.rpc('acx_removed_company_ids');
+        if (!rmv.error && Array.isArray(rmv.data)) rmv.data.forEach(function(x){ addTomb('companies', x.company_id); if (x.company_name) addTomb('companies', x.company_name); });
+      }
+    } catch(e){}
     applyTombstones();
     window.__acxCloudReady = true;
     merge(); mergeTickets(); mergePayments(); try { var __ap = document.getElementById('apps'); if (__ap && __ap.classList.contains('active')) window.renderAppsPage(); } catch(e){} renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
@@ -3160,7 +3168,7 @@ function devAutoRefresh(){
     var cs = rows.map(function(r){
       return { id: r.company_id, companyId: r.company_id, orgCode: r.org_code || acctOrgCode(r.company_id), companyName: r.company_name || r.company_id, ownerName: r.owner_name || '-',
         email: r.email || '-', plan: planLabel(r.plan, 'Free'), price: Number(r.price || 0), extraUsers: Number(r.extra_users || 0), billing: /^y/i.test(String(r.billing || '')) ? 'Yearly' : 'Monthly', allApps: !!r.all_apps, appList: r.apps || '', posMode: r.pos_mode || '', posPrice: Number(r.pos_price || 0), posUntil: r.pos_until || '', amountDue: Number(r.amount_due || 0), status: title(eff(r)),
-        registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), _row: r };
+        registered: fmt(r.created_at), createdAt: fmt(r.created_at), expiry: r.paid_until ? fmt(r.paid_until) : '-', note: r.note || '', apps: usageText(r.company_id), licenseCode: r.license_code || '', _row: r };
     });
     var known = {}; rows.forEach(function(r){ known[String(r.company_id).toLowerCase()] = 1; });
     var extra = normalizeCompanies(companiesFromUsers(users).concat(devCollect(COMPANY_STORE_KEYS)))
@@ -3297,14 +3305,14 @@ function devAutoRefresh(){
     var statusFilter = (document.getElementById('companyStatusFilter') || {}).value || '';
     populateFilterOptionsLabeled('companyPlanFilter', companies.map(function(c){ return c.plan; }), 'All Plans');
     populateFilterOptionsLabeled('companyStatusFilter', companies.map(function(c){ return c.status; }), 'All Statuses');
-    var f = companies.filter(function(c){ return (c.companyName || '').toLowerCase().indexOf(search) > -1 || (c.orgCode || '').toLowerCase().indexOf(search) > -1 || (c.ownerName || '').toLowerCase().indexOf(search) > -1 || (c.email || '').toLowerCase().indexOf(search) > -1; });
+    var f = companies.filter(function(c){ return (c.companyName || '').toLowerCase().indexOf(search) > -1 || (c.orgCode || '').toLowerCase().indexOf(search) > -1 || (c.licenseCode || '').toLowerCase().indexOf(search) > -1 || (c.ownerName || '').toLowerCase().indexOf(search) > -1 || (c.email || '').toLowerCase().indexOf(search) > -1; });
     if (planFilter) f = f.filter(function(c){ return planLabel(c.plan, "") === planFilter; });
     if (statusFilter) f = f.filter(function(c){ return c.status === statusFilter; });
     var pg = paginate(f, 'companies'), html = '';
-    if (!f.length) html = '<tr><td colspan="9" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
+    if (!f.length) html = '<tr><td colspan="10" class="text-center p-6 text-gray-500">No companies yet.</td></tr>';
     pg.pageItems.forEach(function(c){
       html += '<tr><td class="p-4 pl-6"><input type="checkbox" class="companies-row-checkbox rounded border-gray-300 text-blue-600" value="' + esc(c.id || c.companyName) + '" onclick="onRowCheckToggle(\'companies\')"></td>' +
-        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td class="font-mono text-xs whitespace-nowrap">' + (c.orgCode ? esc(c.orgCode) : '<span class="text-gray-400">-</span>') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.plan) + planLine(c) + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
+        '<td>' + esc(c.companyName) + (c.apps ? '<div class="text-xs text-gray-500 mt-1">' + esc(c.apps) + '</div>' : '') + '</td><td class="font-mono text-xs whitespace-nowrap">' + (c.orgCode ? esc(c.orgCode) : '<span class="text-gray-400">-</span>') + '</td><td>' + esc(c.ownerName) + '</td><td>' + esc(c.email) + '</td><td class="font-mono text-xs whitespace-nowrap">' + (c.licenseCode ? esc(c.licenseCode) : '<span class="text-gray-400" title="Issued when the company is approved">-</span>') + '</td><td>' + esc(c.plan) + planLine(c) + (Number(c.extraUsers) > 0 ? '<div class="text-xs text-indigo-600 mt-1">+' + Number(c.extraUsers) + ' extra users</div>' : '') + '</td>' +
         '<td><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (badge[c.status] || 'bg-gray-100 text-gray-700') + '">' + esc(c.status) + '</span>' +
         (c.expiry && c.expiry !== '-' ? '<div class="text-xs text-gray-500 mt-1">until ' + esc(c.expiry) + '</div>' : '') + '</td>' +
         '<td>' + esc(c.registered || '-') + '</td><td class="pr-6 text-right">' + actions(c) + '</td></tr>';
@@ -3418,6 +3426,13 @@ function devAutoRefresh(){
   async function purgeCompany(id, name){
     var errs = [];
     addTomb('companies', id); if (name) addTomb('companies', name);
+    /* Preferred: one server call that deactivates the company in Books and every app (users can no longer sign in)
+       and removes it from Support. Needs acacia_company_lifecycle.sql; otherwise fall back to plain deletes below. */
+    try {
+      var hr = await sb.rpc('acx_hub_remove_company', { p_company: id });
+      if (!hr.error){ scrubLocalStores(); return errs; }
+      console.warn('[hub cloud] acx_hub_remove_company unavailable - run acacia_company_lifecycle.sql:', hr.error.message);
+    } catch(e){}
     var st = await delRows(sb.from('acacia_company_status').delete().eq('company_id', id), 'company record', errs);
     if (!st.error && (!st.data || !st.data.length)) errs.push('company record: 0 rows deleted (no permission?)');
     await delRows(sb.from('app_accounts').delete().eq('company_id', id), 'user accounts', errs);
