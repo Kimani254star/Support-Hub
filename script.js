@@ -2772,7 +2772,7 @@ function devAutoRefresh(){
   if (!window.supabase) { console.warn('[hub cloud] supabase-js not loaded'); return; }
   var sb = window.supabase.createClient(URL_, KEY_, { auth: { storageKey: 'acacia-hub-auth', persistSession: true } });
   window.__acxSb = sb;
-  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], upgrades = [], busy = false;
+  var canWrite = false, cloudOK = false, rows = [], accts = [], usage = [], tix = [], pays = [], hubUsers = [], upgrades = [], restores = [], busy = false;
 
   function title(s){ s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
   function fmt(d){ return d ? new Date(d).toISOString().slice(0, 10) : '-'; }
@@ -2885,6 +2885,7 @@ function devAutoRefresh(){
       var pm = await sb.from('acacia_payments').select('*').order('created_at', { ascending: false }); pays = pm.error ? [] : (pm.data || []);
       var hu = await sb.from('acacia_hub_users').select('*').order('created_at', { ascending: true }); hubUsers = hu.error ? [] : (hu.data || []);
       var ur = await sb.from('acacia_upgrade_requests').select('*').order('created_at', { ascending: false }).limit(100); upgrades = ur.error ? [] : (ur.data || []);
+      var rr = await sb.from('acx_restore_requests').select('*').order('created_at', { ascending: false }).limit(100); restores = rr.error ? [] : (rr.data || []);
       cloudOK = true;
     } catch(e){ cloudOK = false; console.warn('[hub cloud] could not reach Supabase - list stays as last known:', e); pill(); busy = false; return; }
     if (canWrite){
@@ -2908,7 +2909,7 @@ function devAutoRefresh(){
     } catch(e){}
     applyTombstones();
     window.__acxCloudReady = true;
-    merge(); mergeTickets(); mergePayments(); try { var __ap = document.getElementById('apps'); if (__ap && __ap.classList.contains('active')) window.renderAppsPage(); } catch(e){} renderHubAccess(); renderUpgrades(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
+    merge(); mergeTickets(); mergePayments(); try { var __ap = document.getElementById('apps'); if (__ap && __ap.classList.contains('active')) window.renderAppsPage(); } catch(e){} renderHubAccess(); renderUpgrades(); renderRestores(); renderRevenueCard(); checkForAlerts(); pill(); busy = false;
     try { sweepIdleTickets(); } catch(e){}
     try { backfillOrgCodes(); } catch(e){}
   }
@@ -3339,6 +3340,46 @@ function devAutoRefresh(){
     updateBulkBar('companies');
   };
   
+
+  function renderRestores(){
+    var tb = document.getElementById('restoreReqTable'); if (!tb) return;
+    var pend = restores.filter(function(u){ return u.status === 'pending'; });
+    var shown = pend.concat(restores.filter(function(u){ return u.status !== 'pending'; }).slice(0, 8));
+    var cnt = document.getElementById('restorePendingCount');
+    if (cnt){ cnt.textContent = pend.length + ' pending'; cnt.className = 'px-2.5 py-1 rounded-full text-xs font-semibold ' + (pend.length ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'); }
+    var stBadge = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-green-100 text-green-800', rejected: 'bg-gray-200 text-gray-700' };
+    tb.innerHTML = shown.length ? shown.map(function(u){
+      var id = String(u.id).replace(/'/g, '');
+      var act = u.status === 'pending'
+        ? '<button class="bg-green-600 text-white px-2 py-1 text-xs rounded mr-1" onclick="hubApproveRestore(\'' + id + '\')">Approve</button><button class="bg-gray-600 text-white px-2 py-1 text-xs rounded" onclick="hubRejectRestore(\'' + id + '\')">Reject</button>'
+        : '<span class="text-xs text-gray-400">' + esc(u.decided_by || '') + (u.decided_at ? ' \u00b7 ' + fmt(u.decided_at) : '') + '</span>';
+      return '<tr class="border-t"><td class="p-3 pl-5"><div class="font-medium text-gray-900">' + esc(u.company_name || u.company_id) + '</div><div class="text-xs text-gray-500">' + esc(u.login_email || '') + ' \u00b7 ' + (u.scope === 'user' ? 'one user' : 'whole company') + ' \u00b7 ' + ago(u.created_at) + '</div></td>' +
+        '<td class="p-3">' + esc(u.requester || '-') + '<div class="text-xs text-gray-500">' + esc(u.phone || '') + '</div></td>' +
+        '<td class="p-3 text-gray-600 max-w-xs">' + esc(u.message || '-') + '</td>' +
+        '<td class="p-3"><span class="px-2 py-1 rounded-full text-xs font-semibold ' + (stBadge[u.status] || 'bg-gray-100 text-gray-700') + '">' + esc(title(u.status)) + '</span></td>' +
+        '<td class="p-3 pr-5 text-right">' + act + '</td></tr>';
+    }).join('') : '<tr><td colspan="5" class="text-center p-6 text-gray-500">No restore requests yet.</td></tr>';
+  }
+  window.hubApproveRestore = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var u = restores.find(function(x){ return String(x.id) === String(id); }); if (!u) return;
+    if (!confirm('Restore ' + (u.scope === 'user' ? 'user ' + u.login_email + ' in ' : '') + 'company ' + (u.company_name || u.company_id) + '? They will be able to sign in again.')) return;
+    var r = await sb.rpc('acx_decide_restore', { p_id: id, p_approve: true, p_note: null });
+    if (r.error){ alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Restored account ' + (u.company_name || u.company_id) + ' (' + u.login_email + ')', 'Companies'); } catch(e){}
+    var n = r.data && r.data.rows_restored;
+    if (n === 0) alert('Approved. The customer can sign in again.\n\nNote: no archived account rows were found (the account was deleted before the archive existed). If sign-in still fails, re-create the user from Users.');
+    await refresh();
+  };
+  window.hubRejectRestore = async function(id){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var u = restores.find(function(x){ return String(x.id) === String(id); }); if (!u) return;
+    var why = prompt('Reason for rejecting (shown to the customer, optional):', ''); if (why === null) return;
+    var r = await sb.rpc('acx_decide_restore', { p_id: id, p_approve: false, p_note: why.trim() || null });
+    if (r.error){ alert('Failed: ' + r.error.message); return; }
+    try { addLog('Info', who(), 'Rejected restore for ' + (u.company_name || u.company_id), 'Companies'); } catch(e){}
+    await refresh();
+  };
   function upMoney(u){ return (/enterprise/i.test(u.requested_plan || '') && !Number(u.amount)) ? 'Custom price' : money(u.amount); }
   function renderUpgrades(){
     var tb = document.getElementById('upgradeReqTable'); if (!tb) return;
@@ -3419,7 +3460,7 @@ function devAutoRefresh(){
     if (rt || !sb.channel || !localStorage.getItem('developerSession')) return;
     try {
       rt = sb.channel('hub-live');
-      ['acacia_company_status','app_accounts','acacia_app_usage','acacia_tickets','acacia_ticket_messages','acacia_payments','acacia_hub_users','acacia_upgrade_requests'].forEach(function(t){ rt = rt.on('postgres_changes', { event: '*', schema: 'public', table: t }, kick); });
+      ['acacia_company_status','app_accounts','acacia_app_usage','acacia_tickets','acacia_ticket_messages','acacia_payments','acacia_hub_users','acacia_upgrade_requests','acx_restore_requests'].forEach(function(t){ rt = rt.on('postgres_changes', { event: '*', schema: 'public', table: t }, kick); });
       rt.subscribe();
     } catch(e){ rt = null; console.warn('[hub cloud] realtime unavailable, polling only', e); }
   }
