@@ -3606,27 +3606,39 @@ function devAutoRefresh(){
     var rows0 = hubUsers.map(function(u){
       return '<tr class="border-t border-gray-100"><td class="py-2 pr-4">' + esc(u.email) + (u.full_name ? '<div class="text-xs text-gray-400">' + esc(u.full_name) + '</div>' : '') + '</td>' +
         '<td class="py-2 pr-4">' + '<span class="text-xs font-semibold ' + (ROLE_CSS[u.role] || ROLE_CSS.hub_viewer) + ' px-2 py-0.5 rounded-full">' + esc(ROLE_NAME[u.role] || u.role) + '</span>' + '</td>' +
-        '<td class="py-2 text-right">' + (canWrite && u.email.toLowerCase() !== me0 ? '<button class="text-xs text-red-600 hover:underline" onclick="hubRemoveAccess(\'' + u.email.replace(/'/g, "\\'") + '\')">Remove</button>' : '') + '</td></tr>';
+        '<td class="py-2 text-right">' + (canWrite ? '<button class="text-xs text-blue-700 hover:underline mr-3" onclick="hubSetPassword(\'' + u.email.replace(/'/g, "\\'") + '\')">Set password</button>' : '') + (canWrite && u.email.toLowerCase() !== me0 ? '<button class="text-xs text-red-600 hover:underline" onclick="hubRemoveAccess(\'' + u.email.replace(/'/g, "\\'") + '\')">Remove</button>' : '') + '</td></tr>';
     }).join('');
     box.innerHTML =
       '<div class="flex items-center justify-between mb-3"><h3 class="font-bold text-gray-900">Hub Access</h3>' +
       (canWrite ? '<button class="bg-blue-900 text-white text-xs px-3 py-1.5 rounded" onclick="hubAddAccessPrompt()">+ Add person</button>' : '') + '</div>' +
       '<table class="w-full text-sm"><thead><tr class="text-left text-gray-500"><th class="pb-2">Email</th><th class="pb-2">Access</th><th></th></tr></thead><tbody>' +
       (rows0 || '<tr><td colspan="3" class="py-3 text-gray-400">No one on the list yet.</td></tr>') + '</tbody></table>' +
-      '<p class="text-xs text-gray-400 mt-3">Adding someone here lets them sign in once they also have a Supabase login with the matching role. Create that under Supabase \u2192 Authentication \u2192 Users, tick Auto Confirm, then set their role (hub_admin, hub_viewer, hub_accounts or hub_support) with the role SQL.</p>';
+      '<p class="text-xs text-gray-400 mt-3">+ Add person creates their sign-in (email + the password you set). Use Set password to change it later. They sign in with their email address.</p>';
   }
   window.hubAddAccessPrompt = async function(){
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
-    var email = prompt('Email address to give access to:'); if (!email) return;
+    var email = prompt('Email address to give access to (this is what they type to sign in):'); if (!email) return;
     email = email.trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('That does not look like an email address.'); return; }
     var pick = prompt('Choose access for ' + email + ':\n\n1 = Admin (full access)\n2 = Viewer (read-only, everything)\n3 = Accounts (Payments + Companies, read-only)\n4 = Customer Care (Support inquiries, can reply)', '3'); if (pick === null) return;
     var role = { '1': 'hub_admin', '2': 'hub_viewer', '3': 'hub_accounts', '4': 'hub_support' }[String(pick).trim()];
     if (!role){ alert('Enter 1, 2, 3 or 4.'); return; }
-    var r = await sb.from('acacia_hub_users').upsert({ email: email, role: role, added_by: who() });
-    if (r.error) { alert('Failed: ' + r.error.message); return; }
-    try { addLog('Warning', who(), 'Granted ' + role + ' Hub access to ' + email, 'Security'); } catch(e){}
-    alert(email + ' is now on the allow-list as ' + ROLE_NAME[role] + '. They still need a Supabase login whose role is set to ' + role + ' (see the SQL I gave you).');
+    var nm = prompt('Full name (optional):', ''); if (nm === null) return;
+    var pw = prompt('Set a password for ' + email + ' (at least 8 characters):', ''); if (pw === null) return;
+    if (pw.length < 8){ alert('Password must be at least 8 characters.'); return; }
+    var r = await sb.rpc('acx_hub_create_login', { p_email: email, p_password: pw, p_role: role, p_name: nm.trim() || null });
+    if (r.error) { alert('Failed: ' + r.error.message + '\n\nIf it says the function does not exist, run acacia_hub_logins.sql in Supabase first.'); return; }
+    try { addLog('Warning', who(), 'Created Hub login ' + role + ' for ' + email, 'Security'); } catch(e){}
+    alert(email + ' can now sign in as ' + ROLE_NAME[role] + ' with the password you set.');
     await refresh();
+  };
+  window.hubSetPassword = async function(email){
+    if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
+    var pw = prompt('New password for ' + email + ' (at least 8 characters):', ''); if (pw === null) return;
+    if (pw.length < 8){ alert('Password must be at least 8 characters.'); return; }
+    var r = await sb.rpc('acx_hub_set_password', { p_email: email, p_password: pw });
+    if (r.error) { alert('Failed: ' + r.error.message); return; }
+    try { addLog('Warning', who(), 'Reset Hub password for ' + email, 'Security'); } catch(e){}
+    alert('Password changed for ' + email + '.');
   };
   window.hubRemoveAccess = async function(email){
     if (!canWrite){ alert('Read-only: hub admin sign-in missing.'); return; }
@@ -3742,6 +3754,14 @@ function devAutoRefresh(){
     var pw = prompt('New password for ' + (u.username || loginId) + ' (tell them this - it cannot be shown again):');
     if (!pw) return;
     if (pw.length < 4){ alert('Choose at least 4 characters.'); return; }
+    /* Preferred: server-side reset (old password stops working, user is signed out). Needs acacia_books_password_reset.sql */
+    var rr = await sb.rpc('acx_hub_set_books_password', { p_company: String(row.company_id), p_login: loginId, p_password: pw });
+    if (!rr.error){
+      try { addLog('Warning', who(), 'Reset password for ' + loginId, 'Security'); } catch(e){}
+      alert('Password reset. Tell ' + (u.username || loginId) + ' their new password. Their old password no longer works and they were signed out of other devices.');
+      return;
+    }
+    if (!/could not find the function|does not exist|schema cache/i.test(rr.error.message || '')){ alert('Failed: ' + rr.error.message); return; }
     var salt = genSalt(), hash = await hashPw(pw, salt);
     var data = Object.assign({}, row.data, { passwordHash: hash, passwordSalt: salt });
     delete data.password;
